@@ -8,9 +8,116 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
+});
+
+/**
+ * @summary Register a new user
+ */
+export const RegisterBody = zod.object({
+  username: zod.string(),
+  password: zod.string(),
+});
+
+/**
+ * @summary Login
+ */
+export const LoginBody = zod.object({
+  username: zod.string(),
+  password: zod.string(),
+});
+
+export const LoginResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+});
+
+/**
+ * @summary Logout
+ */
+export const LogoutResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Get current user
+ */
+export const GetMeResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+});
+
+/**
+ * @summary Get current active question
+ */
+export const GetCurrentQuestionResponse = zod.object({
+  sessionId: zod.number(),
+  questionId: zod.number(),
+  text: zod.string(),
+  choices: zod.array(zod.string()),
+  category: zod.string(),
+  hasAnswered: zod.boolean(),
+  answeredCount: zod.number(),
+});
+
+/**
+ * @summary Move to next question (host only)
+ */
+export const NextQuestionResponse = zod.object({
+  sessionId: zod.number(),
+  questionId: zod.number(),
+  text: zod.string(),
+  choices: zod.array(zod.string()),
+  category: zod.string(),
+  hasAnswered: zod.boolean(),
+  answeredCount: zod.number(),
+});
+
+/**
+ * @summary Submit an answer to the current question
+ */
+export const SubmitAnswerBody = zod.object({
+  answer: zod.number(),
+});
+
+export const SubmitAnswerResponse = zod.object({
+  correct: zod.boolean(),
+  correctAnswer: zod.number(),
+  correctAnswerText: zod.string(),
+  newScore: zod.number(),
+});
+
+/**
+ * @summary Get current leaderboard
+ */
+export const GetLeaderboardResponseItem = zod.object({
+  userId: zod.number(),
+  username: zod.string(),
+  score: zod.number(),
+  rank: zod.number(),
+});
+export const GetLeaderboardResponse = zod.array(GetLeaderboardResponseItem);
+
+/**
+ * @summary Get recent chat messages
+ */
+export const GetChatMessagesResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  username: zod.string(),
+  message: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetChatMessagesResponse = zod.array(GetChatMessagesResponseItem);
+
+/**
+ * @summary Get current question answer stats
+ */
+export const GetQuizStatsResponse = zod.object({
+  totalAnswers: zod.number(),
+  correctAnswers: zod.number(),
+  distribution: zod.record(zod.string(), zod.number()),
 });

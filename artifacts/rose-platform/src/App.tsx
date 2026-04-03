@@ -1,22 +1,49 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Home from "@/pages/Home";
 import SongGame from "@/pages/SongGame";
 import XOGame from "@/pages/XOGame";
 import WheelGame from "@/pages/WheelGame";
+import QuizGame from "@/pages/QuizGame";
+import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-2 border-pink-400/40 border-t-pink-400 rounded-full" />
+      </div>
+    );
+  }
+  if (!user) return <AuthPage />;
+  return <Component />;
+}
+
 function Router() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-2 border-pink-400/40 border-t-pink-400 rounded-full" />
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/song-game" component={SongGame} />
-      <Route path="/xo-game" component={XOGame} />
-      <Route path="/wheel-game" component={WheelGame} />
+      <Route path="/">{user ? <Home /> : <AuthPage />}</Route>
+      <Route path="/song-game"><ProtectedRoute component={SongGame} /></Route>
+      <Route path="/xo-game"><ProtectedRoute component={XOGame} /></Route>
+      <Route path="/wheel-game"><ProtectedRoute component={WheelGame} /></Route>
+      <Route path="/quiz"><ProtectedRoute component={QuizGame} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -26,10 +53,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

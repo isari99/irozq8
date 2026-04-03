@@ -6,4 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./answerResult";
+export * from "./authCredentials";
+export * from "./authUser";
+export * from "./chatMessage";
+export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./leaderboardEntry";
+export * from "./quizQuestion";
+export * from "./quizStats";
+export * from "./quizStatsDistribution";
+export * from "./submitAnswerBody";
+export * from "./successResponse";

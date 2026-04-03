@@ -8,3 +8,65 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface AuthCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+}
+
+export interface QuizQuestion {
+  sessionId: number;
+  questionId: number;
+  text: string;
+  choices: string[];
+  category: string;
+  hasAnswered: boolean;
+  answeredCount: number;
+}
+
+export interface SubmitAnswerBody {
+  answer: number;
+}
+
+export interface AnswerResult {
+  correct: boolean;
+  correctAnswer: number;
+  correctAnswerText: string;
+  newScore: number;
+}
+
+export interface LeaderboardEntry {
+  userId: number;
+  username: string;
+  score: number;
+  rank: number;
+}
+
+export interface ChatMessage {
+  id: number;
+  userId: number;
+  username: string;
+  message: string;
+  createdAt: string;
+}
+
+export type QuizStatsDistribution = { [key: string]: number };
+
+export interface QuizStats {
+  totalAnswers: number;
+  correctAnswers: number;
+  distribution: QuizStatsDistribution;
+}

@@ -1,6 +1,5 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: API specification
@@ -10,13 +9,16 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: quiz
+    description: Quiz game operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +26,207 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "201":
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /quiz/current:
+    get:
+      operationId: getCurrentQuestion
+      tags: [quiz]
+      summary: Get current active question
+      responses:
+        "200":
+          description: Current question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizQuestion"
+        "404":
+          description: No active question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /quiz/next:
+    post:
+      operationId: nextQuestion
+      tags: [quiz]
+      summary: Move to next question (host only)
+      responses:
+        "200":
+          description: Next question started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizQuestion"
+
+  /quiz/answer:
+    post:
+      operationId: submitAnswer
+      tags: [quiz]
+      summary: Submit an answer to the current question
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitAnswerBody"
+      responses:
+        "200":
+          description: Answer result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnswerResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Already answered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /quiz/leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [quiz]
+      summary: Get current leaderboard
+      responses:
+        "200":
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /quiz/chat:
+    get:
+      operationId: getChatMessages
+      tags: [quiz]
+      summary: Get recent chat messages
+      responses:
+        "200":
+          description: Recent messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+  /quiz/stats:
+    get:
+      operationId: getQuizStats
+      tags: [quiz]
+      summary: Get current question answer stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +237,146 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    AuthCredentials:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - username
+
+    QuizQuestion:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+        questionId:
+          type: integer
+        text:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        hasAnswered:
+          type: boolean
+        answeredCount:
+          type: integer
+      required:
+        - sessionId
+        - questionId
+        - text
+        - choices
+        - category
+        - hasAnswered
+        - answeredCount
+
+    SubmitAnswerBody:
+      type: object
+      properties:
+        answer:
+          type: integer
+      required:
+        - answer
+
+    AnswerResult:
+      type: object
+      properties:
+        correct:
+          type: boolean
+        correctAnswer:
+          type: integer
+        correctAnswerText:
+          type: string
+        newScore:
+          type: integer
+      required:
+        - correct
+        - correctAnswer
+        - correctAnswerText
+        - newScore
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        userId:
+          type: integer
+        username:
+          type: string
+        score:
+          type: integer
+        rank:
+          type: integer
+      required:
+        - userId
+        - username
+        - score
+        - rank
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - username
+        - message
+        - createdAt
+
+    QuizStats:
+      type: object
+      properties:
+        totalAnswers:
+          type: integer
+        correctAnswers:
+          type: integer
+        distribution:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - totalAnswers
+        - correctAnswers
+        - distribution

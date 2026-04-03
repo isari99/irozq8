@@ -1,8 +1,21 @@
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Music, Grid3X3, CircleDot } from "lucide-react";
+import { Music, Grid3X3, CircleDot, HelpCircle, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const games = [
+  {
+    id: "quiz",
+    title: "لعبة الأسئلة",
+    description: "أجب بالأرقام 1-4 عبر الشات وتصدّر القائمة",
+    icon: HelpCircle,
+    neonColor: "#ffd600",
+    path: "/quiz",
+    emoji: "❓",
+    borderColor: "border-yellow-500/40",
+    color: "",
+    glowColor: "",
+  },
   {
     id: "song-game",
     title: "لعبة الأغاني",
@@ -43,6 +56,7 @@ const games = [
 
 export default function Home() {
   const [, navigate] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen gradient-bg relative overflow-hidden" dir="rtl">
@@ -79,6 +93,19 @@ export default function Home() {
         style={{ background: "radial-gradient(circle, #00e5ff, transparent)" }} />
 
       <div className="relative z-10 flex flex-col items-center min-h-screen px-4 py-12">
+        {/* User bar */}
+        {user && (
+          <div className="absolute top-4 left-4 flex items-center gap-3">
+            <span className="text-sm text-purple-300/70">مرحباً، <span className="text-pink-400 font-bold">{user.username}</span></span>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 text-xs text-purple-400/60 hover:text-red-400 transition-colors px-2 py-1 rounded-lg border border-purple-500/20 hover:border-red-400/30"
+            >
+              <LogOut size={12} /> خروج
+            </button>
+          </div>
+        )}
+
         {/* Logo section */}
         <motion.div
           initial={{ opacity: 0, y: -50 }}
