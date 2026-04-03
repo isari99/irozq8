@@ -14,6 +14,25 @@ function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
+// GET /quiz/joined - check if user has joined
+router.get("/quiz/joined", requireAuth, (req, res): void => {
+  const session = (req as any).session;
+  if (session.joined) {
+    res.json({ joined: true });
+  } else {
+    res.status(404).json({ joined: false });
+  }
+});
+
+// POST /quiz/join - join the game
+router.post("/quiz/join", requireAuth, (req, res): void => {
+  const session = (req as any).session;
+  session.joined = true;
+  session.save(() => {
+    res.json({ success: true, message: "تم الانضمام بنجاح" });
+  });
+});
+
 // GET /quiz/current
 router.get("/quiz/current", requireAuth, async (req, res): Promise<void> => {
   const session = (req as any).session;
