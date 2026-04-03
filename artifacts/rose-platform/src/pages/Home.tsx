@@ -1,0 +1,228 @@
+import { useLocation } from "wouter";
+import { motion } from "framer-motion";
+import { Music, Grid3X3, CircleDot } from "lucide-react";
+
+const games = [
+  {
+    id: "song-game",
+    title: "لعبة الأغاني",
+    description: "خمّن الأغنية وفوز بالنقاط لفريقك",
+    icon: Music,
+    color: "from-pink-600 to-purple-700",
+    borderColor: "border-pink-500/40",
+    glowColor: "shadow-pink-500/30",
+    neonColor: "#e040fb",
+    path: "/song-game",
+    emoji: "🎵",
+  },
+  {
+    id: "xo-game",
+    title: "لعبة XO",
+    description: "الكلاسيكية الخالدة بين فريقين",
+    icon: Grid3X3,
+    color: "from-cyan-600 to-blue-700",
+    borderColor: "border-cyan-500/40",
+    glowColor: "shadow-cyan-500/30",
+    neonColor: "#00e5ff",
+    path: "/xo-game",
+    emoji: "❌",
+  },
+  {
+    id: "wheel-game",
+    title: "عجلة الحرب",
+    description: "الحظ يحدد من يبقى ومن يخرج",
+    icon: CircleDot,
+    color: "from-orange-500 to-red-600",
+    borderColor: "border-orange-500/40",
+    glowColor: "shadow-orange-500/30",
+    neonColor: "#ff6d00",
+    path: "/wheel-game",
+    emoji: "🎡",
+  },
+];
+
+export default function Home() {
+  const [, navigate] = useLocation();
+
+  return (
+    <div className="min-h-screen gradient-bg relative overflow-hidden" dir="rtl">
+      {/* Background particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: Math.random() * 4 + 1,
+              height: Math.random() * 4 + 1,
+              background: i % 2 === 0 ? "#e040fb" : "#00e5ff",
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              opacity: [0.2, 0.8, 0.2],
+              scale: [1, 1.5, 1],
+            }}
+            transition={{
+              duration: Math.random() * 3 + 2,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Decorative gradient circles */}
+      <div className="absolute top-[-200px] right-[-200px] w-[500px] h-[500px] rounded-full opacity-10"
+        style={{ background: "radial-gradient(circle, #e040fb, transparent)" }} />
+      <div className="absolute bottom-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full opacity-10"
+        style={{ background: "radial-gradient(circle, #00e5ff, transparent)" }} />
+
+      <div className="relative z-10 flex flex-col items-center min-h-screen px-4 py-12">
+        {/* Logo section */}
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="flex flex-col items-center mb-16"
+        >
+          <motion.div
+            className="relative mb-6"
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <div className="absolute inset-0 rounded-full blur-2xl opacity-40"
+              style={{ background: "radial-gradient(circle, #e040fb, #00e5ff)", transform: "scale(1.2)" }} />
+            <img
+              src="/rose-logo.png"
+              alt="روز"
+              className="relative w-32 h-32 rounded-full object-cover border-2 border-pink-400/50 animate-logo-glow"
+              style={{ filter: "drop-shadow(0 0 20px #e040fb) drop-shadow(0 0 40px #00e5ff40)" }}
+            />
+          </motion.div>
+
+          <motion.h1
+            className="text-6xl font-black mb-3 neon-text-pink"
+            style={{ fontFamily: "'Cairo', sans-serif", letterSpacing: "0.05em" }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+          >
+            روز
+          </motion.h1>
+          <motion.p
+            className="text-lg text-purple-300/80 text-center max-w-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.6 }}
+          >
+            منصة الألعاب التفاعلية للبث المباشر
+          </motion.p>
+
+          {/* Divider */}
+          <motion.div
+            className="mt-6 w-64 h-px"
+            style={{ background: "linear-gradient(90deg, transparent, #e040fb, #00e5ff, transparent)" }}
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.7, duration: 0.8 }}
+          />
+        </motion.div>
+
+        {/* Game cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+          {games.map((game, index) => (
+            <motion.div
+              key={game.id}
+              initial={{ opacity: 0, y: 60 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 + index * 0.15, duration: 0.6, ease: "easeOut" }}
+              onClick={() => navigate(game.path)}
+              className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} p-6 flex flex-col items-center gap-4 relative overflow-hidden group`}
+              style={{
+                background: "linear-gradient(135deg, rgba(26,10,46,0.9), rgba(10,26,46,0.9))",
+                boxShadow: `0 8px 32px ${game.neonColor}20`,
+              }}
+              whileHover={{ scale: 1.04, y: -8 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              {/* Card glow on hover */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
+                style={{ background: `radial-gradient(circle at center, ${game.neonColor}15, transparent 70%)` }}
+              />
+
+              {/* Top accent line */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+                style={{ background: `linear-gradient(90deg, transparent, ${game.neonColor}, transparent)` }}
+              />
+
+              {/* Logo */}
+              <motion.div
+                className="relative"
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 3, repeat: Infinity, delay: index * 0.5 }}
+              >
+                <div
+                  className="absolute inset-0 blur-xl opacity-60 rounded-full"
+                  style={{ background: game.neonColor }}
+                />
+                <img
+                  src="/rose-logo.png"
+                  alt="روز"
+                  className="relative w-20 h-20 rounded-full object-cover border-2"
+                  style={{
+                    borderColor: `${game.neonColor}60`,
+                    filter: `drop-shadow(0 0 10px ${game.neonColor})`,
+                  }}
+                />
+                <div
+                  className="absolute -top-1 -right-1 text-2xl"
+                >
+                  {game.emoji}
+                </div>
+              </motion.div>
+
+              {/* Card content */}
+              <div className="text-center z-10">
+                <h3
+                  className="text-2xl font-bold mb-2"
+                  style={{ color: game.neonColor, textShadow: `0 0 15px ${game.neonColor}` }}
+                >
+                  {game.title}
+                </h3>
+                <p className="text-purple-300/70 text-sm leading-relaxed">
+                  {game.description}
+                </p>
+              </div>
+
+              {/* Play button */}
+              <motion.div
+                className="mt-2 px-8 py-2.5 rounded-xl text-sm font-bold z-10 btn-shimmer"
+                style={{
+                  background: `linear-gradient(135deg, ${game.neonColor}30, ${game.neonColor}10)`,
+                  border: `1px solid ${game.neonColor}50`,
+                  color: game.neonColor,
+                }}
+                whileHover={{ scale: 1.05 }}
+              >
+                العب الآن
+              </motion.div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <motion.p
+          className="mt-16 text-purple-400/40 text-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          Rose Platform — منصة ألعاب البث التفاعلي
+        </motion.p>
+      </div>
+    </div>
+  );
+}

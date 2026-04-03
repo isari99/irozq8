@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "روز - منصة ألعاب البث"
+version = "1.0.0"
+id = "artifacts/rose-platform"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25575
+
+[services.development]
+run = "pnpm --filter @workspace/rose-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rose-platform", "run", "build" ]
+publicDir = "artifacts/rose-platform/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25575"
+BASE_PATH = "/"

@@ -1,0 +1,188 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --font-sans: var(--app-font-sans);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: 265 25% 8%;
+  --foreground: 280 20% 96%;
+  --border: 265 30% 20%;
+  --input: 265 30% 20%;
+  --ring: 300 80% 65%;
+  --card: 265 25% 12%;
+  --card-foreground: 280 20% 96%;
+  --popover: 265 25% 10%;
+  --popover-foreground: 280 20% 96%;
+  --primary: 300 80% 65%;
+  --primary-foreground: 265 25% 8%;
+  --secondary: 265 30% 18%;
+  --secondary-foreground: 280 20% 90%;
+  --muted: 265 25% 15%;
+  --muted-foreground: 265 20% 60%;
+  --accent: 195 90% 55%;
+  --accent-foreground: 265 25% 8%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --app-font-sans: 'Cairo', 'Inter', sans-serif;
+  --radius: 0.75rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    direction: rtl;
+  }
+}
+
+/* Neon glow effects */
+.neon-pink {
+  box-shadow: 0 0 10px #e040fb, 0 0 30px #e040fb40, 0 0 60px #e040fb20;
+}
+.neon-cyan {
+  box-shadow: 0 0 10px #00e5ff, 0 0 30px #00e5ff40, 0 0 60px #00e5ff20;
+}
+.neon-text-pink {
+  text-shadow: 0 0 10px #e040fb, 0 0 30px #e040fb80;
+}
+.neon-text-cyan {
+  text-shadow: 0 0 10px #00e5ff, 0 0 30px #00e5ff80;
+}
+
+/* Animated gradient background */
+.gradient-bg {
+  background: linear-gradient(135deg, #0d0a1a 0%, #1a0a2e 30%, #0a1a2e 60%, #0d0a1a 100%);
+}
+
+/* Card hover */
+.game-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.game-card:hover {
+  transform: translateY(-8px) scale(1.02);
+}
+
+/* Spinning wheel */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 10px #e040fb, 0 0 30px #e040fb40; }
+  50% { box-shadow: 0 0 20px #e040fb, 0 0 60px #e040fb60, 0 0 90px #e040fb20; }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Logo glow animation */
+@keyframes logo-glow {
+  0%, 100% { filter: drop-shadow(0 0 15px #e040fb) drop-shadow(0 0 30px #00e5ff40); }
+  50% { filter: drop-shadow(0 0 30px #e040fb) drop-shadow(0 0 60px #00e5ff60); }
+}
+.animate-logo-glow {
+  animation: logo-glow 3s ease-in-out infinite;
+}
+
+/* Stars background */
+.stars-bg::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 50% 50%, rgba(255,255,255,0.2) 0%, transparent 100%),
+    radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.2) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Wheel spin animation - controlled via JS */
+.wheel-container {
+  position: relative;
+}
+
+/* Score badge */
+.score-badge {
+  background: linear-gradient(135deg, #e040fb20, #00e5ff20);
+  border: 1px solid #e040fb40;
+}
+
+/* XO grid */
+.xo-cell {
+  transition: all 0.2s ease;
+  background: linear-gradient(135deg, #1a0a2e, #0a1a2e);
+}
+.xo-cell:hover:not(.occupied) {
+  background: linear-gradient(135deg, #2a1a3e, #1a2a3e);
+  border-color: #e040fb80;
+}
+
+/* Button shimmer */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.5s ease;
+}
+.btn-shimmer:hover::after {
+  left: 150%;
+}
