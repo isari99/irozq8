@@ -159,8 +159,7 @@ export default function WheelGame() {
   const { user, logout } = useAuth();
   const [scope, animate] = useAnimate();
 
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [channelInput, setChannelInput] = useState("");
+  const [phase, setPhase] = useState<Phase>("joining");
   const [players, setPlayers] = useState<Player[]>([]);
   const [shooter, setShooter] = useState<Player | null>(null);
   const [target, setTarget] = useState<Player | null>(null);
@@ -203,6 +202,13 @@ export default function WheelGame() {
     };
     ws.onclose = () => setTwitchConnected(false);
   };
+
+  // ── Auto-connect on mount using logged-in username as channel ────────────
+  useEffect(() => {
+    if (user?.username) connectTwitch(user.username);
+    return () => { wsRef.current?.close(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username]);
 
   const handleChatMsg = useCallback((username: string, text: string) => {
     const msg = text.trim().toLowerCase();
@@ -360,7 +366,7 @@ export default function WheelGame() {
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
             twitchConnected ? "border-purple-500/40 bg-purple-500/10 text-purple-300" : "border-gray-700 text-gray-600"}`}>
             {twitchConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
-            {twitchConnected ? channelInput : "غير متصل"}
+            {twitchConnected ? `#${user?.username}` : "جارٍ الاتصال..."}
           </div>
           {user && (
             <button onClick={logout} className="text-purple-400/30 hover:text-red-400 transition-colors">خروج</button>
@@ -372,45 +378,6 @@ export default function WheelGame() {
       <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 overflow-y-auto">
         <AnimatePresence mode="wait">
 
-          {/* ── IDLE ── */}
-          {phase === "idle" && (
-            <motion.div key="idle"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="flex flex-col items-center gap-8 w-full max-w-sm"
-            >
-              {/* Square image button */}
-              <div className="w-full max-w-xs sm:max-w-sm aspect-square relative rounded-2xl overflow-hidden border-2 border-pink-500/50 shadow-2xl"
-                style={{ boxShadow: "0 0 60px #e040fb25" }}>
-                <img src="/play-now.png" alt="الشخصنة"
-                  className="w-full h-full object-cover" />
-                <div className="absolute inset-0"
-                  style={{ background: "linear-gradient(to top, rgba(10,5,20,0.9) 30%, transparent 60%)" }} />
-                <div className="absolute bottom-0 inset-x-0 flex flex-col items-center pb-6 gap-1">
-                  <span className="text-4xl">🔫</span>
-                  <p className="text-3xl font-black text-white drop-shadow-2xl tracking-wide">الشخصنة</p>
-                </div>
-              </div>
-
-              <form onSubmit={e => { e.preventDefault(); connectTwitch(channelInput); setPhase("joining"); setPlayers([]); }}
-                className="w-full space-y-3">
-                <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-purple-500/30 bg-black/40">
-                  <Tv2 size={16} className="text-purple-400 flex-shrink-0" />
-                  <input value={channelInput} onChange={e => setChannelInput(e.target.value)}
-                    placeholder="اسم قناة Twitch" required
-                    className="flex-1 bg-transparent text-white placeholder-purple-400/30 focus:outline-none text-base" />
-                </div>
-                <motion.button type="submit"
-                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                  className="w-full py-4 rounded-xl text-xl font-black btn-shimmer"
-                  style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 30px #e040fb40" }}>
-                  العب الآن 🎮
-                </motion.button>
-              </form>
-            </motion.div>
-          )}
-
           {/* ── JOINING ── */}
           {phase === "joining" && (
             <motion.div key="joining"
@@ -419,7 +386,7 @@ export default function WheelGame() {
             >
               <div className="text-center space-y-3">
                 <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border ${twitchConnected ? "border-green-500/40 bg-green-500/10 text-green-300" : "border-gray-700 text-gray-500"}`}>
-                  {twitchConnected ? <><Wifi size={14} />{channelInput}</> : <><WifiOff size={14} />جارٍ الاتصال...</>}
+                  {twitchConnected ? <><Wifi size={14} />#{user?.username}</> : <><WifiOff size={14} />جارٍ الاتصال...</>}
                 </div>
                 <h2 className="text-4xl sm:text-5xl font-black text-white">
                   اكتب <span className="neon-text-pink">join</span> في الشات
@@ -452,10 +419,6 @@ export default function WheelGame() {
                   style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 25px #e040fb30" }}>
                   <Play size={20} fill="white" /> ابدأ اللعبة ({players.length})
                 </motion.button>
-                <button onClick={() => { wsRef.current?.close(); setPhase("idle"); }}
-                  className="px-5 py-3.5 rounded-xl text-sm font-bold border border-gray-700 text-gray-500 hover:border-red-500/40 hover:text-red-400 transition-all">
-                  إلغاء
-                </button>
               </div>
             </motion.div>
           )}
@@ -662,9 +625,9 @@ export default function WheelGame() {
                   style={{ background: "#e040fb20", border: "1px solid #e040fb40", color: "#e040fb" }}>
                   <RefreshCw size={18} /> جولة جديدة
                 </motion.button>
-                <button onClick={() => { wsRef.current?.close(); setTwitchConnected(false); setPhase("idle"); }}
+                <button onClick={() => navigate("/")}
                   className="px-6 py-3 rounded-xl font-bold text-lg border border-gray-700 text-gray-500 hover:text-red-400 hover:border-red-500/40 transition-all">
-                  خروج
+                  الصفحة الرئيسية
                 </button>
               </div>
             </motion.div>
@@ -681,7 +644,7 @@ export default function WheelGame() {
             <Users size={11} /> {alivePlayers.length} حي / {players.filter(p => !p.alive).length} 💀
           </span>
           <div className={`flex items-center gap-1.5 ${twitchConnected ? "text-purple-300/50" : "text-gray-600"}`}>
-            <Tv2 size={11} /> {twitchConnected ? `#${channelInput}` : "غير متصل"}
+            <Tv2 size={11} /> {twitchConnected ? `#${user?.username}` : "غير متصل"}
           </div>
         </div>
       )}
