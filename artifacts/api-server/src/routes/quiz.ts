@@ -201,6 +201,58 @@ router.post("/quiz/reveal", requireAuth, async (req, res): Promise<void> => {
   });
 });
 
+// ── POST /quiz/web-answer ─────────────────────────────────────────────────────
+// Web players answer via button click (uses session username)
+router.post("/quiz/web-answer", requireAuth, async (req, res): Promise<void> => {
+  const session = (req as any).session;
+  const { answer } = req.body;
+  const num = parseInt(answer, 10);
+
+  if (!num || num < 1 || num > 4) {
+    res.status(400).json({ error: "الإجابة يجب أن تكون بين 1 و4" });
+    return;
+  }
+
+  if (gameState.phase !== "active") {
+    res.status(400).json({ error: "لا يوجد سؤال نشط" });
+    return;
+  }
+
+  const username = session.username as string;
+  const { correct, alreadyAnswered } = gameState.recordAnswer(username, num);
+
+  if (alreadyAnswered) {
+    res.status(409).json({ error: "أجبت بالفعل" });
+    return;
+  }
+
+  broadcast({
+    type: "twitch_answer",
+    username,
+    answer: num,
+    correct,
+    totalAnswers: gameState.totalAnswers,
+    distribution: gameState.distribution,
+  });
+
+  broadcast({ type: "leaderboard_update", leaderboard: gameState.getLeaderboard() });
+
+  // Find correctAnswer text
+  let correctAnswerText = "";
+  if (gameState.currentQuestionId) {
+    const { db, questionsTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    const [q] = await db.select().from(questionsTable)
+      .where(eq(questionsTable.id, gameState.currentQuestionId)).limit(1);
+    if (q) {
+      const choices = q.choices as string[];
+      correctAnswerText = correct ? choices[num - 1] : choices[q.correctAnswer - 1];
+    }
+  }
+
+  res.json({ correct, correctAnswer: gameState.currentCorrectAnswer, correctAnswerText });
+});
+
 // ── GET /quiz/leaderboard ────────────────────────────────────────────────────
 router.get("/quiz/leaderboard", (req, res): void => {
   res.json(gameState.getLeaderboard());
