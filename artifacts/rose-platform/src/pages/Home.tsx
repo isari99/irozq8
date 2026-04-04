@@ -42,15 +42,15 @@ const games = [
   },
   {
     id: "wheel-game",
-    title: "عجلة الحرب",
-    description: "الحظ يحدد من يبقى ومن يخرج",
+    title: "الشخصنة",
+    description: "دخول عبر Twitch • اختر هدفك • نظام طلقات عشوائي",
     icon: CircleDot,
     color: "from-orange-500 to-red-600",
     borderColor: "border-orange-500/40",
     glowColor: "shadow-orange-500/30",
     neonColor: "#ff6d00",
     path: "/wheel-game",
-    emoji: "🎡",
+    emoji: "🔫",
   },
 ];
 
