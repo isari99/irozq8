@@ -28,6 +28,7 @@ const games = [
     neonColor: "#e040fb",
     path: "/song-game",
     emoji: "🎵",
+    heroImage: "/song-hero.jpg",
   },
   {
     id: "xo-game",
