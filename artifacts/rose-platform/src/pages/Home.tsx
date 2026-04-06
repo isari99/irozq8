@@ -41,7 +41,7 @@ const games = [
     neonColor: "#00e5ff",
     path: "/xo-game",
     emoji: "❌",
-    heroImage: "/xo-hero.jpg",
+    heroImage: "/xo-hero.png",
   },
   {
     id: "wheel-game",
