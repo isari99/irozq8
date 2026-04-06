@@ -67,6 +67,7 @@ const games = [
     neonColor: "#22c55e",
     path: "/snakes-game",
     emoji: "🐍",
+    heroImage: "/snakes-hero.png",
   },
 ];
 
@@ -209,6 +210,11 @@ export default function Home() {
                     whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                     العب الآن
                   </motion.button>
+                  {/* Game title below button */}
+                  <p className="text-center text-sm font-black"
+                    style={{ color: game.neonColor, textShadow: `0 0 12px ${game.neonColor}60` }}>
+                    {game.title}
+                  </p>
                 </motion.div>
               );
             }
