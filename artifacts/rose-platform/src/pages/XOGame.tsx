@@ -47,17 +47,17 @@ const PlayerAvatar = ({
   const color = mark === "X" ? X_COLOR : O_COLOR;
   return (
     <div
-      className="flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all duration-300"
+      className="flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all duration-300"
       style={{
         borderColor: isActive ? color : `${color}30`,
         background: isActive ? `${color}12` : `${color}06`,
-        boxShadow: isActive ? `0 0 20px ${color}25` : "none",
+        boxShadow: isActive ? `0 0 28px ${color}35` : "none",
       }}
     >
       {player ? (
         <>
           <div
-            className="relative w-16 h-16 rounded-xl overflow-hidden border-2"
+            className="relative w-24 h-24 rounded-2xl overflow-hidden border-2"
             style={{
               borderColor: isActive ? color : `${color}40`,
               boxShadow: isActive ? `0 0 14px ${color}40` : "none",
@@ -307,20 +307,20 @@ export default function XOGame() {
           {phase === "joining" && (
             <motion.div key="joining"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-md space-y-5">
+              className="w-full max-w-2xl space-y-6">
 
-              <div className="text-center space-y-2">
-                <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs ${
+              <div className="text-center space-y-3">
+                <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border text-sm ${
                   twitchConnected
                     ? "border-green-500/40 bg-green-500/10 text-green-300"
                     : "border-gray-700 text-gray-500"
                 }`}>
-                  {twitchConnected ? <><Wifi size={11} />#{user?.username} متصل</> : <><WifiOff size={11} />جارٍ الاتصال...</>}
+                  {twitchConnected ? <><Wifi size={13} />#{user?.username} متصل</> : <><WifiOff size={13} />جارٍ الاتصال...</>}
                 </div>
-                <h2 className="text-3xl font-black text-white">
+                <h2 className="text-5xl font-black text-white">
                   اكتب <span className="neon-text-cyan">join</span> في الشات
                 </h2>
-                <p className="text-purple-300/40 text-sm">أول لاعبين يكتبون join يدخلون</p>
+                <p className="text-purple-300/40 text-lg">أول لاعبين يكتبون join يدخلون</p>
               </div>
 
               {/* Join notification */}
@@ -335,45 +335,45 @@ export default function XOGame() {
               </AnimatePresence>
 
               {/* Player slots */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-2xl border p-4 text-center space-y-3"
+              <div className="grid grid-cols-2 gap-6">
+                <div className="rounded-3xl border p-6 text-center space-y-4"
                   style={{ borderColor: `${X_COLOR}30`, background: `${X_COLOR}08` }}>
-                  <p className="text-sm font-bold" style={{ color: X_COLOR }}>اللاعب الأول</p>
+                  <p className="text-base font-bold" style={{ color: X_COLOR }}>اللاعب الأول</p>
                   {players.X ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden border-2" style={{ borderColor: X_COLOR }}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-28 h-28 rounded-2xl overflow-hidden border-2" style={{ borderColor: X_COLOR }}>
                         <img src={players.X.avatar} alt={players.X.displayName} className="w-full h-full object-cover"
                           onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${players.X!.username}`; }} />
                       </div>
-                      <p className="font-bold text-sm" style={{ color: X_COLOR }}>{players.X.displayName}</p>
+                      <p className="font-bold text-lg" style={{ color: X_COLOR }}>{players.X.displayName}</p>
                     </div>
                   ) : (
-                    <div className="w-16 h-16 rounded-xl border-2 border-dashed mx-auto flex items-center justify-center"
+                    <div className="w-28 h-28 rounded-2xl border-2 border-dashed mx-auto flex items-center justify-center"
                       style={{ borderColor: `${X_COLOR}30` }}>
-                      <span className="text-purple-400/30 text-xs">انتظار</span>
+                      <span className="text-purple-400/30 text-sm">انتظار</span>
                     </div>
                   )}
-                  <div className="text-3xl font-black" style={{ color: X_COLOR }}>✕</div>
+                  <div className="text-5xl font-black" style={{ color: X_COLOR, textShadow: `0 0 20px ${X_COLOR}80` }}>✕</div>
                 </div>
 
-                <div className="rounded-2xl border p-4 text-center space-y-3"
+                <div className="rounded-3xl border p-6 text-center space-y-4"
                   style={{ borderColor: `${O_COLOR}30`, background: `${O_COLOR}08` }}>
-                  <p className="text-sm font-bold" style={{ color: O_COLOR }}>اللاعب الثاني</p>
+                  <p className="text-base font-bold" style={{ color: O_COLOR }}>اللاعب الثاني</p>
                   {players.O ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden border-2" style={{ borderColor: O_COLOR }}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-28 h-28 rounded-2xl overflow-hidden border-2" style={{ borderColor: O_COLOR }}>
                         <img src={players.O.avatar} alt={players.O.displayName} className="w-full h-full object-cover"
                           onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${players.O!.username}`; }} />
                       </div>
-                      <p className="font-bold text-sm" style={{ color: O_COLOR }}>{players.O.displayName}</p>
+                      <p className="font-bold text-lg" style={{ color: O_COLOR }}>{players.O.displayName}</p>
                     </div>
                   ) : (
-                    <div className="w-16 h-16 rounded-xl border-2 border-dashed mx-auto flex items-center justify-center"
+                    <div className="w-28 h-28 rounded-2xl border-2 border-dashed mx-auto flex items-center justify-center"
                       style={{ borderColor: `${O_COLOR}30` }}>
-                      <span className="text-purple-400/30 text-xs">انتظار</span>
+                      <span className="text-purple-400/30 text-sm">انتظار</span>
                     </div>
                   )}
-                  <div className="text-3xl font-black" style={{ color: O_COLOR }}>○</div>
+                  <div className="text-5xl font-black" style={{ color: O_COLOR, textShadow: `0 0 20px ${O_COLOR}80` }}>○</div>
                 </div>
               </div>
 
@@ -382,14 +382,14 @@ export default function XOGame() {
                   onClick={startGame}
                   initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="w-full py-4 rounded-2xl text-xl font-black flex items-center justify-center gap-3"
+                  className="w-full py-5 rounded-2xl text-2xl font-black flex items-center justify-center gap-3"
                   style={{
                     background: "linear-gradient(135deg, #00e5ff, #0288d1)",
-                    boxShadow: "0 0 30px rgba(0,229,255,0.35)",
+                    boxShadow: "0 0 35px rgba(0,229,255,0.45)",
                     color: "#000",
                   }}
                 >
-                  <Play size={22} fill="black" /> ابدأ اللعبة
+                  <Play size={26} fill="black" /> ابدأ اللعبة
                 </motion.button>
               )}
             </motion.div>
@@ -400,21 +400,21 @@ export default function XOGame() {
             <motion.div key="playing"
               initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}
               transition={{ duration: 0.35 }}
-              className="w-full max-w-lg space-y-5">
+              className="w-full max-w-2xl space-y-6">
 
               {/* Score + Players */}
-              <div className="grid grid-cols-3 items-center gap-3">
+              <div className="grid grid-cols-3 items-center gap-4">
                 <PlayerAvatar player={players.X} isActive={currentMark === "X"} mark="X" />
-                <div className="text-center space-y-1">
-                  <p className="text-xl font-black text-purple-300/50">VS</p>
-                  <div className="space-y-0.5 text-xs">
-                    <div className="flex justify-center gap-2">
-                      <span style={{ color: X_COLOR }} className="font-bold">{scores.X}</span>
-                      <span className="text-purple-400/40">-</span>
-                      <span style={{ color: O_COLOR }} className="font-bold">{scores.O}</span>
+                <div className="text-center space-y-2">
+                  <p className="text-3xl font-black text-purple-300/50">VS</p>
+                  <div className="space-y-1 text-base">
+                    <div className="flex justify-center gap-4">
+                      <span style={{ color: X_COLOR }} className="font-black text-2xl">{scores.X}</span>
+                      <span className="text-purple-400/40 text-2xl">-</span>
+                      <span style={{ color: O_COLOR }} className="font-black text-2xl">{scores.O}</span>
                     </div>
                     {scores.draw > 0 && (
-                      <p className="text-purple-400/30 text-[10px]">تعادل: {scores.draw}</p>
+                      <p className="text-purple-400/30 text-sm">تعادل: {scores.draw}</p>
                     )}
                   </div>
                 </div>
@@ -425,13 +425,13 @@ export default function XOGame() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentMark}
                   initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  className="text-center py-2.5 px-5 rounded-xl border"
+                  className="text-center py-4 px-6 rounded-2xl border"
                   style={{
                     borderColor: currentMark === "X" ? `${X_COLOR}40` : `${O_COLOR}40`,
                     background: currentMark === "X" ? `${X_COLOR}10` : `${O_COLOR}10`,
                   }}
                 >
-                  <p className="text-sm font-black" style={{ color: currentMark === "X" ? X_COLOR : O_COLOR }}>
+                  <p className="text-lg font-black" style={{ color: currentMark === "X" ? X_COLOR : O_COLOR }}>
                     دور {currentPlayer?.displayName}
                     {" "}
                     <span style={{ textShadow: `0 0 10px ${currentMark === "X" ? X_COLOR : O_COLOR}` }}>
@@ -443,7 +443,7 @@ export default function XOGame() {
               </AnimatePresence>
 
               {/* Board */}
-              <div className="grid grid-cols-3 gap-3 max-w-[340px] mx-auto">
+              <div className="grid grid-cols-3 gap-4 max-w-[520px] mx-auto">
                 {board.map((cell, i) => {
                   const cellNum = i + 1;
                   const cellColor = cell === "X" ? X_COLOR : cell === "O" ? O_COLOR : null;
@@ -471,7 +471,7 @@ export default function XOGame() {
                         ) : (
                           <motion.span
                             key={`num-${i}`}
-                            className="text-2xl font-black"
+                            className="text-3xl font-black"
                             style={{ color: "rgba(120,80,160,0.45)" }}
                           >
                             {cellNum}
@@ -500,7 +500,7 @@ export default function XOGame() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.45, ease: "easeOut" }}
-              className="w-full max-w-md flex flex-col items-center gap-6 text-center"
+              className="w-full max-w-xl flex flex-col items-center gap-8 text-center"
             >
               {winnerPlayer && winnerInfo ? (
                 <>

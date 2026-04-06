@@ -13,7 +13,7 @@ interface QuestionResult { username: string; answer: number; correct: boolean; p
 interface Question { id: number; text: string; choices: string[]; category: string; correctAnswer: number | null; correctAnswerText: string | null; }
 interface LeaderboardEntry { rank: number; username: string; score: number; }
 
-type UIPhase = "setup" | "settings" | "active" | "revealed" | "finished";
+type UIPhase = "settings" | "active" | "revealed" | "finished";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CHOICE_COLORS = [
@@ -94,8 +94,8 @@ export default function QuizGame() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
-  // ── UI always starts at setup — never restores server state ─────────────────
-  const [uiPhase, setUiPhase] = useState<UIPhase>("setup");
+  // ── UI always starts at settings — never restores server state ───────────────
+  const [uiPhase, setUiPhase] = useState<UIPhase>("settings");
   const [question, setQuestion] = useState<Question | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [distribution, setDistribution] = useState<Record<string, number>>({ "1": 0, "2": 0, "3": 0, "4": 0 });
@@ -258,7 +258,7 @@ export default function QuizGame() {
 
   const restartFull = () => {
     stopTimer();
-    setUiPhase("setup");
+    setUiPhase("settings");
     setQuestion(null);
     setLeaderboard([]);
     setQuestionResults([]);
@@ -311,50 +311,30 @@ export default function QuizGame() {
         <main className="flex-1 flex flex-col items-center justify-center p-5 overflow-y-auto z-10">
           <AnimatePresence mode="wait">
 
-            {/* ── SETUP ── */}
-            {uiPhase === "setup" && (
-              <motion.div key="setup"
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-                className="flex flex-col items-center gap-5">
-                <div className="w-72 sm:w-80 rounded-3xl overflow-hidden border border-purple-500/25"
-                  style={{ boxShadow: "0 0 40px rgba(224,64,251,0.12)" }}>
-                  <img src="/quiz-hero.png" alt="لعبة الأسئلة" className="w-full h-auto object-contain block" />
-                </div>
-                <motion.button
-                  onClick={() => setUiPhase("settings")}
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-10 py-3.5 rounded-2xl text-lg font-black"
-                  style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)",
-                    boxShadow: "0 0 30px rgba(224,64,251,0.4)", color: "#fff" }}>
-                  <Play size={20} fill="white" /> إلعب الآن
-                </motion.button>
-              </motion.div>
-            )}
-
             {/* ── SETTINGS ── */}
             {uiPhase === "settings" && (
               <motion.div key="settings"
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-                className="w-full max-w-md space-y-6">
+                className="w-full max-w-2xl space-y-8">
                 <div className="text-center">
-                  <h2 className="text-2xl font-black text-white">إعدادات اللعبة</h2>
-                  <p className="text-purple-300/40 text-sm mt-1">اختر الجولات ووقت السؤال</p>
+                  <h2 className="text-4xl font-black text-white">إعدادات اللعبة</h2>
+                  <p className="text-purple-300/40 text-base mt-2">اختر الجولات ووقت السؤال</p>
                 </div>
 
                 {/* Rounds */}
-                <div className="space-y-3">
-                  <p className="text-sm font-bold text-purple-300/60 flex items-center gap-2">
-                    <Trophy size={14} /> عدد الجولات
+                <div className="space-y-4">
+                  <p className="text-base font-bold text-purple-300/60 flex items-center gap-2">
+                    <Trophy size={16} /> عدد الجولات
                   </p>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-5 gap-3">
                     {ROUND_OPTIONS.map(r => (
                       <button key={r} onClick={() => setSelectedRounds(r)}
-                        className="py-2.5 rounded-xl font-black text-sm border transition-all"
+                        className="py-4 rounded-2xl font-black text-xl border transition-all"
                         style={{
                           borderColor: selectedRounds === r ? "#e040fb" : "rgba(224,64,251,0.2)",
                           background: selectedRounds === r ? "rgba(224,64,251,0.2)" : "rgba(224,64,251,0.05)",
                           color: selectedRounds === r ? "#e040fb" : "rgba(224,64,251,0.35)",
-                          boxShadow: selectedRounds === r ? "0 0 14px rgba(224,64,251,0.3)" : "none",
+                          boxShadow: selectedRounds === r ? "0 0 18px rgba(224,64,251,0.4)" : "none",
                         }}>
                         {r}
                       </button>
@@ -363,19 +343,19 @@ export default function QuizGame() {
                 </div>
 
                 {/* Time */}
-                <div className="space-y-3">
-                  <p className="text-sm font-bold text-purple-300/60 flex items-center gap-2">
-                    <Clock size={14} /> وقت كل سؤال (ثانية)
+                <div className="space-y-4">
+                  <p className="text-base font-bold text-purple-300/60 flex items-center gap-2">
+                    <Clock size={16} /> وقت كل سؤال (ثانية)
                   </p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-4">
                     {TIME_OPTIONS.map(t => (
                       <button key={t} onClick={() => setSelectedTime(t)}
-                        className="py-3 rounded-xl font-black text-base border transition-all"
+                        className="py-5 rounded-2xl font-black text-2xl border transition-all"
                         style={{
                           borderColor: selectedTime === t ? "#00e5ff" : "rgba(0,229,255,0.2)",
                           background: selectedTime === t ? "rgba(0,229,255,0.15)" : "rgba(0,229,255,0.04)",
                           color: selectedTime === t ? "#00e5ff" : "rgba(0,229,255,0.35)",
-                          boxShadow: selectedTime === t ? "0 0 14px rgba(0,229,255,0.25)" : "none",
+                          boxShadow: selectedTime === t ? "0 0 18px rgba(0,229,255,0.35)" : "none",
                         }}>
                         {t}s
                       </button>
@@ -383,23 +363,23 @@ export default function QuizGame() {
                   </div>
                 </div>
 
-                <div className="pt-2 flex gap-3">
-                  <button onClick={() => setUiPhase("setup")}
-                    className="px-5 py-3 rounded-xl border border-purple-500/20 text-purple-400/50 hover:text-purple-300 transition-all text-sm font-bold">
+                <div className="pt-2 flex gap-4">
+                  <button onClick={() => navigate("/")}
+                    className="px-6 py-4 rounded-2xl border border-purple-500/20 text-purple-400/50 hover:text-purple-300 transition-all text-base font-bold">
                     رجوع
                   </button>
                   <motion.button
                     onClick={startGame} disabled={actionLoading}
                     whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                    className="flex-1 py-3.5 rounded-2xl font-black text-lg flex items-center justify-center gap-2"
+                    className="flex-1 py-4 rounded-2xl font-black text-xl flex items-center justify-center gap-2"
                     style={{
                       background: actionLoading ? "rgba(224,64,251,0.3)" : "linear-gradient(135deg, #e040fb, #9c27b0)",
-                      boxShadow: actionLoading ? "none" : "0 0 30px rgba(224,64,251,0.4)",
+                      boxShadow: actionLoading ? "none" : "0 0 35px rgba(224,64,251,0.5)",
                       color: "#fff",
                     }}>
                     {actionLoading
-                      ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      : <><Play size={20} fill="white" /> بدأ اللعبة</>}
+                      ? <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      : <><Play size={22} fill="white" /> ابدأ اللعبة</>}
                   </motion.button>
                 </div>
               </motion.div>
