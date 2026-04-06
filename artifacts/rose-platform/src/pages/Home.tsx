@@ -161,6 +161,43 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
           {games.map((game, index) => {
             const heroImage = (game as any).heroImage as string | undefined;
+
+            if (heroImage) {
+              /* ── Hero card: image fills card, button sits below ── */
+              return (
+                <motion.div key={game.id}
+                  initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + index * 0.15, duration: 0.6, ease: "easeOut" }}
+                  className="flex flex-col gap-3">
+                  {/* Card — pure image, no button inside */}
+                  <motion.div
+                    onClick={() => navigate(game.path)}
+                    className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} relative overflow-hidden group min-h-[310px]`}
+                    style={{ boxShadow: `0 8px 32px ${game.neonColor}20` }}
+                    whileHover={{ scale: 1.03, y: -6 }} whileTap={{ scale: 0.97 }}>
+                    <img src={heroImage} alt={game.title}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ objectPosition: "top center" }} />
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
+                      style={{ boxShadow: `inset 0 0 50px ${game.neonColor}25` }} />
+                  </motion.div>
+                  {/* Button — completely outside and below the card */}
+                  <motion.button
+                    onClick={() => navigate(game.path)}
+                    className="w-full py-3 rounded-xl text-base font-black btn-shimmer"
+                    style={{
+                      background: `linear-gradient(135deg, ${game.neonColor}40, ${game.neonColor}20)`,
+                      border: `1px solid ${game.neonColor}60`,
+                      color: "#fff",
+                      boxShadow: `0 4px 20px ${game.neonColor}25`,
+                    }}
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                    العب الآن
+                  </motion.button>
+                </motion.div>
+              );
+            }
+
             return (
               <motion.div
                 key={game.id}
@@ -168,7 +205,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + index * 0.15, duration: 0.6, ease: "easeOut" }}
                 onClick={() => navigate(game.path)}
-                className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} relative overflow-hidden group ${heroImage ? "min-h-[320px]" : "p-6 flex flex-col items-center gap-4"}`}
+                className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} relative overflow-hidden group p-6 flex flex-col items-center gap-4`}
                 style={{
                   background: "linear-gradient(135deg, rgba(26,10,46,0.9), rgba(10,26,46,0.9))",
                   boxShadow: `0 8px 32px ${game.neonColor}20`,
@@ -176,42 +213,7 @@ export default function Home() {
                 whileHover={{ scale: 1.04, y: -8 }}
                 whileTap={{ scale: 0.97 }}
               >
-                {heroImage ? (
-                  /* ── Full-image hero card (الشخصنة) ── */
-                  <>
-                    {/* Image — takes the top 80% of the card */}
-                    <div className="absolute top-0 inset-x-0 overflow-hidden rounded-t-2xl"
-                      style={{ height: "80%" }}>
-                      <img src={heroImage} alt={game.title}
-                        className="w-full h-full object-cover"
-                        style={{ objectPosition: "top center" }} />
-                    </div>
-
-                    {/* Button strip — sits cleanly in the bottom 20% */}
-                    <div className="absolute bottom-0 inset-x-0 flex items-center justify-center rounded-b-2xl"
-                      style={{
-                        height: "20%",
-                        background: `linear-gradient(135deg, rgba(12,5,24,0.98), rgba(20,8,38,0.98))`,
-                        borderTop: `1px solid ${game.neonColor}25`,
-                      }}>
-                      <motion.div
-                        className="px-8 py-2 rounded-xl text-sm font-bold btn-shimmer"
-                        style={{
-                          background: `linear-gradient(135deg, ${game.neonColor}45, ${game.neonColor}20)`,
-                          border: `1px solid ${game.neonColor}60`,
-                          color: "#fff",
-                        }}
-                        whileHover={{ scale: 1.06 }}
-                      >
-                        العب الآن
-                      </motion.div>
-                    </div>
-
-                    {/* Hover glow */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
-                      style={{ boxShadow: `inset 0 0 50px ${game.neonColor}20` }} />
-                  </>
-                ) : (
+                {(
                   /* ── Standard card ── */
                   <>
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
