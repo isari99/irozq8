@@ -26,17 +26,25 @@ declare global {
   }
 }
 
-// ─── Song bank (clipEnd = clipStart + ~20s with vocals) ───────────────────────
+// ─── Song bank (clipEnd = clipStart + ~20-50s with vocals) ───────────────────
 const SONGS: Song[] = [
   {
     id: 1,
     title: "يا نور العين",
     artist: "مطرف المطرف",
     youtubeId: "WlqefHeYYR0",
-    clipStart: 45,
-    clipEnd: 65,
+    clipStart: 45,   // 0:45 — vocal chorus
+    clipEnd: 65,     // 1:05 — 20 second clip
   },
-  // { id: 2, title: "...", artist: "...", youtubeId: "...", clipStart: X, clipEnd: X+20 },
+  {
+    id: 2,
+    title: "يا طير خذ قلبي وشل",
+    artist: "راشد الماجد",
+    youtubeId: "joevqtOJFes",
+    clipStart: 35,   // 0:35 — skip musical intro, enter with vocals
+    clipEnd: 80,     // 1:20 — 45 second clip with full chorus
+  },
+  // { id: 3, title: "...", artist: "...", youtubeId: "...", clipStart: X, clipEnd: X+20~50 },
 ];
 
 const ROUND_OPTIONS = [5, 10, 15, 20, 25];
@@ -110,9 +118,12 @@ export default function SongGame() {
   const [audioState, setAudioState] = useState<"loading" | "playing" | "paused" | "stopped" | "error">("loading");
   const [volume, setVolume] = useState(60);
   const clipWatchRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref so timer callback can access current song without stale closure
+  const currentSongRef = useRef<Song>(SONGS[0]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const currentSong: Song = SONGS[currentSongIndex % SONGS.length];
+  currentSongRef.current = currentSong; // keep ref in sync for timer callback
   const teamColor = (t: 1 | 2) => t === 1 ? "#e040fb" : "#00e5ff";
   const teamName = (t: 1 | 2) => t === 1 ? team1Name : team2Name;
   const currentDoubleUsed = currentTurn === 1 ? team1DoubleUsed : team2DoubleUsed;
@@ -131,12 +142,22 @@ export default function SongGame() {
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) {
-          stopTimer();
+          // Stay in play — switch turn, reset timer, replay clip for new team
           setCurrentTurn(prev => prev === 1 ? 2 : 1);
           setDoubleActive(false);
           setShowAnswer(false);
-          setPhase("control");
-          return 0;
+          setTimeout(() => {
+            const song = currentSongRef.current;
+            if (ytPlayerRef.current) {
+              try {
+                ytPlayerRef.current.seekTo(song.clipStart, true);
+                ytPlayerRef.current.playVideo();
+                setAudioState("playing");
+                startClipWatch(song);
+              } catch (_) {}
+            }
+          }, 300);
+          return TIMER_BASE; // reset timer for next team, stay in play page
         }
         return t - 1;
       });
@@ -610,15 +631,22 @@ export default function SongGame() {
               {/* ── Teams + Timer row ── */}
               <div className="w-full max-w-2xl grid grid-cols-3 gap-4 items-center">
                 {/* Team 1 */}
-                <div className="rounded-2xl border overflow-hidden"
-                  style={{ borderColor: "rgba(224,64,251,0.25)", background: "rgba(224,64,251,0.08)" }}>
-                  <div className="h-1" style={{ background: "linear-gradient(90deg, #e040fb, #c026d3)" }} />
+                <motion.div layout className="rounded-2xl border overflow-hidden transition-all"
+                  style={{
+                    borderColor: currentTurn === 1 ? "#e040fb80" : "rgba(224,64,251,0.2)",
+                    background: currentTurn === 1 ? "rgba(224,64,251,0.16)" : "rgba(224,64,251,0.06)",
+                    boxShadow: currentTurn === 1 ? "0 0 32px rgba(224,64,251,0.25)" : "none",
+                  }}>
+                  <div className="h-1.5" style={{ background: currentTurn === 1
+                    ? "linear-gradient(90deg, #e040fb, #c026d3)"
+                    : "rgba(224,64,251,0.15)" }} />
                   <div className="p-4 text-center">
-                    <p className="text-sm font-black truncate" style={{ color: "#e040fb80" }}>{team1Name}</p>
+                    <p className="text-sm font-black truncate" style={{ color: currentTurn === 1 ? "#e040fb" : "#e040fb80" }}>{team1Name}</p>
                     <p className="text-5xl font-black mt-1"
-                      style={{ color: "#e040fb", textShadow: "0 0 28px #e040fb80" }}>{team1Score}</p>
+                      style={{ color: "#e040fb", textShadow: currentTurn === 1 ? "0 0 32px #e040fb" : "0 0 20px #e040fb50" }}>{team1Score}</p>
+                    {currentTurn === 1 && <p className="text-xs font-black mt-1.5" style={{ color: "#e040fb" }}>⚡ دورهم</p>}
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Timer */}
                 <div className="flex flex-col items-center gap-2">
@@ -641,19 +669,26 @@ export default function SongGame() {
                       </motion.span>
                     </div>
                   </div>
-                  <div className="text-sm text-purple-400/35 font-bold">{currentRound}/{totalRounds}</div>
+                  <div className="text-xs text-purple-400/35 font-bold">{currentRound}/{totalRounds}</div>
                 </div>
 
                 {/* Team 2 */}
-                <div className="rounded-2xl border overflow-hidden"
-                  style={{ borderColor: "rgba(0,229,255,0.25)", background: "rgba(0,229,255,0.08)" }}>
-                  <div className="h-1" style={{ background: "linear-gradient(90deg, #00e5ff, #0284c7)" }} />
+                <motion.div layout className="rounded-2xl border overflow-hidden transition-all"
+                  style={{
+                    borderColor: currentTurn === 2 ? "#00e5ff80" : "rgba(0,229,255,0.2)",
+                    background: currentTurn === 2 ? "rgba(0,229,255,0.14)" : "rgba(0,229,255,0.06)",
+                    boxShadow: currentTurn === 2 ? "0 0 32px rgba(0,229,255,0.22)" : "none",
+                  }}>
+                  <div className="h-1.5" style={{ background: currentTurn === 2
+                    ? "linear-gradient(90deg, #00e5ff, #0284c7)"
+                    : "rgba(0,229,255,0.15)" }} />
                   <div className="p-4 text-center">
-                    <p className="text-sm font-black truncate" style={{ color: "#00e5ff80" }}>{team2Name}</p>
+                    <p className="text-sm font-black truncate" style={{ color: currentTurn === 2 ? "#00e5ff" : "#00e5ff80" }}>{team2Name}</p>
                     <p className="text-5xl font-black mt-1"
-                      style={{ color: "#00e5ff", textShadow: "0 0 28px #00e5ff80" }}>{team2Score}</p>
+                      style={{ color: "#00e5ff", textShadow: currentTurn === 2 ? "0 0 32px #00e5ff" : "0 0 20px #00e5ff50" }}>{team2Score}</p>
+                    {currentTurn === 2 && <p className="text-xs font-black mt-1.5" style={{ color: "#00e5ff" }}>⚡ دورهم</p>}
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               {/* Double badge */}
@@ -680,13 +715,16 @@ export default function SongGame() {
                       className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border border-purple-500/20 text-purple-400/55 hover:text-purple-200 transition-all">
                       {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>
-                    <input type="range" min={0} max={100} value={volume}
+                    <input
+                      type="range" min={0} max={100} value={volume}
+                      dir="ltr"
                       onChange={e => setVolume(Number(e.target.value))}
                       className="flex-1 appearance-none h-2.5 rounded-full outline-none cursor-pointer"
                       style={{
-                        background: `linear-gradient(to left, rgba(255,255,255,0.08) ${100 - volume}%, #e040fb ${100 - volume}%)`,
+                        background: `linear-gradient(to right, #e040fb ${volume}%, rgba(255,255,255,0.08) ${volume}%)`,
                         accentColor: "#e040fb",
-                      }} />
+                      }}
+                    />
                     <span className="text-sm text-purple-400/45 w-8 text-left font-bold">{volume}</span>
                   </div>
 
