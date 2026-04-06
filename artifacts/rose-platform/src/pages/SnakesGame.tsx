@@ -598,69 +598,83 @@ export default function SnakesGame() {
               style={{ padding: "12px", gap: "12px" }}>
 
               {/* ── Sidebar — FIRST in RTL = visual RIGHT ── */}
-              <motion.div
-                animate={{ width: sidebarW }}
-                transition={{ type: "spring", stiffness: 260, damping: 28 }}
-                style={{ flexShrink: 0, overflow: "hidden" }}
-                className="flex flex-col gap-2.5 overflow-y-auto">
+              <div style={{ width: sidebarW, flexShrink: 0 }}
+                className="flex flex-col gap-2 overflow-hidden">
 
-                {/* Current player card */}
-                {currentPlayer && (
-                  <div className="rounded-2xl border p-3"
-                    style={{ borderColor: currentPlayer.color + "60", background: currentPlayer.color + "10" }}>
-                    <p className="text-[9px] text-purple-400/50 mb-2 text-center font-bold tracking-wide uppercase">
-                      الدور على
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-11 h-11 rounded-xl overflow-hidden border-2 flex-shrink-0"
-                        style={{ borderColor: currentPlayer.color, boxShadow: `0 0 12px ${currentPlayer.color}50` }}>
-                        <img src={currentPlayer.avatar} alt={currentPlayer.displayName}
-                          className="w-full h-full object-cover"
-                          onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${currentPlayer.username}`; }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-black truncate" style={{ color: currentPlayer.color }}>
-                          {currentPlayer.displayName}
-                        </p>
-                        <p className="text-[10px] text-purple-400/50 mt-0.5">
-                          {currentPlayer.position === 0 ? "لم يبدأ" : `المربع ${toArabic(currentPlayer.position)}`}
-                        </p>
-                      </div>
-                    </div>
-                    {!isAnimating ? (
-                      <motion.div animate={{ opacity: [0.6, 1, 0.6] }} transition={{ repeat: Infinity, duration: 1.4 }}
-                        className="mt-2.5 text-center text-[10px] font-bold py-1.5 rounded-lg"
-                        style={{ background: currentPlayer.color + "20", color: currentPlayer.color }}>
-                        اكتب <span className="font-black text-white">roll</span> أو <span className="font-black text-white">رول</span>
+                {/* ── Players table (dynamic height, no empty space) ── */}
+                <div className="rounded-2xl border border-purple-500/20 overflow-hidden flex-shrink-0"
+                  style={{ background: "rgba(10,4,24,0.85)" }}>
+                  {/* Header */}
+                  <div className="px-3 py-1.5 border-b border-purple-500/15 flex items-center gap-1.5">
+                    <Users size={10} className="text-purple-400/40" />
+                    <span className="text-[9px] font-bold text-purple-400/40">اللاعبون ({players.length})</span>
+                  </div>
+                  {/* Rows — one per player, no empty rows */}
+                  {players.map((p, idx) => {
+                    const isCurrent = idx === currentPlayerIdx && !isAnimating;
+                    return (
+                      <motion.div key={p.username}
+                        animate={{ backgroundColor: isCurrent ? p.color + "18" : "transparent" }}
+                        transition={{ duration: 0.35 }}
+                        className="flex items-center gap-2 px-2.5"
+                        style={{
+                          paddingTop: isCurrent ? "8px" : "5px",
+                          paddingBottom: isCurrent ? "8px" : "5px",
+                          borderBottom: idx < players.length - 1 ? "1px solid rgba(139,92,246,0.10)" : "none",
+                          transition: "padding 0.3s",
+                        }}>
+                        {/* Avatar — bigger for current player */}
+                        <motion.div
+                          animate={{ width: isCurrent ? 34 : 22, height: isCurrent ? 34 : 22 }}
+                          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                          className="rounded-xl overflow-hidden border-2 flex-shrink-0"
+                          style={{
+                            borderColor: isCurrent ? p.color : p.color + "50",
+                            boxShadow: isCurrent ? `0 0 10px ${p.color}60` : "none",
+                          }}>
+                          <img src={p.avatar} alt={p.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                        </motion.div>
+                        {/* Name */}
+                        <div className="flex-1 min-w-0">
+                          <motion.p
+                            animate={{ fontSize: isCurrent ? "13px" : "10px" }}
+                            transition={{ duration: 0.3 }}
+                            className="font-black truncate"
+                            style={{ color: isCurrent ? p.color : p.color + "80", fontWeight: isCurrent ? 900 : 700 }}>
+                            {p.displayName}
+                          </motion.p>
+                          {isCurrent && (
+                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                              className="text-[9px] font-bold mt-0.5"
+                              style={{ color: p.color + "99" }}>
+                              {p.position === 0 ? "لم يبدأ بعد" : `المربع ${toArabic(p.position)}`}
+                            </motion.p>
+                          )}
+                        </div>
+                        {/* Position & indicator */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {!isCurrent && (
+                            <span className="text-[9px] text-purple-400/35 font-bold">
+                              {p.position === 0 ? "—" : toArabic(p.position)}
+                            </span>
+                          )}
+                          {isCurrent && (
+                            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1 }}
+                              className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                          )}
+                        </div>
                       </motion.div>
-                    ) : (
-                      <p className="text-center text-[10px] mt-2 text-purple-400/40">جارٍ الحركة...</p>
-                    )}
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
 
-                {/* Dice result */}
-                {diceValue !== null && (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <motion.div
-                      animate={isRolling ? { rotate: [-15, 15, -10, 10, -5, 5, 0] } : {}}
-                      transition={{ duration: 0.15 }}>
-                      <DiceFace value={diceValue} size={68} color={currentPlayer?.color ?? "#e040fb"} />
-                    </motion.div>
-                    {!isRolling && (
-                      <p className="text-[10px] font-bold" style={{ color: currentPlayer?.color ?? "#e040fb" }}>
-                        رمية {toArabic(diceValue)}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Snake / Ladder message */}
+                {/* ── Snake / Ladder message ── */}
                 <AnimatePresence>
                   {lastAction && (
                     <motion.div key={lastAction}
-                      initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                      className="rounded-xl border p-2.5 text-center font-black text-[11px] leading-snug"
+                      initial={{ opacity: 0, y: -6, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }}
+                      className="rounded-xl border px-2.5 py-2 text-center font-black text-[11px] leading-snug flex-shrink-0"
                       style={{
                         borderColor: lastAction.includes("سلم") ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)",
                         background: lastAction.includes("سلم") ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.10)",
@@ -671,129 +685,224 @@ export default function SnakesGame() {
                   )}
                 </AnimatePresence>
 
-                {/* Players list — compact, dynamic */}
-                <div className="flex-1 rounded-2xl border border-purple-500/20 flex flex-col overflow-hidden"
-                  style={{ background: "rgba(10,4,24,0.80)", minHeight: 0 }}>
-                  <div className="px-2.5 py-1.5 border-b border-purple-500/15 flex items-center gap-1.5 flex-shrink-0">
-                    <Users size={10} className="text-purple-400/40" />
-                    <span className="text-[9px] font-bold text-purple-400/40">اللاعبون ({players.length})</span>
-                  </div>
-                  <div className="overflow-y-auto divide-y divide-purple-500/10">
-                    {players.map((p, idx) => (
-                      <div key={p.username}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 transition-colors"
-                        style={{ background: idx === currentPlayerIdx && !isAnimating ? p.color + "12" : "transparent" }}>
-                        <div className="relative flex-shrink-0">
-                          <div className="w-6 h-6 rounded-md overflow-hidden border"
-                            style={{ borderColor: p.color + "70" }}>
-                            <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
-                              onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-                          </div>
-                          {idx === currentPlayerIdx && !isAnimating && (
-                            <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1 }}
-                              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
-                              style={{ background: p.color }} />
-                          )}
+                {/* ── Dice + Roll instruction ── */}
+                <div className="rounded-2xl border border-purple-500/20 flex-shrink-0 flex flex-col items-center gap-2 p-3"
+                  style={{ background: "rgba(10,4,24,0.85)" }}>
+                  {/* Dice */}
+                  <motion.div
+                    animate={isRolling ? { rotate: [-12, 12, -8, 8, -4, 4, 0] } : {}}
+                    transition={{ duration: 0.15 }}>
+                    {diceValue !== null
+                      ? <DiceFace value={diceValue} size={64} color={currentPlayer?.color ?? "#e040fb"} />
+                      : (
+                        <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-purple-500/25 flex items-center justify-center">
+                          <span style={{ fontSize: "28px", opacity: 0.3 }}>🎲</span>
                         </div>
-                        <span className="flex-1 text-[10px] font-bold truncate" style={{ color: idx === currentPlayerIdx ? p.color : p.color + "99" }}>
-                          {p.displayName}
-                        </span>
-                        <span className="text-[9px] text-purple-400/40 font-bold flex-shrink-0">
-                          {p.position === 0 ? "—" : toArabic(p.position)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      )
+                    }
+                  </motion.div>
+                  {/* Result */}
+                  <AnimatePresence mode="wait">
+                    {diceValue !== null && !isRolling && (
+                      <motion.p key={diceValue}
+                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="text-[11px] font-black"
+                        style={{ color: currentPlayer?.color ?? "#e040fb" }}>
+                        رمية {toArabic(diceValue)}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                  {/* Roll instruction */}
+                  {!isAnimating && currentPlayer && (
+                    <motion.div animate={{ opacity: [0.55, 1, 0.55] }} transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="text-center text-[10px] font-bold px-3 py-1.5 rounded-lg w-full"
+                      style={{ background: currentPlayer.color + "15", color: currentPlayer.color + "cc" }}>
+                      {currentPlayer.displayName} — اكتب{" "}
+                      <span className="text-white font-black">roll</span> أو{" "}
+                      <span className="text-white font-black">رول</span>
+                    </motion.div>
+                  )}
+                  {isAnimating && (
+                    <p className="text-[10px] text-purple-400/40">جارٍ الحركة...</p>
+                  )}
                 </div>
 
+                {/* ── New game button ── */}
                 <button onClick={handleNewGame}
-                  className="flex items-center justify-center gap-1 py-1.5 rounded-xl text-purple-400/25 hover:text-purple-300/40 text-[10px] border border-purple-500/10 transition-all">
-                  <RotateCcw size={9} /> لعبة جديدة
+                  className="flex items-center justify-center gap-1 py-1.5 rounded-xl text-purple-400/20 hover:text-purple-300/40 text-[9px] border border-purple-500/10 hover:border-purple-500/20 transition-all flex-shrink-0">
+                  <RotateCcw size={8} /> لعبة جديدة
                 </button>
-              </motion.div>
+              </div>
 
-              {/* ── Board — centered in remaining space ── */}
+              {/* ── Board — centered with breathing room ── */}
               <div className="flex-1 flex items-center justify-center overflow-hidden">
-                <div style={{
-                  height: "92%",
-                  aspectRatio: "1",
-                  containerType: "inline-size",
-                }}>
+                <div style={{ height: "80%", aspectRatio: "1", containerType: "inline-size" }}>
                   <GameBoard players={players} />
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ── FINISHED ── */}
-          {phase === "finished" && winner && (
-            <motion.div key="finished"
-              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col items-center justify-center p-6 gap-6 text-center overflow-y-auto">
-
-              {/* Trophy */}
-              <motion.div
-                initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: "spring", stiffness: 260, damping: 18, delay: 0.05 }}
-                style={{ fontSize: "88px", lineHeight: 1, filter: "drop-shadow(0 0 24px gold)" }}>
-                🏆
-              </motion.div>
-
-              {/* Winner avatar + rings */}
-              <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
-                {[1, 2, 3].map(ring => (
-                  <motion.div key={ring} className="absolute rounded-full"
-                    style={{
-                      width: 80 + ring * 46, height: 80 + ring * 46,
-                      border: `2px solid ${winner.color}`,
-                      opacity: 0.2 / ring,
-                    }}
-                    animate={{ scale: [1, 1.08, 1], opacity: [0.2 / ring, 0.45 / ring, 0.2 / ring] }}
-                    transition={{ repeat: Infinity, duration: 2 + ring * 0.4, delay: ring * 0.2 }} />
-                ))}
-                <motion.div
-                  animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-                  className="relative w-28 h-28 rounded-3xl overflow-hidden border-4 z-10"
-                  style={{ borderColor: winner.color, boxShadow: `0 0 50px ${winner.color}70, 0 0 100px ${winner.color}30` }}>
-                  <img src={winner.avatar} alt={winner.displayName} className="w-full h-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winner.username}`; }} />
-                </motion.div>
-              </div>
-
-              {/* Name */}
-              <div className="space-y-2">
-                <motion.h2 className="text-5xl font-black"
-                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, type: "spring" }}
-                  style={{ color: winner.color, textShadow: `0 0 40px ${winner.color}` }}>
-                  {winner.displayName}
-                </motion.h2>
-                <motion.p className="text-2xl font-bold text-white/50"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                  🎉 مبروك على الفوز!
-                </motion.p>
-              </div>
-
-              {/* Buttons */}
-              <motion.div className="flex gap-4"
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-                <motion.button onClick={handleRematch}
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-7 py-3.5 rounded-2xl font-black text-base border border-purple-500/35 text-purple-300 hover:border-purple-400/60 transition-all">
-                  <RotateCcw size={18} /> إعادة اللعبة
-                </motion.button>
-                <motion.button onClick={handleNewGame}
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-7 py-3.5 rounded-2xl font-black text-base"
-                  style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 30px rgba(224,64,251,0.45)" }}>
-                  <Play size={18} fill="white" /> جولة جديدة
-                </motion.button>
-              </motion.div>
-            </motion.div>
-          )}
-
         </AnimatePresence>
       </div>
+
+      {/* ── WIN SCREEN — full-screen overlay, separate from playing phase ── */}
+      <AnimatePresence>
+        {phase === "finished" && winner && (
+          <motion.div
+            key="win-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 100,
+              background: "radial-gradient(ellipse at 50% 40%, #1a0535 0%, #0a0318 60%, #050112 100%)",
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              gap: "28px", padding: "32px", textAlign: "center",
+              direction: "rtl",
+            }}>
+
+            {/* Glowing particles background */}
+            {[...Array(12)].map((_, i) => (
+              <motion.div key={i}
+                style={{
+                  position: "absolute",
+                  width: Math.random() * 8 + 4,
+                  height: Math.random() * 8 + 4,
+                  borderRadius: "50%",
+                  background: [winner.color, "#e040fb", "#00e5ff", "#ffd600"][i % 4],
+                  left: `${(i * 37 + 11) % 95}%`,
+                  top: `${(i * 53 + 7) % 90}%`,
+                  filter: "blur(1px)",
+                }}
+                animate={{
+                  y: [0, -30, 0, 20, 0],
+                  opacity: [0.2, 0.8, 0.3, 0.9, 0.2],
+                  scale: [1, 1.4, 0.8, 1.2, 1],
+                }}
+                transition={{
+                  duration: 3 + (i % 4),
+                  repeat: Infinity,
+                  delay: i * 0.25,
+                  ease: "easeInOut",
+                }} />
+            ))}
+
+            {/* Trophy — springs in from above */}
+            <motion.div
+              initial={{ scale: 0, y: -60, rotate: -20 }}
+              animate={{ scale: 1, y: 0, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 220, damping: 16, delay: 0.1 }}
+              style={{ fontSize: "96px", lineHeight: 1, filter: "drop-shadow(0 0 30px gold) drop-shadow(0 0 60px rgba(255,200,0,0.4))", zIndex: 10 }}>
+              🏆
+            </motion.div>
+
+            {/* Winner avatar with glow rings */}
+            <div style={{ position: "relative", width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
+              {[1, 2, 3].map(ring => (
+                <motion.div key={ring}
+                  style={{
+                    position: "absolute",
+                    width: 76 + ring * 42,
+                    height: 76 + ring * 42,
+                    borderRadius: "50%",
+                    border: `2px solid ${winner.color}`,
+                  }}
+                  animate={{ scale: [1, 1.07, 1], opacity: [0.35 / ring, 0.7 / ring, 0.35 / ring] }}
+                  transition={{ repeat: Infinity, duration: 1.8 + ring * 0.4, delay: ring * 0.18 }} />
+              ))}
+              <motion.div
+                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 280, damping: 18, delay: 0.3 }}
+                style={{
+                  width: 120, height: 120, borderRadius: "28px", overflow: "hidden",
+                  border: `4px solid ${winner.color}`,
+                  boxShadow: `0 0 40px ${winner.color}80, 0 0 80px ${winner.color}30`,
+                  zIndex: 10, position: "relative",
+                }}>
+                <img src={winner.avatar} alt={winner.displayName}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winner.username}`; }} />
+              </motion.div>
+              {/* Floating animation wrapper */}
+              <motion.div style={{ position: "absolute", inset: 0 }}
+                animate={{ y: [0, -10, 0] }}
+                transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }} />
+            </div>
+
+            {/* Name + congrats */}
+            <motion.div style={{ zIndex: 10 }}
+              initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45, type: "spring" }}>
+              <p style={{ fontSize: "14px", color: "rgba(200,180,255,0.5)", fontWeight: 700, marginBottom: "8px", letterSpacing: "0.05em" }}>
+                الفائز بالجولة
+              </p>
+              <h1 style={{
+                fontSize: "clamp(36px, 6vw, 64px)",
+                fontWeight: 900,
+                color: winner.color,
+                textShadow: `0 0 40px ${winner.color}, 0 0 80px ${winner.color}50`,
+                lineHeight: 1.1,
+                marginBottom: "10px",
+              }}>
+                {winner.displayName}
+              </h1>
+              <motion.p
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+                style={{ fontSize: "24px", fontWeight: 700, color: "rgba(255,255,255,0.45)" }}>
+                🎉 مبروك عليك الفوز!
+              </motion.p>
+            </motion.div>
+
+            {/* Action buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85 }}
+              style={{ display: "flex", gap: "14px", zIndex: 10 }}>
+              <motion.button onClick={() => navigate("/")}
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "14px 28px", borderRadius: "16px",
+                  fontWeight: 900, fontSize: "15px",
+                  border: "1px solid rgba(139,92,246,0.35)",
+                  color: "rgba(196,181,253,0.8)",
+                  background: "rgba(139,92,246,0.08)",
+                  cursor: "pointer",
+                }}>
+                <ArrowRight size={17} /> الرئيسية
+              </motion.button>
+              <motion.button onClick={handleRematch}
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "14px 28px", borderRadius: "16px",
+                  fontWeight: 900, fontSize: "15px",
+                  border: "1px solid rgba(139,92,246,0.35)",
+                  color: "rgba(196,181,253,0.8)",
+                  background: "rgba(139,92,246,0.08)",
+                  cursor: "pointer",
+                }}>
+                <RotateCcw size={17} /> إعادة اللعبة
+              </motion.button>
+              <motion.button onClick={handleNewGame}
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "14px 28px", borderRadius: "16px",
+                  fontWeight: 900, fontSize: "15px",
+                  background: "linear-gradient(135deg, #e040fb, #9c27b0)",
+                  boxShadow: "0 0 28px rgba(224,64,251,0.5)",
+                  color: "white",
+                  cursor: "pointer",
+                }}>
+                <Play size={17} fill="white" /> جولة جديدة
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
