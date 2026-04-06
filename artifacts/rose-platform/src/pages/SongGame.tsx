@@ -1,33 +1,83 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Play, Trophy, Music2, SkipForward, Zap,
-  RotateCcw, RefreshCw, Eye,
+  ArrowRight, Play, Pause, Trophy, Music2, SkipForward, Zap,
+  RotateCcw, RefreshCw, Eye, Volume2, VolumeX,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Phase = "setup" | "settings" | "control" | "play" | "ended";
 
+interface Song {
+  id: number;
+  title: string;
+  artist: string;
+  youtubeId: string;
+  clipStart: number; // seconds into the video where clip begins
+  clipEnd: number;   // seconds into the video where clip ends
+}
+
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady?: () => void;
+    _ytApiReady?: boolean;
+  }
+}
+
+// ─── Song bank ────────────────────────────────────────────────────────────────
+const SONGS: Song[] = [
+  {
+    id: 1,
+    title: "يا نور العين",
+    artist: "مطرف المطرف",
+    youtubeId: "WlqefHeYYR0",
+    clipStart: 42,   // 0:42 — main chorus kicks in
+    clipEnd: 57,     // 0:57 — 15-second clip
+  },
+  // ── إضافة أغاني جديدة هنا ──────────────────────────────────────────────
+  // { id: 2, title: "اسم الأغنية", artist: "الفنان", youtubeId: "VIDEO_ID", clipStart: 30, clipEnd: 45 },
+];
+
 const ROUND_OPTIONS = [5, 10, 15, 20, 25];
 const TIMER_TOTAL = 60;
 
-// ─── Animated music note ─────────────────────────────────────────────────────
-const MusicNote = ({ delay, x, color }: { delay: number; x: number; color: string }) => (
-  <motion.div
-    className="absolute text-2xl pointer-events-none select-none"
+// ─── YouTube API loader ───────────────────────────────────────────────────────
+let ytApiPromise: Promise<void> | null = null;
+function loadYouTubeAPI(): Promise<void> {
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    if (window._ytApiReady && window.YT?.Player) { resolve(); return; }
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      window._ytApiReady = true;
+      if (prev) prev();
+      resolve();
+    };
+    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(tag);
+    }
+  });
+  return ytApiPromise;
+}
+
+// ─── Animated note ────────────────────────────────────────────────────────────
+const Note = ({ delay, x, color }: { delay: number; x: number; color: string }) => (
+  <motion.span className="absolute text-2xl pointer-events-none select-none font-bold"
     style={{ left: `${x}%`, bottom: 0, color }}
     initial={{ y: 0, opacity: 0, scale: 0.5 }}
-    animate={{ y: -180, opacity: [0, 1, 1, 0], scale: [0.5, 1, 1, 0.3], rotate: [0, 15, -15, 0] }}
-    transition={{ duration: 2.8, delay, repeat: Infinity, repeatDelay: 0.5 }}
-  >♪</motion.div>
+    animate={{ y: -160, opacity: [0, 1, 1, 0], scale: [0.5, 1.1, 1, 0.3], rotate: [0, 18, -12, 0] }}
+    transition={{ duration: 2.6, delay, repeat: Infinity, repeatDelay: 0.6 }}>
+    ♪
+  </motion.span>
 );
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function SongGame() {
   const [, navigate] = useLocation();
-
-  // Phase
   const [phase, setPhase] = useState<Phase>("setup");
 
   // Settings
@@ -38,26 +88,52 @@ export default function SongGame() {
   // Game state
   const [team1Score, setTeam1Score] = useState(0);
   const [team2Score, setTeam2Score] = useState(0);
-  const [currentRound, setCurrentRound] = useState(0);      // scored rounds
-  const [currentTurn, setCurrentTurn] = useState<1 | 2>(1); // whose turn
+  const [currentRound, setCurrentRound] = useState(0);
+  const [currentTurn, setCurrentTurn] = useState<1 | 2>(1);
   const [team1DoubleUsed, setTeam1DoubleUsed] = useState(false);
   const [team2DoubleUsed, setTeam2DoubleUsed] = useState(false);
-  const [doubleActive, setDoubleActive] = useState(false);   // double armed for this round
+  const [doubleActive, setDoubleActive] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
 
   // Timer
   const [timeLeft, setTimeLeft] = useState(TIMER_TOTAL);
   const [timerRunning, setTimerRunning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Timer logic ───────────────────────────────────────────────────────────
+  // YouTube player
+  const ytPlayerRef = useRef<any>(null);
+  const ytContainerRef = useRef<HTMLDivElement>(null);
+  const [audioState, setAudioState] = useState<"loading" | "playing" | "paused" | "ended" | "error">("loading");
+  const [muted, setMuted] = useState(false);
+  const clipWatchRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const currentSong: Song = SONGS[currentSongIndex % SONGS.length];
+  const teamColor = (t: 1 | 2) => t === 1 ? "#e040fb" : "#00e5ff";
+  const teamName = (t: 1 | 2) => t === 1 ? team1Name : team2Name;
+  const currentDoubleUsed = currentTurn === 1 ? team1DoubleUsed : team2DoubleUsed;
+  const timerPct = (timeLeft / TIMER_TOTAL) * 100;
+  const timerColor = timeLeft > 10 ? "#22c55e" : "#ef4444";
+
+  // ── Timer ─────────────────────────────────────────────────────────────────
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setTimerRunning(false);
+  }, []);
+
   useEffect(() => {
-    if (!timerRunning) { stopTimer(); return; }
+    if (!timerRunning) return;
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) {
           stopTimer();
-          handleTimeUp();
+          pauseAudio();
+          // Switch turn on timeout — go back to control
+          setCurrentTurn(prev => prev === 1 ? 2 : 1);
+          setDoubleActive(false);
+          setShowAnswer(false);
+          setPhase("control");
           return 0;
         }
         return t - 1;
@@ -66,31 +142,107 @@ export default function SongGame() {
     return () => stopTimer();
   }, [timerRunning]);
 
-  const stopTimer = () => {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    setTimerRunning(false);
+  // ── YouTube player logic ──────────────────────────────────────────────────
+  const clearClipWatch = () => {
+    if (clipWatchRef.current) { clearInterval(clipWatchRef.current); clipWatchRef.current = null; }
   };
 
-  const handleTimeUp = () => {
-    // Auto switch turn
-    setCurrentTurn(t => t === 1 ? 2 : 1);
-    setDoubleActive(false);
-    setShowAnswer(false);
-    setPhase("control");
+  const destroyPlayer = useCallback(() => {
+    clearClipWatch();
+    if (ytPlayerRef.current) {
+      try { ytPlayerRef.current.destroy(); } catch (_) {}
+      ytPlayerRef.current = null;
+    }
+  }, []);
+
+  const startClipWatch = (song: Song) => {
+    clearClipWatch();
+    clipWatchRef.current = setInterval(() => {
+      if (!ytPlayerRef.current) return;
+      try {
+        const t = ytPlayerRef.current.getCurrentTime?.() ?? 0;
+        if (t >= song.clipEnd) {
+          ytPlayerRef.current.seekTo(song.clipStart, true);
+          ytPlayerRef.current.playVideo();
+        }
+      } catch (_) {}
+    }, 500);
   };
 
-  // ── Derived ───────────────────────────────────────────────────────────────
-  const teamName = (t: 1 | 2) => t === 1 ? team1Name : team2Name;
-  const teamColor = (t: 1 | 2) => t === 1 ? "#e040fb" : "#00e5ff";
-  const otherTurn = currentTurn === 1 ? 2 : 1;
-  const timerPct = (timeLeft / TIMER_TOTAL) * 100;
-  const timerColor = timeLeft > 10 ? "#22c55e" : "#ef4444";
-  const currentDoubleUsed = currentTurn === 1 ? team1DoubleUsed : team2DoubleUsed;
+  // Initialise YouTube player when entering play phase
+  useEffect(() => {
+    if (phase !== "play") { destroyPlayer(); return; }
+    setAudioState("loading");
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+    loadYouTubeAPI().then(() => {
+      if (!ytContainerRef.current) return;
+      destroyPlayer();
+
+      ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
+        height: "1",
+        width: "1",
+        videoId: currentSong.youtubeId,
+        playerVars: {
+          autoplay: 1,
+          start: currentSong.clipStart,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          fs: 0,
+          iv_load_policy: 3,
+          disablekb: 1,
+          playsinline: 1,
+        },
+        events: {
+          onReady: (e: any) => {
+            e.target.playVideo();
+            setAudioState("playing");
+            startClipWatch(currentSong);
+          },
+          onStateChange: (e: any) => {
+            const S = window.YT?.PlayerState;
+            if (e.data === S?.PLAYING) setAudioState("playing");
+            else if (e.data === S?.PAUSED) setAudioState("paused");
+            else if (e.data === S?.ENDED) setAudioState("ended");
+          },
+          onError: () => setAudioState("error"),
+        },
+      });
+    }).catch(() => setAudioState("error"));
+
+    return () => destroyPlayer();
+  }, [phase, currentSongIndex]);
+
+  // Mute/unmute sync
+  useEffect(() => {
+    if (!ytPlayerRef.current) return;
+    try { muted ? ytPlayerRef.current.mute() : ytPlayerRef.current.unMute(); } catch (_) {}
+  }, [muted]);
+
+  // ── Audio controls ────────────────────────────────────────────────────────
+  const playAudio = () => {
+    if (!ytPlayerRef.current) return;
+    try { ytPlayerRef.current.playVideo(); setAudioState("playing"); } catch (_) {}
+  };
+  const pauseAudio = () => {
+    if (!ytPlayerRef.current) return;
+    try { ytPlayerRef.current.pauseVideo(); setAudioState("paused"); } catch (_) {}
+  };
+  const replayAudio = () => {
+    if (!ytPlayerRef.current) return;
+    try {
+      ytPlayerRef.current.seekTo(currentSong.clipStart, true);
+      ytPlayerRef.current.playVideo();
+      setAudioState("playing");
+      startClipWatch(currentSong);
+    } catch (_) {}
+  };
+
+  // ── Game actions ──────────────────────────────────────────────────────────
   const startGame = () => {
     setTeam1Score(0); setTeam2Score(0);
     setCurrentRound(0); setCurrentTurn(1);
+    setCurrentSongIndex(0);
     setTeam1DoubleUsed(false); setTeam2DoubleUsed(false);
     setDoubleActive(false); setShowAnswer(false);
     setPhase("control");
@@ -104,7 +256,6 @@ export default function SongGame() {
   };
 
   const skipTurn = () => {
-    // Switch turn only — round doesn't count
     setCurrentTurn(t => t === 1 ? 2 : 1);
     setDoubleActive(false);
     setShowAnswer(false);
@@ -117,10 +268,10 @@ export default function SongGame() {
     setPhase("play");
   };
 
-  const replaySong = () => {
-    setTimeLeft(TIMER_TOTAL);
-    setTimerRunning(true);
-    setShowAnswer(false);
+  const handleShowAnswer = () => {
+    pauseAudio();
+    stopTimer();
+    setShowAnswer(true);
   };
 
   const awardPoint = (team: 1 | 2) => {
@@ -133,6 +284,9 @@ export default function SongGame() {
     setDoubleActive(false);
     setShowAnswer(false);
     stopTimer();
+    destroyPlayer();
+
+    setCurrentSongIndex(i => i + 1);
 
     if (next >= totalRounds) {
       setPhase("ended");
@@ -144,11 +298,54 @@ export default function SongGame() {
 
   const resetFull = () => {
     stopTimer();
+    destroyPlayer();
     setPhase("setup");
   };
 
   const winner = team1Score > team2Score ? team1Name
     : team2Score > team1Score ? team2Name : "تعادل! 🤝";
+
+  // ── Scoreboard component (shared) ─────────────────────────────────────────
+  const Scoreboard = ({ compact = false }: { compact?: boolean }) => (
+    <div className={`grid grid-cols-3 gap-3 items-center ${compact ? "mb-4" : ""}`}>
+      {/* Team 1 */}
+      <div className={`rounded-2xl p-4 text-center border transition-all`}
+        style={{
+          borderColor: currentTurn === 1 ? "#e040fb70" : "rgba(224,64,251,0.15)",
+          background: currentTurn === 1 ? "rgba(224,64,251,0.12)" : "rgba(10,4,20,0.7)",
+          boxShadow: currentTurn === 1 ? "0 0 24px rgba(224,64,251,0.2)" : "none",
+        }}>
+        <p className="text-xs font-bold truncate mb-1" style={{ color: "#e040fb99" }}>{team1Name}</p>
+        <p className={`${compact ? "text-3xl" : "text-4xl"} font-black`}
+          style={{ color: "#e040fb", textShadow: "0 0 16px #e040fb" }}>{team1Score}</p>
+        {currentTurn === 1 && !compact && <p className="text-xs text-pink-400 mt-1 font-bold">⚡ دورهم</p>}
+      </div>
+
+      {/* Middle */}
+      <div className="text-center space-y-1">
+        <p className="text-xl font-black text-purple-500/50">VS</p>
+        <p className="text-xs text-purple-400/40">{currentRound}/{totalRounds}</p>
+        <div className="h-1.5 rounded-full bg-purple-800/30 overflow-hidden">
+          <motion.div className="h-full rounded-full"
+            animate={{ width: `${(currentRound / totalRounds) * 100}%` }}
+            style={{ background: "linear-gradient(90deg, #e040fb, #00e5ff)" }} />
+        </div>
+      </div>
+
+      {/* Team 2 */}
+      <div className={`rounded-2xl p-4 text-center border transition-all`}
+        style={{
+          borderColor: currentTurn === 2 ? "#00e5ff70" : "rgba(0,229,255,0.15)",
+          background: currentTurn === 2 ? "rgba(0,229,255,0.10)" : "rgba(10,4,20,0.7)",
+          boxShadow: currentTurn === 2 ? "0 0 24px rgba(0,229,255,0.2)" : "none",
+        }}>
+        <p className="text-xs font-bold truncate mb-1" style={{ color: "#00e5ff99" }}>{team2Name}</p>
+        <p className={`${compact ? "text-3xl" : "text-4xl"} font-black`}
+          style={{ color: "#00e5ff", textShadow: "0 0 16px #00e5ff" }}>{team2Score}</p>
+        {currentTurn === 2 && !compact && <p className="text-xs text-cyan-400 mt-1 font-bold">⚡ دورهم</p>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen gradient-bg flex flex-col overflow-hidden" dir="rtl">
@@ -172,6 +369,13 @@ export default function SongGame() {
         <div className="w-20" />
       </header>
 
+      {/* Hidden YouTube container — must always be in DOM while in play phase */}
+      {phase === "play" && (
+        <div className="fixed" style={{ top: "-1px", left: "-1px", width: "1px", height: "1px", overflow: "hidden", zIndex: -1 }}>
+          <div ref={ytContainerRef} id="yt-player-root" />
+        </div>
+      )}
+
       {/* ── BODY ──────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex items-center justify-center p-5 overflow-y-auto z-10">
         <AnimatePresence mode="wait">
@@ -186,8 +390,7 @@ export default function SongGame() {
                 <img src="/song-hero.jpg" alt="لعبة الأغاني"
                   className="w-full h-auto object-cover block" />
               </div>
-              <motion.button
-                onClick={() => setPhase("settings")}
+              <motion.button onClick={() => setPhase("settings")}
                 whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
                 className="flex items-center gap-2 px-10 py-3.5 rounded-2xl text-lg font-black"
                 style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)",
@@ -206,8 +409,6 @@ export default function SongGame() {
                 <h2 className="text-2xl font-black text-white">إعدادات اللعبة</h2>
                 <p className="text-purple-300/40 text-sm mt-1">سمّ الفريقين واختر عدد الجولات</p>
               </div>
-
-              {/* Team names */}
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { val: team1Name, set: setTeam1Name, color: "#e040fb", label: "الفريق الأول" },
@@ -222,8 +423,6 @@ export default function SongGame() {
                   </div>
                 ))}
               </div>
-
-              {/* Rounds */}
               <div className="space-y-3">
                 <p className="text-sm font-bold text-purple-300/60 flex items-center gap-2">
                   <Trophy size={14} /> عدد الجولات
@@ -237,13 +436,10 @@ export default function SongGame() {
                         background: totalRounds === r ? "rgba(224,64,251,0.2)" : "rgba(224,64,251,0.05)",
                         color: totalRounds === r ? "#e040fb" : "rgba(224,64,251,0.35)",
                         boxShadow: totalRounds === r ? "0 0 14px rgba(224,64,251,0.3)" : "none",
-                      }}>
-                      {r}
-                    </button>
+                      }}>{r}</button>
                   ))}
                 </div>
               </div>
-
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setPhase("setup")}
                   className="px-5 py-3 rounded-xl border border-purple-500/20 text-purple-400/50 hover:text-purple-300 transition-all text-sm font-bold">
@@ -265,48 +461,7 @@ export default function SongGame() {
             <motion.div key="control"
               initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               className="w-full max-w-lg space-y-5">
-
-              {/* Scoreboard */}
-              <div className="grid grid-cols-3 gap-3 items-center">
-                {/* Team 1 */}
-                <motion.div layout
-                  className="rounded-2xl p-4 text-center border transition-all"
-                  style={{
-                    borderColor: currentTurn === 1 ? "#e040fb70" : "rgba(224,64,251,0.15)",
-                    background: currentTurn === 1 ? "rgba(224,64,251,0.12)" : "rgba(10,4,20,0.7)",
-                    boxShadow: currentTurn === 1 ? "0 0 24px rgba(224,64,251,0.2)" : "none",
-                  }}>
-                  <p className="text-xs font-bold truncate mb-1" style={{ color: "#e040fb99" }}>{team1Name}</p>
-                  <p className="text-4xl font-black" style={{ color: "#e040fb", textShadow: "0 0 16px #e040fb" }}>{team1Score}</p>
-                  {currentTurn === 1 && <p className="text-xs text-pink-400 mt-1 font-bold">⚡ دورهم</p>}
-                </motion.div>
-
-                {/* Middle */}
-                <div className="text-center space-y-1">
-                  <p className="text-2xl font-black text-purple-500/50">VS</p>
-                  <p className="text-xs text-purple-400/40">{currentRound}/{totalRounds}</p>
-                  <div className="h-1.5 rounded-full bg-purple-800/30 overflow-hidden">
-                    <motion.div className="h-full rounded-full"
-                      animate={{ width: `${(currentRound / totalRounds) * 100}%` }}
-                      style={{ background: "linear-gradient(90deg, #e040fb, #00e5ff)" }} />
-                  </div>
-                </div>
-
-                {/* Team 2 */}
-                <motion.div layout
-                  className="rounded-2xl p-4 text-center border transition-all"
-                  style={{
-                    borderColor: currentTurn === 2 ? "#00e5ff70" : "rgba(0,229,255,0.15)",
-                    background: currentTurn === 2 ? "rgba(0,229,255,0.10)" : "rgba(10,4,20,0.7)",
-                    boxShadow: currentTurn === 2 ? "0 0 24px rgba(0,229,255,0.2)" : "none",
-                  }}>
-                  <p className="text-xs font-bold truncate mb-1" style={{ color: "#00e5ff99" }}>{team2Name}</p>
-                  <p className="text-4xl font-black" style={{ color: "#00e5ff", textShadow: "0 0 16px #00e5ff" }}>{team2Score}</p>
-                  {currentTurn === 2 && <p className="text-xs text-cyan-400 mt-1 font-bold">⚡ دورهم</p>}
-                </motion.div>
-              </div>
-
-              {/* Current turn banner */}
+              <Scoreboard />
               <div className="rounded-2xl border py-3 text-center"
                 style={{ borderColor: `${teamColor(currentTurn)}35`, background: `${teamColor(currentTurn)}08` }}>
                 <p className="text-sm text-purple-300/40">دور</p>
@@ -315,7 +470,6 @@ export default function SongGame() {
 
               {/* 3 action buttons */}
               <div className="space-y-3">
-                {/* تشغيل الأغنية */}
                 <motion.button onClick={playSong}
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-xl"
@@ -324,7 +478,6 @@ export default function SongGame() {
                   <Play size={22} fill="white" /> تشغيل الأغنية
                 </motion.button>
 
-                {/* تفعيل الدبل */}
                 <motion.button
                   onClick={activateDouble}
                   disabled={currentDoubleUsed}
@@ -332,11 +485,8 @@ export default function SongGame() {
                   whileTap={currentDoubleUsed ? {} : { scale: 0.98 }}
                   className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl font-black text-lg border transition-all"
                   style={{
-                    background: currentDoubleUsed
-                      ? "rgba(255,214,0,0.04)"
-                      : doubleActive
-                      ? "rgba(255,214,0,0.2)"
-                      : "rgba(255,214,0,0.09)",
+                    background: currentDoubleUsed ? "rgba(255,214,0,0.04)"
+                      : doubleActive ? "rgba(255,214,0,0.2)" : "rgba(255,214,0,0.09)",
                     borderColor: currentDoubleUsed ? "rgba(255,214,0,0.15)" : doubleActive ? "#ffd600" : "rgba(255,214,0,0.4)",
                     color: currentDoubleUsed ? "rgba(255,214,0,0.3)" : "#ffd600",
                     boxShadow: doubleActive ? "0 0 20px rgba(255,214,0,0.3)" : "none",
@@ -346,7 +496,6 @@ export default function SongGame() {
                   {currentDoubleUsed ? "الدبل مستخدم" : doubleActive ? "DOUBLE مفعّل! ×2" : "تفعيل الدبل"}
                 </motion.button>
 
-                {/* تخطي الدور */}
                 <motion.button onClick={skipTurn}
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="w-full flex items-center justify-center gap-3 py-3 rounded-2xl font-bold border border-purple-500/25 text-purple-400/60 hover:text-purple-300 hover:border-purple-500/40 transition-all">
@@ -354,7 +503,6 @@ export default function SongGame() {
                 </motion.button>
               </div>
 
-              {/* Reset */}
               <button onClick={resetFull}
                 className="w-full flex items-center justify-center gap-2 py-2 text-xs text-purple-500/30 hover:text-purple-400/50 transition-colors">
                 <RotateCcw size={13} /> إعادة تعيين
@@ -368,102 +516,152 @@ export default function SongGame() {
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               className="w-full max-w-lg space-y-4">
 
-              {/* Teams row */}
-              <div className="grid grid-cols-3 gap-3 items-center">
-                <div className="rounded-2xl p-4 text-center border border-pink-500/25 bg-pink-500/08">
-                  <p className="text-xs font-bold text-pink-400/60 mb-1 truncate">{team1Name}</p>
-                  <p className="text-4xl font-black" style={{ color: "#e040fb", textShadow: "0 0 16px #e040fb" }}>{team1Score}</p>
-                </div>
-
-                {/* Music + Timer */}
-                <div className="flex flex-col items-center gap-2">
-                  {/* Timer ring */}
-                  <div className="relative w-20 h-20">
-                    <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
-                      <motion.circle cx="40" cy="40" r="34" fill="none"
-                        stroke={timerColor} strokeWidth="5" strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 34}`}
-                        strokeDashoffset={`${2 * Math.PI * 34 * (1 - timerPct / 100)}`}
-                        transition={{ duration: 0.7 }} />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black" style={{ color: timerColor }}>{timeLeft}</span>
-                    </div>
-                  </div>
-                  {/* Floating music notes */}
-                  <div className="relative w-12 h-8 overflow-visible">
-                    <MusicNote delay={0}   x={10} color="#e040fb" />
-                    <MusicNote delay={0.8} x={50} color="#00e5ff" />
-                    <MusicNote delay={1.6} x={80} color="#ffd600" />
-                  </div>
-                </div>
-
-                <div className="rounded-2xl p-4 text-center border border-cyan-500/25 bg-cyan-500/08">
-                  <p className="text-xs font-bold text-cyan-400/60 mb-1 truncate">{team2Name}</p>
-                  <p className="text-4xl font-black" style={{ color: "#00e5ff", textShadow: "0 0 16px #00e5ff" }}>{team2Score}</p>
-                </div>
-              </div>
+              <Scoreboard compact />
 
               {/* Double badge */}
               {doubleActive && (
                 <motion.div animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 1 }}
-                  className="rounded-2xl border-2 border-yellow-400/80 bg-yellow-400/10 py-3 text-center font-black text-yellow-400 text-xl"
+                  className="rounded-2xl border-2 border-yellow-400/80 bg-yellow-400/10 py-2 text-center font-black text-yellow-400 text-lg"
                   style={{ boxShadow: "0 0 20px rgba(255,214,0,0.3)" }}>
                   ⚡ DOUBLE × 2 ⚡
                 </motion.div>
               )}
 
-              {/* Replay + Show answer */}
-              {!showAnswer && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={replaySong}
-                    className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold border border-purple-500/25 text-purple-300/60 hover:text-purple-200 hover:border-purple-500/40 transition-all">
-                    <RefreshCw size={16} /> إعادة الأغنية
-                  </button>
-                  <motion.button onClick={() => { stopTimer(); setShowAnswer(true); }}
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                    className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold"
-                    style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.45)", color: "#fbbf24" }}>
-                    <Eye size={16} /> إظهار الإجابة
-                  </motion.button>
-                </div>
-              )}
+              {/* Music player card */}
+              <div className="rounded-3xl border border-purple-500/25 overflow-hidden"
+                style={{ background: "linear-gradient(135deg, rgba(20,8,40,0.95), rgba(5,15,35,0.95))" }}>
 
-              {/* Answer + Point buttons */}
-              <AnimatePresence>
-                {showAnswer && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className="space-y-3">
-                    <div className="rounded-2xl border border-green-500/40 bg-green-500/08 py-3 text-center">
-                      <p className="text-xs text-green-400/60 mb-0.5">الإجابة الصحيحة</p>
-                      <p className="text-lg font-black text-green-300">أغنية تشغيل الهوست</p>
+                {/* Top gradient strip */}
+                <div className="h-0.5" style={{ background: "linear-gradient(90deg, #e040fb, #7c3aed, #00e5ff)" }} />
+
+                <div className="p-5">
+                  {/* Timer + notes */}
+                  <div className="flex items-center justify-between mb-5">
+                    {/* Timer ring */}
+                    <div className="relative w-20 h-20 flex-shrink-0">
+                      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
+                        <motion.circle cx="40" cy="40" r="32" fill="none"
+                          stroke={timerColor} strokeWidth="5" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 32}`}
+                          strokeDashoffset={`${2 * Math.PI * 32 * (1 - timerPct / 100)}`}
+                          transition={{ duration: 0.7 }} />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl font-black" style={{ color: timerColor }}>{timeLeft}</span>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <motion.button onClick={() => awardPoint(1)}
-                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                        className="py-4 rounded-2xl font-black text-base"
-                        style={{ background: "linear-gradient(135deg, rgba(224,64,251,0.25), rgba(224,64,251,0.1))",
-                          border: "1px solid rgba(224,64,251,0.55)", color: "#e040fb",
-                          boxShadow: "0 0 18px rgba(224,64,251,0.2)" }}>
-                        +{doubleActive ? 2 : 1} {team1Name}
-                      </motion.button>
-                      <motion.button onClick={() => awardPoint(2)}
-                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                        className="py-4 rounded-2xl font-black text-base"
-                        style={{ background: "linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.08))",
-                          border: "1px solid rgba(0,229,255,0.5)", color: "#00e5ff",
-                          boxShadow: "0 0 18px rgba(0,229,255,0.18)" }}>
-                        +{doubleActive ? 2 : 1} {team2Name}
-                      </motion.button>
+
+                    {/* Music icon + floating notes */}
+                    <div className="flex-1 flex flex-col items-center relative py-2">
+                      <motion.div
+                        animate={audioState === "playing" ? { scale: [1, 1.1, 1], rotate: [-3, 3, -3] } : {}}
+                        transition={{ repeat: Infinity, duration: 1.2 }}
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                        style={{ background: "rgba(224,64,251,0.12)", border: "2px solid rgba(224,64,251,0.3)" }}>
+                        <Music2 size={30} style={{ color: "#e040fb", filter: "drop-shadow(0 0 8px #e040fb)" }} />
+                      </motion.div>
+
+                      {/* Floating notes */}
+                      <div className="relative w-32 h-8 mt-1 overflow-visible">
+                        <Note delay={0}   x={10} color="#e040fb" />
+                        <Note delay={0.9} x={45} color="#00e5ff" />
+                        <Note delay={1.7} x={78} color="#ffd600" />
+                      </div>
+
+                      {/* Loading / error state */}
+                      {audioState === "loading" && (
+                        <p className="text-xs text-purple-400/50 mt-1">جارٍ التحميل...</p>
+                      )}
+                      {audioState === "error" && (
+                        <p className="text-xs text-red-400/70 mt-1">تعذّر تحميل الصوت</p>
+                      )}
                     </div>
-                    <button onClick={replaySong}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/20 text-purple-400/50 hover:text-purple-300 transition-all text-sm">
-                      <RefreshCw size={14} /> إعادة تشغيل الأغنية
+
+                    {/* Mute button */}
+                    <button onClick={() => setMuted(m => !m)}
+                      className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border border-purple-500/20 text-purple-400/50 hover:text-purple-300 hover:border-purple-500/40 transition-all">
+                      {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </div>
+
+                  {/* Play / Pause / Replay row */}
+                  {!showAnswer && (
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      {/* Play / Pause */}
+                      <motion.button
+                        onClick={audioState === "playing" ? pauseAudio : playAudio}
+                        whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
+                        className="col-span-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl font-bold text-sm"
+                        style={{
+                          background: audioState === "playing" ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.15)",
+                          border: `1px solid ${audioState === "playing" ? "rgba(239,68,68,0.4)" : "rgba(34,197,94,0.4)"}`,
+                          color: audioState === "playing" ? "#ef4444" : "#22c55e",
+                        }}>
+                        {audioState === "playing"
+                          ? <><Pause size={16} fill="currentColor" /> إيقاف</>
+                          : <><Play size={16} fill="currentColor" /> تشغيل</>}
+                      </motion.button>
+
+                      {/* Replay */}
+                      <motion.button onClick={replayAudio}
+                        whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
+                        className="col-span-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl font-bold text-sm border border-purple-500/25 text-purple-300/60 hover:text-purple-200 hover:border-purple-500/40 transition-all">
+                        <RefreshCw size={16} /> إعادة
+                      </motion.button>
+
+                      {/* Show answer */}
+                      <motion.button onClick={handleShowAnswer}
+                        whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
+                        className="col-span-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl font-bold text-sm"
+                        style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.4)", color: "#fbbf24" }}>
+                        <Eye size={16} /> الإجابة
+                      </motion.button>
+                    </div>
+                  )}
+
+                  {/* Answer + point buttons */}
+                  <AnimatePresence>
+                    {showAnswer && (
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="space-y-3">
+                        {/* Answer card */}
+                        <div className="rounded-2xl border border-green-500/35 bg-green-500/06 p-4 text-center">
+                          <p className="text-xs text-green-400/60 mb-1">الإجابة الصحيحة</p>
+                          <p className="text-xl font-black text-green-300">{currentSong.title}</p>
+                          <p className="text-sm text-green-400/70 mt-0.5">{currentSong.artist}</p>
+                        </div>
+
+                        {/* Award buttons */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <motion.button onClick={() => awardPoint(1)}
+                            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                            className="py-4 rounded-2xl font-black text-base"
+                            style={{ background: "linear-gradient(135deg, rgba(224,64,251,0.25), rgba(224,64,251,0.1))",
+                              border: "1px solid rgba(224,64,251,0.55)", color: "#e040fb",
+                              boxShadow: "0 0 18px rgba(224,64,251,0.2)" }}>
+                            +{doubleActive ? 2 : 1} {team1Name}
+                          </motion.button>
+                          <motion.button onClick={() => awardPoint(2)}
+                            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                            className="py-4 rounded-2xl font-black text-base"
+                            style={{ background: "linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.08))",
+                              border: "1px solid rgba(0,229,255,0.5)", color: "#00e5ff",
+                              boxShadow: "0 0 18px rgba(0,229,255,0.18)" }}>
+                            +{doubleActive ? 2 : 1} {team2Name}
+                          </motion.button>
+                        </div>
+
+                        {/* Replay after answer */}
+                        <button onClick={replayAudio}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-purple-500/20 text-purple-400/40 hover:text-purple-300 transition-all text-xs">
+                          <RefreshCw size={13} /> إعادة تشغيل الكليب
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -475,12 +673,10 @@ export default function SongGame() {
               <motion.div animate={{ y: [0, -12, 0] }} transition={{ repeat: Infinity, duration: 2.2 }}>
                 <Trophy size={80} className="text-yellow-400" style={{ filter: "drop-shadow(0 0 24px #ffd600)" }} />
               </motion.div>
-
               <div>
                 <p className="text-purple-300/40 text-sm mb-1">الفائز</p>
                 <h2 className="text-4xl font-black neon-text-pink">{winner}</h2>
               </div>
-
               <div className="flex gap-12 w-full justify-center">
                 <div className="text-center">
                   <p className="text-sm font-bold mb-1" style={{ color: "#e040fb80" }}>{team1Name}</p>
@@ -492,9 +688,8 @@ export default function SongGame() {
                   <p className="text-4xl font-black" style={{ color: "#00e5ff" }}>{team2Score}</p>
                 </div>
               </div>
-
               <div className="flex gap-3 mt-2">
-                <motion.button onClick={() => { resetFull(); }}
+                <motion.button onClick={resetFull}
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
                   className="px-7 py-3 rounded-2xl font-black border border-pink-500/35 text-pink-400 hover:bg-pink-500/10 transition-all">
                   لعبة جديدة
