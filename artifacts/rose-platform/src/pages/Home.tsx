@@ -31,7 +31,7 @@ const games = [
   {
     id: "xo-game",
     title: "لعبة XO",
-    description: "الكلاسيكية الخالدة بين فريقين",
+    description: "",
     icon: Grid3X3,
     color: "from-cyan-600 to-blue-700",
     borderColor: "border-cyan-500/40",
@@ -39,6 +39,7 @@ const games = [
     neonColor: "#00e5ff",
     path: "/xo-game",
     emoji: "❌",
+    heroImage: "/xo-hero.jpg",
   },
   {
     id: "wheel-game",
