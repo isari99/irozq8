@@ -214,12 +214,12 @@ export default function Home() {
                   {/* Card — pure image, no button inside */}
                   <motion.div
                     onClick={() => navigate(game.path)}
-                    className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} relative overflow-hidden group min-h-[310px]`}
-                    style={{ boxShadow: `0 8px 32px ${game.neonColor}20` }}
+                    className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} relative overflow-hidden group`}
+                    style={{ boxShadow: `0 8px 32px ${game.neonColor}20`, aspectRatio: "1 / 1" }}
                     whileHover={{ scale: 1.03, y: -6 }} whileTap={{ scale: 0.97 }}>
                     <img src={heroImage} alt={game.title}
                       className="absolute inset-0 w-full h-full object-cover"
-                      style={{ objectPosition: "top center" }} />
+                      style={{ objectPosition: "center center" }} />
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
                       style={{ boxShadow: `inset 0 0 50px ${game.neonColor}25` }} />
                   </motion.div>
