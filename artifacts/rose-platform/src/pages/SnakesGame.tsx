@@ -598,85 +598,110 @@ export default function SnakesGame() {
               style={{ padding: "12px", gap: "12px" }}>
 
               {/* ── Sidebar — FIRST in RTL = visual RIGHT ── */}
-              <div style={{ width: sidebarW, flexShrink: 0 }}
-                className="flex flex-col gap-2 overflow-hidden">
+              <div style={{ width: "220px", flexShrink: 0 }}
+                className="flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden">
 
-                {/* ── Players table (dynamic height, no empty space) ── */}
-                <div className="rounded-2xl border border-purple-500/20 overflow-hidden flex-shrink-0"
-                  style={{ background: "rgba(10,4,24,0.85)" }}>
-                  {/* Header */}
-                  <div className="px-3 py-1.5 border-b border-purple-500/15 flex items-center gap-1.5">
-                    <Users size={10} className="text-purple-400/40" />
-                    <span className="text-[9px] font-bold text-purple-400/40">اللاعبون ({players.length})</span>
-                  </div>
-                  {/* Rows — one per player, no empty rows */}
-                  {players.map((p, idx) => {
-                    const isCurrent = idx === currentPlayerIdx && !isAnimating;
-                    return (
-                      <motion.div key={p.username}
-                        animate={{ backgroundColor: isCurrent ? p.color + "18" : "transparent" }}
-                        transition={{ duration: 0.35 }}
-                        className="flex items-center gap-2 px-2.5"
+                {/* ══ 1️⃣  CURRENT PLAYER CARD ══ */}
+                {currentPlayer && (
+                  <motion.div
+                    key={currentPlayer.username}
+                    initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 26 }}
+                    className="rounded-2xl p-4 flex-shrink-0"
+                    style={{
+                      border: `2px solid ${currentPlayer.color}`,
+                      background: `linear-gradient(135deg, ${currentPlayer.color}15, ${currentPlayer.color}08)`,
+                      boxShadow: `0 0 24px ${currentPlayer.color}35, inset 0 0 20px ${currentPlayer.color}06`,
+                    }}>
+                    {/* Label */}
+                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                      <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2 }}
+                        className="w-2 h-2 rounded-full" style={{ background: currentPlayer.color }} />
+                      <span className="text-[10px] font-black tracking-wider"
+                        style={{ color: currentPlayer.color + "cc" }}>
+                        الدور على
+                      </span>
+                      <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.6 }}
+                        className="w-2 h-2 rounded-full" style={{ background: currentPlayer.color }} />
+                    </div>
+                    {/* Avatar + name */}
+                    <div className="flex flex-col items-center gap-2.5">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0"
                         style={{
-                          paddingTop: isCurrent ? "8px" : "5px",
-                          paddingBottom: isCurrent ? "8px" : "5px",
-                          borderBottom: idx < players.length - 1 ? "1px solid rgba(139,92,246,0.10)" : "none",
-                          transition: "padding 0.3s",
+                          border: `3px solid ${currentPlayer.color}`,
+                          boxShadow: `0 0 20px ${currentPlayer.color}60`,
                         }}>
-                        {/* Avatar — bigger for current player */}
-                        <motion.div
-                          animate={{ width: isCurrent ? 34 : 22, height: isCurrent ? 34 : 22 }}
-                          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                          className="rounded-xl overflow-hidden border-2 flex-shrink-0"
-                          style={{
-                            borderColor: isCurrent ? p.color : p.color + "50",
-                            boxShadow: isCurrent ? `0 0 10px ${p.color}60` : "none",
-                          }}>
-                          <img src={p.avatar} alt={p.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-                        </motion.div>
-                        {/* Name */}
-                        <div className="flex-1 min-w-0">
-                          <motion.p
-                            animate={{ fontSize: isCurrent ? "13px" : "10px" }}
-                            transition={{ duration: 0.3 }}
-                            className="font-black truncate"
-                            style={{ color: isCurrent ? p.color : p.color + "80", fontWeight: isCurrent ? 900 : 700 }}>
-                            {p.displayName}
-                          </motion.p>
-                          {isCurrent && (
-                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                              className="text-[9px] font-bold mt-0.5"
-                              style={{ color: p.color + "99" }}>
-                              {p.position === 0 ? "لم يبدأ بعد" : `المربع ${toArabic(p.position)}`}
-                            </motion.p>
-                          )}
+                        <img src={currentPlayer.avatar} alt={currentPlayer.displayName}
+                          className="w-full h-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${currentPlayer.username}`; }} />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-black text-base leading-tight truncate"
+                          style={{ color: currentPlayer.color, textShadow: `0 0 16px ${currentPlayer.color}60` }}>
+                          {currentPlayer.displayName}
+                        </p>
+                        <p className="text-[10px] mt-0.5 font-bold"
+                          style={{ color: currentPlayer.color + "70" }}>
+                          {currentPlayer.position === 0 ? "لم يبدأ بعد" : `المربع ${toArabic(currentPlayer.position)}`}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* ══ 2️⃣  DICE CARD ══ */}
+                <div className="rounded-2xl p-4 flex-shrink-0 flex flex-col items-center gap-2"
+                  style={{ border: "1px solid rgba(139,92,246,0.25)", background: "rgba(10,4,24,0.90)" }}>
+
+                  {/* Dice face */}
+                  <motion.div
+                    animate={isRolling ? { rotate: [-14, 14, -9, 9, -4, 4, 0] } : {}}
+                    transition={{ duration: 0.14 }}>
+                    {diceValue !== null
+                      ? <DiceFace value={diceValue} size={72} color={currentPlayer?.color ?? "#e040fb"} />
+                      : (
+                        <div className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center"
+                          style={{ border: "2px dashed rgba(139,92,246,0.25)" }}>
+                          <span style={{ fontSize: "32px", opacity: 0.25 }}>🎲</span>
                         </div>
-                        {/* Position & indicator */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {!isCurrent && (
-                            <span className="text-[9px] text-purple-400/35 font-bold">
-                              {p.position === 0 ? "—" : toArabic(p.position)}
-                            </span>
-                          )}
-                          {isCurrent && (
-                            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1 }}
-                              className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                          )}
-                        </div>
+                      )
+                    }
+                  </motion.div>
+
+                  {/* Roll result */}
+                  <AnimatePresence mode="wait">
+                    {diceValue !== null && !isRolling && (
+                      <motion.p key={`d-${diceValue}`}
+                        initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                        className="text-base font-black"
+                        style={{ color: currentPlayer?.color ?? "#e040fb" }}>
+                        رمية {toArabic(diceValue)}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Instruction */}
+                  {!isAnimating && currentPlayer
+                    ? (
+                      <motion.div animate={{ opacity: [0.55, 1, 0.55] }} transition={{ repeat: Infinity, duration: 1.5 }}
+                        className="text-center text-[11px] font-bold py-2 px-3 rounded-xl w-full"
+                        style={{ background: currentPlayer.color + "14", color: currentPlayer.color + "dd" }}>
+                        اكتب <span className="text-white font-black">roll</span> أو <span className="text-white font-black">رول</span>
                       </motion.div>
-                    );
-                  })}
+                    ) : isAnimating && (
+                      <p className="text-[10px] text-purple-400/40">جارٍ الحركة...</p>
+                    )
+                  }
                 </div>
 
-                {/* ── Snake / Ladder message ── */}
+                {/* ── Snake / Ladder flash ── */}
                 <AnimatePresence>
                   {lastAction && (
                     <motion.div key={lastAction}
-                      initial={{ opacity: 0, y: -6, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }}
-                      className="rounded-xl border px-2.5 py-2 text-center font-black text-[11px] leading-snug flex-shrink-0"
+                      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className="rounded-xl border px-3 py-2 text-center font-black text-[11px] flex-shrink-0"
                       style={{
-                        borderColor: lastAction.includes("سلم") ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)",
+                        borderColor: lastAction.includes("سلم") ? "rgba(34,197,94,0.55)" : "rgba(239,68,68,0.55)",
                         background: lastAction.includes("سلم") ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.10)",
                         color: lastAction.includes("سلم") ? "#22c55e" : "#ef4444",
                       }}>
@@ -685,51 +710,39 @@ export default function SnakesGame() {
                   )}
                 </AnimatePresence>
 
-                {/* ── Dice + Roll instruction ── */}
-                <div className="rounded-2xl border border-purple-500/20 flex-shrink-0 flex flex-col items-center gap-2 p-3"
-                  style={{ background: "rgba(10,4,24,0.85)" }}>
-                  {/* Dice */}
-                  <motion.div
-                    animate={isRolling ? { rotate: [-12, 12, -8, 8, -4, 4, 0] } : {}}
-                    transition={{ duration: 0.15 }}>
-                    {diceValue !== null
-                      ? <DiceFace value={diceValue} size={64} color={currentPlayer?.color ?? "#e040fb"} />
-                      : (
-                        <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-purple-500/25 flex items-center justify-center">
-                          <span style={{ fontSize: "28px", opacity: 0.3 }}>🎲</span>
+                {/* ══ 3️⃣  PLAYERS LIST (compact) ══ */}
+                <div className="rounded-xl overflow-hidden flex-shrink-0"
+                  style={{ border: "1px solid rgba(139,92,246,0.15)", background: "rgba(10,4,24,0.80)" }}>
+                  {players.map((p, idx) => {
+                    const isCur = idx === currentPlayerIdx;
+                    return (
+                      <div key={p.username}
+                        className="flex items-center gap-2 px-2.5 py-1.5"
+                        style={{
+                          background: isCur ? p.color + "12" : "transparent",
+                          borderBottom: idx < players.length - 1 ? "1px solid rgba(139,92,246,0.08)" : "none",
+                        }}>
+                        <div className="w-5 h-5 rounded-md overflow-hidden border flex-shrink-0"
+                          style={{ borderColor: isCur ? p.color + "cc" : p.color + "40" }}>
+                          <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
                         </div>
-                      )
-                    }
-                  </motion.div>
-                  {/* Result */}
-                  <AnimatePresence mode="wait">
-                    {diceValue !== null && !isRolling && (
-                      <motion.p key={diceValue}
-                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className="text-[11px] font-black"
-                        style={{ color: currentPlayer?.color ?? "#e040fb" }}>
-                        رمية {toArabic(diceValue)}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                  {/* Roll instruction */}
-                  {!isAnimating && currentPlayer && (
-                    <motion.div animate={{ opacity: [0.55, 1, 0.55] }} transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-center text-[10px] font-bold px-3 py-1.5 rounded-lg w-full"
-                      style={{ background: currentPlayer.color + "15", color: currentPlayer.color + "cc" }}>
-                      {currentPlayer.displayName} — اكتب{" "}
-                      <span className="text-white font-black">roll</span> أو{" "}
-                      <span className="text-white font-black">رول</span>
-                    </motion.div>
-                  )}
-                  {isAnimating && (
-                    <p className="text-[10px] text-purple-400/40">جارٍ الحركة...</p>
-                  )}
+                        <span className="flex-1 text-[10px] font-bold truncate"
+                          style={{ color: isCur ? p.color : p.color + "70" }}>
+                          {p.displayName}
+                        </span>
+                        <span className="text-[9px] font-bold flex-shrink-0"
+                          style={{ color: isCur ? p.color + "aa" : "rgba(139,92,246,0.3)" }}>
+                          {p.position === 0 ? "—" : toArabic(p.position)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* ── New game button ── */}
+                {/* ── New game ── */}
                 <button onClick={handleNewGame}
-                  className="flex items-center justify-center gap-1 py-1.5 rounded-xl text-purple-400/20 hover:text-purple-300/40 text-[9px] border border-purple-500/10 hover:border-purple-500/20 transition-all flex-shrink-0">
+                  className="flex items-center justify-center gap-1 py-1.5 rounded-xl text-purple-400/20 hover:text-purple-300/35 text-[9px] border border-purple-500/10 hover:border-purple-500/18 transition-all flex-shrink-0">
                   <RotateCcw size={8} /> لعبة جديدة
                 </button>
               </div>
