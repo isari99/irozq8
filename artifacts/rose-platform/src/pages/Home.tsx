@@ -56,6 +56,18 @@ const games = [
     emoji: "🔫",
     heroImage: "/shakhsana.png",
   },
+  {
+    id: "snakes-game",
+    title: "السلم والثعبان",
+    description: "العب عبر الشات - اكتب join للانضمام و roll لرمي النرد",
+    icon: CircleDot,
+    color: "from-green-600 to-emerald-700",
+    borderColor: "border-green-500/40",
+    glowColor: "shadow-green-500/30",
+    neonColor: "#22c55e",
+    path: "/snakes-game",
+    emoji: "🐍",
+  },
 ];
 
 export default function Home() {
