@@ -9,6 +9,7 @@ import XOGame from "@/pages/XOGame";
 import WheelGame from "@/pages/WheelGame";
 import QuizGame from "@/pages/QuizGame";
 import SnakesGame from "@/pages/SnakesGame";
+import FruitsGame from "@/pages/FruitsGame";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/not-found";
 
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/wheel-game"><ProtectedRoute component={WheelGame} /></Route>
       <Route path="/quiz"><ProtectedRoute component={QuizGame} /></Route>
       <Route path="/snakes-game"><ProtectedRoute component={SnakesGame} /></Route>
+      <Route path="/fruits-game"><ProtectedRoute component={FruitsGame} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
