@@ -180,12 +180,13 @@ export default function Home() {
                   /* ── Full-image hero card (الشخصنة) ── */
                   <>
                     <img src={heroImage} alt={game.title}
-                      className="absolute inset-0 w-full h-full object-cover" />
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ objectPosition: "top center" }} />
                     <div className="absolute inset-0 rounded-2xl"
-                      style={{ background: "linear-gradient(to top, rgba(8,4,18,0.93) 25%, rgba(8,4,18,0.05) 65%)" }} />
+                      style={{ background: "linear-gradient(to top, rgba(8,4,18,0.95) 14%, rgba(8,4,18,0.0) 35%)" }} />
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
                       style={{ boxShadow: `inset 0 0 50px ${game.neonColor}25` }} />
-                    <div className="absolute bottom-5 inset-x-0 flex justify-center z-10">
+                    <div className="absolute bottom-2 inset-x-0 flex justify-center z-10">
                       <motion.div
                         className="px-8 py-2.5 rounded-xl text-sm font-bold btn-shimmer"
                         style={{
