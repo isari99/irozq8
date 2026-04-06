@@ -2,16 +2,42 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Trophy, HelpCircle, CheckCircle2, Wifi, WifiOff,
-  Play, SkipForward, Eye, RefreshCw, Tv2,
+  ArrowRight, Trophy, CheckCircle2, Wifi, WifiOff,
+  Play, SkipForward, RotateCcw, Clock, Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
+interface QuestionResult {
+  username: string;
+  answer: number;
+  correct: boolean;
+  points: number;
+  rank: number;
+}
 
-// ────────────────────────────────────────────────────────────────────────────
-// Types
-// ────────────────────────────────────────────────────────────────────────────
-interface GameQuestion {
+// ─── Constants ────────────────────────────────────────────────────────────────
+const CHOICE_COLORS = [
+  { color: "#e040fb", border: "#e040fb50", bg: "#e040fb12", ring: "#e040fb60" },
+  { color: "#00e5ff", border: "#00e5ff50", bg: "#00e5ff12", ring: "#00e5ff60" },
+  { color: "#ffd600", border: "#ffd60050", bg: "#ffd60012", ring: "#ffd60060" },
+  { color: "#ff6d00", border: "#ff6d0050", bg: "#ff6d0012", ring: "#ff6d0060" },
+];
+
+const CAT_COLOR: Record<string, string> = {
+  "ديني": "#22c55e",
+  "حيوانات": "#f59e0b",
+  "علوم": "#3b82f6",
+  "عام": "#00e5ff",
+  "خفيف": "#e040fb",
+  "أغاني": "#a855f7",
+};
+
+const ROUND_OPTIONS = [10, 15, 20, 25, 30];
+const TIME_OPTIONS = [15, 20, 30];
+
+type UIPhase = "setup" | "settings" | "idle" | "active" | "revealed" | "finished";
+
+interface Question {
   id: number;
   text: string;
   choices: string[];
@@ -20,82 +46,113 @@ interface GameQuestion {
   correctAnswerText: string | null;
 }
 interface LeaderboardEntry { rank: number; username: string; score: number }
-interface GameStateAPI {
-  phase: "idle" | "active" | "revealed";
-  question: GameQuestion | null;
-  leaderboard: LeaderboardEntry[];
-  totalAnswers: number;
-  distribution: Record<string, number>;
-  twitch: { connected: boolean; channel: string | null };
-}
 
-// ────────────────────────────────────────────────────────────────────────────
-// Constants
-// ────────────────────────────────────────────────────────────────────────────
-const CHOICE_COLORS = [
-  { color: "#e040fb", border: "#e040fb50", bg: "#e040fb12", num: "bg-pink-500/20 text-pink-300 border-pink-500/40" },
-  { color: "#00e5ff", border: "#00e5ff50", bg: "#00e5ff12", num: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" },
-  { color: "#ffd600", border: "#ffd60050", bg: "#ffd60012", num: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40" },
-  { color: "#ff6d00", border: "#ff6d0050", bg: "#ff6d0012", num: "bg-orange-500/20 text-orange-300 border-orange-500/40" },
-];
-const CAT_COLORS: Record<string, string> = {
-  "ديني": "#22c55e", "عام": "#00e5ff", "أغاني": "#e040fb",
-};
+// ─── Leaderboard Sidebar ──────────────────────────────────────────────────────
+const LeaderboardSidebar = ({ entries, title = "المتصدرون" }: { entries: LeaderboardEntry[]; title?: string }) => (
+  <aside className="w-56 flex flex-col border-r border-purple-500/20 flex-shrink-0 overflow-hidden"
+    style={{ background: "rgba(8,4,18,0.75)" }}>
+    <div className="flex items-center gap-2 px-4 py-3 border-b border-yellow-500/20 flex-shrink-0"
+      style={{ background: "rgba(255,214,0,0.05)" }}>
+      <Trophy size={14} className="text-yellow-400" />
+      <span className="font-black text-yellow-400 text-sm">{title}</span>
+    </div>
+    <div className="flex-1 overflow-y-auto divide-y divide-purple-500/10">
+      {entries.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-full gap-2 py-12 text-center px-4">
+          <Trophy size={28} className="text-purple-400/15" />
+          <p className="text-purple-400/30 text-xs">لا توجد نقاط بعد</p>
+        </div>
+      ) : entries.map(e => {
+        const medals = ["🥇", "🥈", "🥉"];
+        const pct = entries[0].score > 0 ? (e.score / entries[0].score) * 100 : 0;
+        return (
+          <motion.div key={e.username} layout
+            className="relative flex items-center gap-2 px-3 py-2.5 overflow-hidden">
+            <div className="absolute inset-0 opacity-25 pointer-events-none"
+              style={{ width: `${pct}%`, background: "linear-gradient(90deg, #e040fb15, transparent)" }} />
+            <span className="relative w-6 text-center text-sm font-black flex-shrink-0"
+              style={{ color: e.rank === 1 ? "#ffd600" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#4b5563" }}>
+              {e.rank <= 3 ? medals[e.rank - 1] : `#${e.rank}`}
+            </span>
+            <span className="relative flex-1 text-xs font-medium truncate text-white/80">{e.username}</span>
+            <span className="relative font-black text-yellow-400 text-sm flex-shrink-0">{e.score}</span>
+          </motion.div>
+        );
+      })}
+    </div>
+  </aside>
+);
 
-// ────────────────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function QuizGame() {
   const [, navigate] = useLocation();
   const { user, logout } = useAuth();
 
-  // Remote state
-  const [phase, setPhase] = useState<"idle" | "active" | "revealed">("idle");
-  const [question, setQuestion] = useState<GameQuestion | null>(null);
+  const [uiPhase, setUiPhase] = useState<UIPhase>("setup");
+  const [question, setQuestion] = useState<Question | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [totalAnswers, setTotalAnswers] = useState(0);
   const [distribution, setDistribution] = useState<Record<string, number>>({ "1": 0, "2": 0, "3": 0, "4": 0 });
+  const [totalAnswers, setTotalAnswers] = useState(0);
+  const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
+  const [currentRound, setCurrentRound] = useState(0);
+  const [totalRounds, setTotalRounds] = useState(10);
+  const [questionTime, setQuestionTime] = useState(20);
   const [twitchConnected, setTwitchConnected] = useState(false);
-  const [twitchChannel, setTwitchChannel] = useState<string | null>(null);
-
-  // Host control state
-  const [channelInput, setChannelInput] = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [isLastRound, setIsLastRound] = useState(false);
 
-  // Live answer feed (latest 6)
-  const [feed, setFeed] = useState<{ id: number; username: string; answer: number; correct: boolean }[]>([]);
+  // Settings selections
+  const [selectedRounds, setSelectedRounds] = useState(10);
+  const [selectedTime, setSelectedTime] = useState(20);
 
+  // Timer
+  const [timeLeft, setTimeLeft] = useState(20);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const feedIdRef = useRef(0);
+  const revealCalledRef = useRef(false);
 
-  // ── Poll game state on mount ─────────────────────────────────────────────
+  // ── Load state on mount ────────────────────────────────────────────────────
   useEffect(() => {
     loadState();
   }, []);
 
   const loadState = async () => {
     try {
-      const s = await apiFetch<GameStateAPI>("/quiz/state");
-      applyState(s);
+      const s = await apiFetch<any>("/quiz/state");
+      setLeaderboard(s.leaderboard ?? []);
+      setTotalAnswers(s.totalAnswers ?? 0);
+      setDistribution(s.distribution ?? { "1": 0, "2": 0, "3": 0, "4": 0 });
+      setCurrentRound(s.currentRound ?? 0);
+      setTotalRounds(s.totalRounds ?? 10);
+      setQuestionTime(s.questionTime ?? 20);
+      setTwitchConnected(s.twitch?.connected ?? false);
+      if (s.question) setQuestion(s.question);
+
+      if (s.phase === "active" || s.phase === "revealed" || s.phase === "finished") {
+        setUiPhase(s.phase);
+      } else {
+        setUiPhase("setup");
+      }
     } catch {}
   };
 
-  const applyState = (s: GameStateAPI) => {
-    setPhase(s.phase);
-    setQuestion(s.question);
-    setLeaderboard(s.leaderboard);
-    setTotalAnswers(s.totalAnswers);
-    setDistribution(s.distribution);
-    setTwitchConnected(s.twitch.connected);
-    setTwitchChannel(s.twitch.channel);
-    if (s.twitch.channel) setChannelInput(s.twitch.channel);
-  };
+  // ── Auto-connect Twitch ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (user?.username && !twitchConnected) {
+      apiFetch("/quiz/twitch/connect", {
+        method: "POST",
+        body: JSON.stringify({ channel: user.username }),
+      }).catch(() => {});
+    }
+  }, [user]);
 
-  // ── WebSocket ────────────────────────────────────────────────────────────
+  // ── WebSocket ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${window.location.host}/ws`;
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${proto}//${window.location.host}/ws`;
 
     const connect = () => {
       const ws = new WebSocket(url);
@@ -106,9 +163,7 @@ export default function QuizGame() {
       };
       ws.onclose = () => { setWsConnected(false); setTimeout(connect, 3000); };
       ws.onerror = () => ws.close();
-      ws.onmessage = (e) => {
-        try { handleWS(JSON.parse(e.data)); } catch {}
-      };
+      ws.onmessage = (e) => { try { handleWS(JSON.parse(e.data)); } catch {} };
     };
     connect();
     return () => { wsRef.current?.close(); };
@@ -117,470 +172,617 @@ export default function QuizGame() {
   const handleWS = useCallback((msg: any) => {
     switch (msg.type) {
       case "new_question":
-        setPhase("active");
         setQuestion({
-          id: msg.questionId,
-          text: msg.text,
-          choices: msg.choices,
-          category: msg.category,
-          correctAnswer: null,
-          correctAnswerText: null,
+          id: msg.questionId, text: msg.text, choices: msg.choices,
+          category: msg.category, correctAnswer: null, correctAnswerText: null,
         });
+        setCurrentRound(msg.currentRound ?? 0);
+        setTotalRounds(msg.totalRounds ?? 10);
+        setQuestionTime(msg.questionTime ?? 20);
         setTotalAnswers(0);
         setDistribution({ "1": 0, "2": 0, "3": 0, "4": 0 });
-        setFeed([]);
+        setQuestionResults([]);
+        setIsLastRound(false);
+        revealCalledRef.current = false;
+        setUiPhase("active");
+        // Start timer
+        setTimeLeft(msg.questionTime ?? 20);
+        setTimerRunning(true);
         break;
 
       case "twitch_answer":
         setTotalAnswers(msg.totalAnswers);
         setDistribution(msg.distribution);
-        setFeed(prev => {
-          const id = ++feedIdRef.current;
-          const next = [{ id, username: msg.username, answer: msg.answer, correct: msg.correct }, ...prev].slice(0, 6);
-          return next;
-        });
-        break;
-
-      case "leaderboard_update":
-        setLeaderboard(msg.leaderboard);
         break;
 
       case "answer_reveal":
-        setPhase("revealed");
+        stopTimer();
         setQuestion(prev => prev ? {
           ...prev,
           correctAnswer: msg.correctAnswer,
           correctAnswerText: msg.correctAnswerText,
         } : prev);
-        setLeaderboard(msg.leaderboard);
+        setLeaderboard(msg.leaderboard ?? []);
         setDistribution(msg.distribution);
         setTotalAnswers(msg.totalAnswers);
+        setQuestionResults(msg.questionResults ?? []);
+        setCurrentRound(msg.currentRound ?? 0);
+        setTotalRounds(msg.totalRounds ?? 10);
+        setIsLastRound(msg.isLastRound ?? false);
+        setUiPhase("revealed");
         break;
 
       case "game_started":
-        setPhase("idle");
+        setTotalRounds(msg.totalRounds ?? 10);
+        setQuestionTime(msg.questionTime ?? 20);
+        setCurrentRound(0);
         setQuestion(null);
         setLeaderboard([]);
         setTotalAnswers(0);
-        setDistribution({ "1": 0, "2": 0, "3": 0, "4": 0 });
-        setFeed([]);
+        setQuestionResults([]);
+        setIsLastRound(false);
+        break;
+
+      case "game_finished":
+        stopTimer();
+        setLeaderboard(msg.leaderboard ?? []);
+        setUiPhase("finished");
         break;
 
       case "twitch_status":
         setTwitchConnected(msg.status === "connected");
-        if (msg.status === "connected") setTwitchChannel(msg.channel);
-        else setTwitchChannel(null);
         break;
     }
   }, []);
 
-  // ── Host actions ─────────────────────────────────────────────────────────
-  const twitchConnect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!channelInput.trim()) return;
-    setConnecting(true);
-    try {
-      if (twitchConnected) {
-        await apiFetch("/quiz/twitch/disconnect", { method: "POST" });
-        setTwitchConnected(false);
-        setTwitchChannel(null);
-      } else {
-        await apiFetch("/quiz/twitch/connect", { method: "POST", body: JSON.stringify({ channel: channelInput.trim() }) });
-      }
-    } catch {}
-    finally { setConnecting(false); }
+  // ── Timer logic ────────────────────────────────────────────────────────────
+  const stopTimer = () => {
+    setTimerRunning(false);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
 
-  const hostAction = async (endpoint: string, label: string) => {
+  useEffect(() => {
+    if (timerRunning) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft(t => {
+          if (t <= 1) {
+            stopTimer();
+            // Auto-reveal when timer hits 0
+            if (!revealCalledRef.current) {
+              revealCalledRef.current = true;
+              hostReveal();
+            }
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [timerRunning]);
+
+  // ── Host actions ───────────────────────────────────────────────────────────
+  const hostReveal = async () => {
+    try { await apiFetch("/quiz/reveal", { method: "POST" }); }
+    catch {}
+  };
+
+  const hostNextQuestion = async () => {
     setActionLoading(true);
-    try { await apiFetch(endpoint, { method: "POST" }); }
+    try { await apiFetch("/quiz/question", { method: "POST" }); }
     catch (e: any) { alert(e.message); }
     finally { setActionLoading(false); }
   };
 
-  const seedAndStart = async () => {
+  const startGame = async () => {
     setActionLoading(true);
     try {
+      // Reseed first (force-update question bank)
       await apiFetch("/seed", { method: "POST" }).catch(() => {});
-      await apiFetch("/quiz/start", { method: "POST" });
+      // Start with settings
+      await apiFetch("/quiz/start", {
+        method: "POST",
+        body: JSON.stringify({ rounds: selectedRounds, questionTime: selectedTime }),
+      });
+      setTotalRounds(selectedRounds);
+      setQuestionTime(selectedTime);
+      // Immediately launch first question
+      await apiFetch("/quiz/question", { method: "POST" });
     } catch (e: any) { alert(e.message); }
     finally { setActionLoading(false); }
   };
 
-  const catColor = CAT_COLORS[question?.category ?? ""] ?? "#00e5ff";
-  const myRank = leaderboard.find(e => e.username.toLowerCase() === user?.username.toLowerCase())?.rank;
+  const restartFull = async () => {
+    stopTimer();
+    setUiPhase("setup");
+    setQuestion(null);
+    setLeaderboard([]);
+    setQuestionResults([]);
+    setCurrentRound(0);
+  };
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const catColor = CAT_COLOR[question?.category ?? ""] ?? "#00e5ff";
+  const timerPct = questionTime > 0 ? (timeLeft / questionTime) * 100 : 0;
+  const timerColor = timerPct > 50 ? "#22c55e" : timerPct > 25 ? "#ffd600" : "#ef4444";
+  const showSidebar = uiPhase === "active" || uiPhase === "revealed";
 
   return (
     <div className="h-screen gradient-bg flex flex-col overflow-hidden" dir="rtl">
       {/* Ambient glows */}
-      <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-10 pointer-events-none"
+      <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 pointer-events-none"
         style={{ background: "radial-gradient(circle, #e040fb, transparent)", filter: "blur(60px)" }} />
-      <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full opacity-10 pointer-events-none"
+      <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-10 pointer-events-none"
         style={{ background: "radial-gradient(circle, #00e5ff, transparent)", filter: "blur(60px)" }} />
 
-      {/* ── HEADER ────────────────────────────────────────────────────────── */}
+      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 py-2.5 border-b border-purple-500/20 flex-shrink-0 z-10"
-        style={{ background: "rgba(10,5,20,0.9)", backdropFilter: "blur(16px)" }}>
+        style={{ background: "rgba(10,5,20,0.92)", backdropFilter: "blur(16px)" }}>
         <button onClick={() => navigate("/")}
           className="flex items-center gap-1.5 text-purple-300/60 hover:text-pink-400 transition-colors text-sm">
           <ArrowRight size={16} /> العودة
         </button>
 
-        {/* Logo + title */}
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-full opacity-60 blur-lg"
-              style={{ background: "radial-gradient(circle, #e040fb, #00e5ff)" }} />
-            <img src="/rose-logo.png" alt="روز"
-              className="relative w-9 h-9 rounded-full object-cover border border-pink-400/40"
-              style={{ filter: "drop-shadow(0 0 8px #e040fb)" }} />
-          </div>
-          <div>
-            <span className="text-lg font-black neon-text-pink">روز</span>
-            <span className="text-purple-300/50 text-xs mx-2">—</span>
-            <span className="font-bold text-white text-sm">لعبة الأسئلة</span>
-          </div>
+          <h1 className="text-lg font-black neon-text-pink">لعبة الأسئلة</h1>
+          {(uiPhase === "active" || uiPhase === "revealed") && currentRound > 0 && (
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border border-purple-500/30 text-purple-300/60">
+              {currentRound} / {totalRounds}
+            </span>
+          )}
         </div>
 
-        {/* Status */}
-        <div className="flex items-center gap-3 text-xs">
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs ${
             twitchConnected
               ? "border-purple-500/40 bg-purple-500/10 text-purple-300"
-              : "border-gray-500/20 bg-gray-500/5 text-gray-500"
+              : "border-gray-700 text-gray-600"
           }`}>
-            <Tv2 size={12} />
-            {twitchConnected ? `#${twitchChannel}` : "غير متصل"}
+            {twitchConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
+            {twitchConnected ? `#${user?.username}` : "جارٍ الاتصال..."}
           </div>
           <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-400" : "bg-red-400"}`} />
-          <span className="text-purple-300/50">{user?.username}</span>
-          <button onClick={logout} className="text-purple-400/30 hover:text-red-400 transition-colors">خروج</button>
         </div>
       </header>
 
-      {/* ── BODY ──────────────────────────────────────────────────────────── */}
+      {/* ── BODY ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── MAIN CENTER ───────────────────────────────────────────────── */}
-        <main className="flex-1 flex flex-col items-center justify-center p-6 gap-5 overflow-y-auto">
-
-          {/* IDLE — no question yet */}
-          {phase === "idle" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center space-y-4"
-            >
-              <div className="relative mx-auto w-32 h-32 mb-2">
-                <div className="absolute inset-0 rounded-full opacity-30 blur-2xl animate-pulse"
-                  style={{ background: "radial-gradient(circle, #e040fb, #00e5ff)" }} />
-                <img src="/rose-logo.png" alt="روز"
-                  className="relative w-32 h-32 rounded-full object-cover border-2 border-pink-400/40"
-                  style={{ filter: "drop-shadow(0 0 20px #e040fb)" }} />
-              </div>
-              <h2 className="text-3xl font-black text-white">جاهز للعب؟</h2>
-              <p className="text-purple-300/50 text-sm">اتصل بقناة Twitch ثم ابدأ اللعبة</p>
-            </motion.div>
-          )}
-
-          {/* ACTIVE or REVEALED — show question */}
+        {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
+        <main className="flex-1 flex flex-col items-center justify-center p-5 overflow-y-auto z-10">
           <AnimatePresence mode="wait">
-            {question && (
-              <motion.div
-                key={question.id}
-                initial={{ opacity: 0, y: 30, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4 }}
-                className="w-full max-w-2xl space-y-5"
-              >
-                {/* Category + answer count */}
+
+            {/* ── SETUP ── */}
+            {uiPhase === "setup" && (
+              <motion.div key="setup"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className="flex flex-col items-center gap-5">
+                <div className="w-72 sm:w-80 rounded-3xl overflow-hidden border border-purple-500/25"
+                  style={{ boxShadow: "0 0 40px rgba(224,64,251,0.12)" }}>
+                  <img src="/quiz-hero.png" alt="لعبة الأسئلة"
+                    className="w-full h-auto object-contain block" />
+                </div>
+                <motion.button
+                  onClick={() => setUiPhase("settings")}
+                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-10 py-3.5 rounded-2xl text-lg font-black"
+                  style={{
+                    background: "linear-gradient(135deg, #e040fb, #9c27b0)",
+                    boxShadow: "0 0 30px rgba(224,64,251,0.4)",
+                    color: "#fff",
+                  }}
+                >
+                  <Play size={20} fill="white" /> إلعب الآن
+                </motion.button>
+              </motion.div>
+            )}
+
+            {/* ── SETTINGS ── */}
+            {uiPhase === "settings" && (
+              <motion.div key="settings"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className="w-full max-w-md space-y-6">
+
+                <div className="text-center">
+                  <h2 className="text-2xl font-black text-white">إعدادات اللعبة</h2>
+                  <p className="text-purple-300/40 text-sm mt-1">اختر الجولات ووقت السؤال</p>
+                </div>
+
+                {/* Rounds */}
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-purple-300/60 flex items-center gap-2">
+                    <Trophy size={14} /> عدد الجولات
+                  </p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {ROUND_OPTIONS.map(r => (
+                      <button
+                        key={r}
+                        onClick={() => setSelectedRounds(r)}
+                        className="py-2.5 rounded-xl font-black text-sm border transition-all"
+                        style={{
+                          borderColor: selectedRounds === r ? "#e040fb" : "rgba(224,64,251,0.2)",
+                          background: selectedRounds === r ? "rgba(224,64,251,0.2)" : "rgba(224,64,251,0.05)",
+                          color: selectedRounds === r ? "#e040fb" : "rgba(224,64,251,0.4)",
+                          boxShadow: selectedRounds === r ? "0 0 16px rgba(224,64,251,0.3)" : "none",
+                        }}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time */}
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-purple-300/60 flex items-center gap-2">
+                    <Clock size={14} /> وقت كل سؤال (ثانية)
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {TIME_OPTIONS.map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setSelectedTime(t)}
+                        className="py-3 rounded-xl font-black text-base border transition-all"
+                        style={{
+                          borderColor: selectedTime === t ? "#00e5ff" : "rgba(0,229,255,0.2)",
+                          background: selectedTime === t ? "rgba(0,229,255,0.15)" : "rgba(0,229,255,0.04)",
+                          color: selectedTime === t ? "#00e5ff" : "rgba(0,229,255,0.35)",
+                          boxShadow: selectedTime === t ? "0 0 16px rgba(0,229,255,0.25)" : "none",
+                        }}
+                      >
+                        {t}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button onClick={() => setUiPhase("setup")}
+                    className="px-5 py-3 rounded-xl border border-purple-500/20 text-purple-400/50 hover:text-purple-300 transition-all text-sm font-bold">
+                    رجوع
+                  </button>
+                  <motion.button
+                    onClick={startGame}
+                    disabled={actionLoading}
+                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    className="flex-1 py-3.5 rounded-2xl font-black text-lg flex items-center justify-center gap-2"
+                    style={{
+                      background: actionLoading ? "rgba(224,64,251,0.3)" : "linear-gradient(135deg, #e040fb, #9c27b0)",
+                      boxShadow: actionLoading ? "none" : "0 0 30px rgba(224,64,251,0.4)",
+                      color: "#fff",
+                    }}
+                  >
+                    {actionLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <><Play size={20} fill="white" /> بدأ اللعبة</>
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── ACTIVE ── */}
+            {uiPhase === "active" && question && (
+              <motion.div key={`q-${question.id}`}
+                initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
+                transition={{ duration: 0.35 }}
+                className="w-full max-w-2xl space-y-4">
+
+                {/* Category + Answer count + Timer */}
                 <div className="flex items-center justify-between">
                   <span className="px-3 py-1 rounded-full text-xs font-bold"
                     style={{ background: `${catColor}18`, border: `1px solid ${catColor}50`, color: catColor }}>
                     {question.category}
                   </span>
-                  <span className="text-xs text-purple-400/60 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                    {totalAnswers} إجابة
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-xs text-purple-400/60">
+                      <Users size={11} />{totalAnswers} أجاب
+                    </span>
+                    {/* Timer circle */}
+                    <div className="relative w-10 h-10">
+                      <svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
+                        <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                        <motion.circle
+                          cx="20" cy="20" r="17" fill="none"
+                          stroke={timerColor}
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 17}`}
+                          strokeDashoffset={`${2 * Math.PI * 17 * (1 - timerPct / 100)}`}
+                          transition={{ duration: 0.5 }}
+                        />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-black"
+                        style={{ color: timerColor }}>
+                        {timeLeft}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Question text */}
-                <div className="rounded-2xl border border-purple-500/30 p-7 text-center relative overflow-hidden"
+                <div className="rounded-2xl border border-purple-500/30 p-6 text-center relative overflow-hidden"
                   style={{ background: "linear-gradient(135deg, rgba(26,10,46,0.98), rgba(8,20,48,0.98))" }}>
                   <div className="absolute top-0 inset-x-0 h-[2px]"
                     style={{ background: "linear-gradient(90deg, transparent, #e040fb, #00e5ff, transparent)" }} />
-                  <p className="text-3xl font-black text-white leading-relaxed">{question.text}</p>
+                  <p className="text-2xl sm:text-3xl font-black text-white leading-relaxed">{question.text}</p>
                 </div>
 
                 {/* 4 Choices */}
                 <div className="grid grid-cols-2 gap-3">
                   {question.choices.map((choice, i) => {
-                    const num = i + 1;
                     const col = CHOICE_COLORS[i];
-                    const isCorrect = question.correctAnswer === num;
-                    const isRevealed = phase === "revealed";
-                    const pct = totalAnswers > 0
-                      ? Math.round(((distribution[String(num)] ?? 0) / totalAnswers) * 100)
-                      : 0;
-
-                    let borderC = col.border;
-                    let bgC = col.bg;
-                    let textC = col.color;
-
-                    if (isRevealed) {
-                      if (isCorrect) { borderC = "#22c55e80"; bgC = "#22c55e18"; textC = "#22c55e"; }
-                      else { borderC = "#ffffff12"; bgC = "rgba(20,10,35,0.7)"; textC = "#6b7280"; }
-                    }
-
                     return (
-                      <div
-                        key={num}
-                        className="relative flex items-center gap-3 p-4 rounded-2xl border overflow-hidden transition-all"
-                        style={{ borderColor: borderC, background: bgC }}
-                      >
-                        {/* Distribution bar behind */}
-                        {isRevealed && (
-                          <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${pct}%` }}
-                              transition={{ duration: 0.8, ease: "easeOut" }}
-                              className="h-full opacity-10"
-                              style={{ background: isCorrect ? "#22c55e" : col.color }}
-                            />
-                          </div>
-                        )}
-
-                        {/* Number badge */}
-                        <span className={`relative w-9 h-9 rounded-full flex items-center justify-center text-base font-black flex-shrink-0 border ${
-                          isRevealed
-                            ? isCorrect ? "bg-green-500/20 border-green-500/60 text-green-400" : "bg-white/5 border-white/10 text-gray-600"
-                            : col.num
-                        }`}>
-                          {num}
+                      <div key={i}
+                        className="flex items-center gap-3 p-4 rounded-2xl border"
+                        style={{ borderColor: col.border, background: col.bg }}>
+                        <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 border"
+                          style={{ background: `${col.color}20`, borderColor: col.ring, color: col.color }}>
+                          {i + 1}
                         </span>
-
-                        {/* Choice text */}
-                        <span className="relative flex-1 text-base font-bold leading-snug" style={{ color: textC }}>
-                          {choice}
-                        </span>
-
-                        {/* Right side: correct icon OR percentage */}
-                        <div className="relative flex-shrink-0 text-right min-w-[36px]">
-                          {isRevealed && isCorrect && <CheckCircle2 size={20} className="text-green-400" />}
-                          {isRevealed && !isCorrect && (
-                            <span className="text-xs font-bold text-gray-600">{pct}%</span>
-                          )}
-                        </div>
+                        <span className="flex-1 text-base font-bold leading-snug" style={{ color: col.color }}>{choice}</span>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Reveal banner */}
-                {phase === "revealed" && question.correctAnswerText && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl border border-green-500/40 bg-green-500/10 p-4 text-center"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <CheckCircle2 className="text-green-400" size={22} />
-                      <span className="text-green-400 font-black text-lg">
-                        الإجابة الصحيحة: {question.correctAnswerText}
-                      </span>
+                {/* Manual reveal button */}
+                <button
+                  onClick={() => { revealCalledRef.current = true; stopTimer(); hostReveal(); }}
+                  className="w-full py-2 rounded-xl text-xs text-purple-400/35 hover:text-purple-300/60 border border-purple-500/12 transition-all"
+                >
+                  كشف الإجابة مبكراً
+                </button>
+              </motion.div>
+            )}
+
+            {/* ── REVEALED ── */}
+            {uiPhase === "revealed" && question && (
+              <motion.div key={`r-${question.id}`}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="w-full max-w-2xl space-y-4">
+
+                {/* Category */}
+                <div className="flex items-center justify-between">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold"
+                    style={{ background: `${catColor}18`, border: `1px solid ${catColor}50`, color: catColor }}>
+                    {question.category}
+                  </span>
+                  <span className="text-xs text-purple-400/40">{totalAnswers} إجابة مستلمة</span>
+                </div>
+
+                {/* Question text */}
+                <div className="rounded-2xl border border-purple-500/20 p-5 text-center relative overflow-hidden"
+                  style={{ background: "rgba(20,8,40,0.95)" }}>
+                  <p className="text-xl font-black text-white/70 leading-relaxed">{question.text}</p>
+                </div>
+
+                {/* Choices with answer highlights */}
+                <div className="grid grid-cols-2 gap-3">
+                  {question.choices.map((choice, i) => {
+                    const num = i + 1;
+                    const isCorrect = question.correctAnswer === num;
+                    const col = CHOICE_COLORS[i];
+                    const pct = totalAnswers > 0
+                      ? Math.round(((distribution[String(num)] ?? 0) / totalAnswers) * 100) : 0;
+                    return (
+                      <div key={i}
+                        className="relative flex items-center gap-3 p-4 rounded-2xl border overflow-hidden"
+                        style={{
+                          borderColor: isCorrect ? "#22c55e70" : "rgba(255,255,255,0.08)",
+                          background: isCorrect ? "rgba(34,197,94,0.12)" : "rgba(10,4,20,0.7)",
+                        }}>
+                        {/* Distribution bar */}
+                        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.8 }}
+                            className="h-full opacity-10"
+                            style={{ background: isCorrect ? "#22c55e" : col.color }}
+                          />
+                        </div>
+                        <span className="relative w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 border"
+                          style={{
+                            background: isCorrect ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.04)",
+                            borderColor: isCorrect ? "#22c55e60" : "rgba(255,255,255,0.1)",
+                            color: isCorrect ? "#22c55e" : "#6b7280",
+                          }}>
+                          {isCorrect ? <CheckCircle2 size={16} /> : num}
+                        </span>
+                        <span className="relative flex-1 text-base font-bold leading-snug"
+                          style={{ color: isCorrect ? "#22c55e" : "#6b7280" }}>
+                          {choice}
+                        </span>
+                        <span className="relative text-xs font-bold flex-shrink-0"
+                          style={{ color: isCorrect ? "#22c55e80" : "#6b728070" }}>
+                          {pct}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Correct answer banner */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-green-500/50 bg-green-500/10 p-4 flex items-center justify-center gap-3">
+                  <CheckCircle2 className="text-green-400 flex-shrink-0" size={22} />
+                  <span className="text-green-400 font-black text-lg">الإجابة: {question.correctAnswerText}</span>
+                </motion.div>
+
+                {/* Per-question results */}
+                {questionResults.length > 0 && (
+                  <div className="rounded-2xl border border-purple-500/20 overflow-hidden"
+                    style={{ background: "rgba(14,6,28,0.8)" }}>
+                    <div className="px-4 py-2.5 border-b border-purple-500/15 flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300/50">نتائج هذا السؤال</span>
+                      <span className="text-xs text-purple-400/30">{questionResults.filter(r => r.correct).length} صحيحة</span>
                     </div>
-                    <p className="text-xs text-purple-400/50 mt-1">{totalAnswers} مشارك أجاب</p>
+                    <div className="divide-y divide-purple-500/10 max-h-40 overflow-y-auto">
+                      {questionResults.slice(0, 12).map((r, idx) => (
+                        <div key={idx}
+                          className="flex items-center gap-3 px-4 py-2">
+                          <span className="flex-shrink-0 w-6 text-center text-xs font-black"
+                            style={{ color: r.correct ? "#22c55e" : "#ef4444" }}>
+                            {r.correct ? `#${r.rank}` : "✕"}
+                          </span>
+                          <span className="flex-1 text-sm font-medium text-white/75 truncate">{r.username}</span>
+                          <span className="flex-shrink-0 font-black text-sm"
+                            style={{ color: r.correct ? "#22c55e" : "#ef444460" }}>
+                            {r.correct ? `+${r.points}` : "0"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action button */}
+                <motion.button
+                  onClick={isLastRound ? restartFull : hostNextQuestion}
+                  disabled={actionLoading}
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2"
+                  style={{
+                    background: isLastRound
+                      ? "linear-gradient(135deg, #ffd600, #f59e0b)"
+                      : "linear-gradient(135deg, #00e5ff, #0288d1)",
+                    boxShadow: isLastRound ? "0 0 30px rgba(255,214,0,0.3)" : "0 0 30px rgba(0,229,255,0.3)",
+                    color: "#000",
+                    opacity: actionLoading ? 0.7 : 1,
+                  }}
+                >
+                  {actionLoading ? (
+                    <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  ) : isLastRound ? (
+                    <><Trophy size={20} /> عرض النتائج النهائية</>
+                  ) : (
+                    <><SkipForward size={20} /> السؤال التالي</>
+                  )}
+                </motion.button>
+              </motion.div>
+            )}
+
+            {/* ── FINISHED ── */}
+            {uiPhase === "finished" && (
+              <motion.div key="finished"
+                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                className="w-full max-w-xl flex flex-col items-center gap-6 text-center">
+
+                {/* Title */}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                  <h2 className="text-4xl font-black" style={{ color: "#ffd600", textShadow: "0 0 30px rgba(255,214,0,0.5)" }}>
+                    انتهت اللعبة
+                  </h2>
+                  <p className="text-purple-300/40 text-sm mt-1">المتصدرون النهائيون</p>
+                </motion.div>
+
+                {/* Podium */}
+                <div className="w-full flex items-end justify-center gap-3 mt-2">
+                  {/* 2nd place */}
+                  {leaderboard[1] && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                      className="flex flex-col items-center gap-2"
+                    >
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden border-2"
+                        style={{ borderColor: "#c0c0c0", boxShadow: "0 0 20px rgba(192,192,192,0.3)" }}>
+                        <img src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${leaderboard[1].username}`}
+                          className="w-full h-full object-cover" alt={leaderboard[1].username} />
+                      </div>
+                      <p className="text-xs font-bold text-gray-300 truncate max-w-[72px]">{leaderboard[1].username}</p>
+                      <div className="h-20 w-24 rounded-t-xl flex flex-col items-center justify-end pb-3"
+                        style={{ background: "linear-gradient(180deg, rgba(192,192,192,0.2), rgba(192,192,192,0.08))", border: "1px solid rgba(192,192,192,0.3)" }}>
+                        <p className="text-2xl">🥈</p>
+                        <p className="text-lg font-black text-silver-300" style={{ color: "#c0c0c0" }}>{leaderboard[1].score}</p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* 1st place */}
+                  {leaderboard[0] && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                      className="flex flex-col items-center gap-2"
+                    >
+                      <motion.div
+                        animate={{ y: [0, -8, 0] }}
+                        transition={{ repeat: Infinity, duration: 2 }}
+                        className="w-20 h-20 rounded-2xl overflow-hidden border-4"
+                        style={{ borderColor: "#ffd600", boxShadow: "0 0 30px rgba(255,214,0,0.5)" }}>
+                        <img src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${leaderboard[0].username}`}
+                          className="w-full h-full object-cover" alt={leaderboard[0].username} />
+                      </motion.div>
+                      <p className="text-sm font-bold text-yellow-300 truncate max-w-[88px]">{leaderboard[0].username}</p>
+                      <div className="h-28 w-28 rounded-t-xl flex flex-col items-center justify-end pb-3"
+                        style={{ background: "linear-gradient(180deg, rgba(255,214,0,0.25), rgba(255,214,0,0.08))", border: "1px solid rgba(255,214,0,0.4)" }}>
+                        <p className="text-3xl">🥇</p>
+                        <p className="text-2xl font-black" style={{ color: "#ffd600" }}>{leaderboard[0].score}</p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* 3rd place */}
+                  {leaderboard[2] && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+                      className="flex flex-col items-center gap-2"
+                    >
+                      <div className="w-14 h-14 rounded-2xl overflow-hidden border-2"
+                        style={{ borderColor: "#cd7f32", boxShadow: "0 0 16px rgba(205,127,50,0.3)" }}>
+                        <img src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${leaderboard[2].username}`}
+                          className="w-full h-full object-cover" alt={leaderboard[2].username} />
+                      </div>
+                      <p className="text-xs font-bold text-orange-300 truncate max-w-[64px]">{leaderboard[2].username}</p>
+                      <div className="h-14 w-20 rounded-t-xl flex flex-col items-center justify-end pb-3"
+                        style={{ background: "linear-gradient(180deg, rgba(205,127,50,0.2), rgba(205,127,50,0.07))", border: "1px solid rgba(205,127,50,0.3)" }}>
+                        <p className="text-xl">🥉</p>
+                        <p className="text-base font-black" style={{ color: "#cd7f32" }}>{leaderboard[2].score}</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Rest of leaderboard */}
+                {leaderboard.length > 3 && (
+                  <motion.div
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+                    className="w-full rounded-2xl border border-purple-500/20 overflow-hidden"
+                    style={{ background: "rgba(14,6,28,0.8)" }}>
+                    {leaderboard.slice(3, 10).map((e, i) => (
+                      <div key={e.username}
+                        className="flex items-center gap-3 px-5 py-2.5 border-b border-purple-500/10 last:border-0">
+                        <span className="text-xs font-black text-gray-600 w-6">#{e.rank}</span>
+                        <span className="flex-1 text-sm text-white/65 truncate">{e.username}</span>
+                        <span className="font-black text-yellow-400/70 text-sm">{e.score}</span>
+                      </div>
+                    ))}
                   </motion.div>
                 )}
 
-                {/* Live answer feed */}
-                {phase === "active" && feed.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    <AnimatePresence>
-                      {feed.map(f => (
-                        <motion.span
-                          key={f.id}
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          className="px-2.5 py-1 rounded-full text-xs font-bold border"
-                          style={{
-                            background: f.correct ? "#22c55e10" : "#ef444410",
-                            borderColor: f.correct ? "#22c55e40" : "#ef444440",
-                            color: f.correct ? "#22c55e" : "#ef4444",
-                          }}
-                        >
-                          {f.username}: {f.answer}
-                        </motion.span>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                )}
+                <motion.button
+                  onClick={restartFull}
+                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+                  className="flex items-center gap-2 px-8 py-3 rounded-2xl font-black border border-purple-500/30 text-purple-300 hover:text-white hover:border-purple-400/50 transition-all"
+                >
+                  <RotateCcw size={16} /> إعادة اللعبة
+                </motion.button>
               </motion.div>
             )}
+
           </AnimatePresence>
         </main>
 
-        {/* ── LEADERBOARD SIDEBAR ──────────────────────────────────────────── */}
-        <aside className="w-60 flex flex-col border-r border-purple-500/20 flex-shrink-0"
-          style={{ background: "rgba(10,5,20,0.7)" }}>
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-yellow-500/20 flex-shrink-0"
-            style={{ background: "rgba(255,214,0,0.04)" }}>
-            <Trophy size={15} className="text-yellow-400" />
-            <span className="font-black text-yellow-400 text-sm">المتصدرون</span>
-          </div>
+        {/* ── LEADERBOARD SIDEBAR ─────────────────────────────────────────────── */}
+        {showSidebar && (
+          <LeaderboardSidebar entries={leaderboard} />
+        )}
 
-          <div className="flex-1 overflow-y-auto divide-y divide-purple-500/10">
-            {leaderboard.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4 py-12">
-                <Trophy size={32} className="text-purple-400/15" />
-                <p className="text-purple-400/30 text-xs">لا توجد نقاط بعد</p>
-              </div>
-            ) : leaderboard.map((entry) => {
-              const medals = ["🥇", "🥈", "🥉"];
-              const pct = leaderboard[0].score > 0 ? (entry.score / leaderboard[0].score) * 100 : 0;
-              return (
-                <motion.div
-                  key={entry.username}
-                  layout
-                  className="relative flex items-center gap-2.5 px-3 py-2.5 overflow-hidden"
-                >
-                  {/* Score bar bg */}
-                  <div className="absolute inset-0 opacity-20"
-                    style={{ width: `${pct}%`, background: "linear-gradient(90deg, #e040fb20, transparent)" }} />
-                  <span className="relative w-6 text-center text-sm font-black flex-shrink-0"
-                    style={{
-                      color: entry.rank === 1 ? "#ffd600" : entry.rank === 2 ? "#c0c0c0" : entry.rank === 3 ? "#cd7f32" : "#4b5563",
-                    }}>
-                    {entry.rank <= 3 ? medals[entry.rank - 1] : `#${entry.rank}`}
-                  </span>
-                  <span className="relative flex-1 text-xs font-medium truncate text-white/80">
-                    {entry.username}
-                  </span>
-                  <span className="relative font-black text-yellow-400 text-sm flex-shrink-0">{entry.score}</span>
-                </motion.div>
-              );
-            })}
-          </div>
-        </aside>
-      </div>
-
-      {/* ── HOST CONTROLS BAR ─────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-t border-purple-500/20 z-10"
-        style={{ background: "rgba(10,5,20,0.95)", backdropFilter: "blur(16px)" }}>
-        <div className="flex items-center gap-3 px-5 py-3 flex-wrap">
-
-          {/* Twitch connect */}
-          <form onSubmit={twitchConnect} className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-purple-500/30 bg-black/30">
-              <Tv2 size={14} className="text-purple-400 flex-shrink-0" />
-              <input
-                value={channelInput}
-                onChange={e => setChannelInput(e.target.value)}
-                placeholder="اسم قناة Twitch"
-                className="bg-transparent text-white text-sm placeholder-purple-400/30 focus:outline-none w-36"
-              />
-            </div>
-            <motion.button
-              type="submit"
-              disabled={connecting || !channelInput.trim()}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all disabled:opacity-40"
-              style={twitchConnected
-                ? { background: "#ef444415", borderColor: "#ef444450", color: "#ef4444" }
-                : { background: "#9c27b015", borderColor: "#9c27b050", color: "#e040fb" }
-              }
-            >
-              {twitchConnected ? <><WifiOff size={13} /> قطع</> : <><Wifi size={13} /> اتصال</>}
-            </motion.button>
-          </form>
-
-          <div className="h-8 w-px bg-purple-500/20" />
-
-          {/* Start Game */}
-          <HostBtn
-            icon={<RefreshCw size={15} />}
-            label="بدء اللعبة"
-            desc="إعادة تعيين النقاط"
-            color="#22c55e"
-            onClick={seedAndStart}
-            disabled={actionLoading}
-          />
-
-          {/* Start Question */}
-          <HostBtn
-            icon={<Play size={15} fill="currentColor" />}
-            label="بدء السؤال"
-            desc="سؤال جديد"
-            color="#e040fb"
-            onClick={() => hostAction("/quiz/question", "بدء السؤال")}
-            disabled={actionLoading}
-          />
-
-          {/* Reveal Answer */}
-          <HostBtn
-            icon={<Eye size={15} />}
-            label="عرض الإجابة"
-            desc="أظهر الصحيح"
-            color="#ffd600"
-            onClick={() => hostAction("/quiz/reveal", "عرض الإجابة")}
-            disabled={actionLoading || phase !== "active"}
-          />
-
-          {/* Next Question */}
-          <HostBtn
-            icon={<SkipForward size={15} />}
-            label="السؤال التالي"
-            desc="سؤال آخر"
-            color="#00e5ff"
-            onClick={() => hostAction("/quiz/question", "السؤال التالي")}
-            disabled={actionLoading || phase === "active"}
-          />
-
-          {/* Phase indicator */}
-          <div className="mr-auto flex items-center gap-2">
-            <span className="text-xs text-purple-400/40">الحالة:</span>
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-              phase === "active"
-                ? "bg-green-500/15 border-green-500/40 text-green-400"
-                : phase === "revealed"
-                ? "bg-yellow-500/15 border-yellow-500/40 text-yellow-400"
-                : "bg-purple-500/15 border-purple-500/40 text-purple-400"
-            }`}>
-              {phase === "active" ? "🟢 جارٍ السؤال" : phase === "revealed" ? "🟡 عرض الإجابة" : "⚪ انتظار"}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
-  );
-}
-
-// ── Host button component ──────────────────────────────────────────────────
-function HostBtn({
-  icon, label, desc, color, onClick, disabled,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  desc: string;
-  color: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <motion.button
-      onClick={onClick}
-      disabled={disabled}
-      whileHover={!disabled ? { scale: 1.04, y: -1 } : {}}
-      whileTap={!disabled ? { scale: 0.96 } : {}}
-      className="flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl border transition-all disabled:opacity-30"
-      style={{ background: `${color}10`, borderColor: `${color}35`, color }}
-    >
-      <span className="flex items-center gap-1.5 font-black text-sm">{icon}{label}</span>
-      <span className="text-[10px] opacity-50">{desc}</span>
-    </motion.button>
   );
 }

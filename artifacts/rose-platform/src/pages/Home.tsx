@@ -7,7 +7,7 @@ const games = [
   {
     id: "quiz",
     title: "لعبة الأسئلة",
-    description: "أجب بالأرقام 1-4 عبر الشات وتصدّر القائمة",
+    description: "",
     icon: HelpCircle,
     neonColor: "#ffd600",
     path: "/quiz",
@@ -15,6 +15,7 @@ const games = [
     borderColor: "border-yellow-500/40",
     color: "",
     glowColor: "",
+    heroImage: "/quiz-hero.png",
   },
   {
     id: "song-game",
