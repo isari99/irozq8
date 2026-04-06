@@ -1,7 +1,8 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { logger } from "./logger";
+import { handleImposterMessage, handleImposterDisconnect, ImposterWS } from "./imposterGame";
 
-interface AuthenticatedWS extends WebSocket {
+interface AuthenticatedWS extends ImposterWS {
   userId?: number;
   username?: string;
   isAlive?: boolean;
@@ -25,6 +26,8 @@ export function setupWebSocketServer(server: import("http").Server): WebSocketSe
           ws.userId = msg.userId;
           ws.username = msg.username;
           ws.send(JSON.stringify({ type: "connected", message: `مرحباً ${msg.username}!` }));
+        } else if (typeof msg.type === "string" && msg.type.startsWith("imposter:")) {
+          handleImposterMessage(ws, msg);
         }
       } catch {
         logger.warn("Invalid WS message");
@@ -32,6 +35,7 @@ export function setupWebSocketServer(server: import("http").Server): WebSocketSe
     });
 
     ws.on("close", () => {
+      handleImposterDisconnect(ws);
       logger.debug({ userId: ws.userId }, "WS disconnected");
     });
   });

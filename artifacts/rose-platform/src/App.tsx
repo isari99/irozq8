@@ -10,6 +10,7 @@ import WheelGame from "@/pages/WheelGame";
 import QuizGame from "@/pages/QuizGame";
 import SnakesGame from "@/pages/SnakesGame";
 import FruitsGame from "@/pages/FruitsGame";
+import ImposterGame from "@/pages/ImposterGame";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/not-found";
 
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/quiz"><ProtectedRoute component={QuizGame} /></Route>
       <Route path="/snakes-game"><ProtectedRoute component={SnakesGame} /></Route>
       <Route path="/fruits-game"><ProtectedRoute component={FruitsGame} /></Route>
+      <Route path="/imposter-game"><ProtectedRoute component={ImposterGame} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
