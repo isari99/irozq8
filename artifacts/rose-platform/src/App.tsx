@@ -58,6 +58,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
+          {/* ── Global animated logo background ── */}
+          <div className="rose-bg-layer" aria-hidden="true" />
+          <div className="rose-bg-overlay" aria-hidden="true" />
+
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
           </WouterRouter>

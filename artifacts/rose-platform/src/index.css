@@ -84,6 +84,57 @@
   background: linear-gradient(135deg, #0d0a1a 0%, #1a0a2e 30%, #0a1a2e 60%, #0d0a1a 100%);
 }
 
+/* ─── Animated Logo Background ──────────────────────────────────────────────── */
+
+/* Slow diagonal drift for the logo tile pattern */
+@keyframes bgDrift {
+  0%   { transform: translate(0,    0);    }
+  20%  { transform: translate(-40px, -25px); }
+  40%  { transform: translate(-70px,  20px); }
+  60%  { transform: translate(-40px,  55px); }
+  80%  { transform: translate( 15px,  30px); }
+  100% { transform: translate(0,    0);    }
+}
+
+/* Gentle breathe pulse on the whole layer */
+@keyframes bgBreathe {
+  0%, 100% { opacity: 0.045; }
+  50%       { opacity: 0.065; }
+}
+
+/* The repeating logo tile layer — z:2 puts it above the page gradient-bg (z:auto) */
+.rose-bg-layer {
+  position: fixed;
+  /* Oversized so drift never exposes blank edges */
+  top: -25%;
+  left: -25%;
+  width: 150%;
+  height: 150%;
+  background-image: url('/rose-bg.jpg');
+  background-size: 200px 200px;
+  background-repeat: repeat;
+  filter: blur(0.6px) grayscale(20%);
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform, opacity;
+  animation:
+    bgDrift    45s ease-in-out infinite,
+    bgBreathe  8s  ease-in-out infinite;
+}
+
+/* Dark gradient overlay — sits above the tiles, below the page content (z:10) */
+.rose-bg-overlay {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(13,6,28,0.78) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 50% at 70% 80%, rgba(6,13,28,0.70) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(10,6,20,0.60) 0%, rgba(10,6,20,0.50) 50%, rgba(10,6,20,0.68) 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
 /* Card hover */
 .game-card {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
