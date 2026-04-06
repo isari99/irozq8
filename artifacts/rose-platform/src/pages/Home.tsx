@@ -179,27 +179,37 @@ export default function Home() {
                 {heroImage ? (
                   /* ── Full-image hero card (الشخصنة) ── */
                   <>
-                    <img src={heroImage} alt={game.title}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      style={{ objectPosition: "top center" }} />
-                    <div className="absolute inset-0 rounded-2xl"
-                      style={{ background: "linear-gradient(to top, rgba(8,4,18,0.95) 14%, rgba(8,4,18,0.0) 35%)" }} />
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
-                      style={{ boxShadow: `inset 0 0 50px ${game.neonColor}25` }} />
-                    <div className="absolute bottom-2 inset-x-0 flex justify-center z-10">
+                    {/* Image — takes the top 80% of the card */}
+                    <div className="absolute top-0 inset-x-0 overflow-hidden rounded-t-2xl"
+                      style={{ height: "80%" }}>
+                      <img src={heroImage} alt={game.title}
+                        className="w-full h-full object-cover"
+                        style={{ objectPosition: "top center" }} />
+                    </div>
+
+                    {/* Button strip — sits cleanly in the bottom 20% */}
+                    <div className="absolute bottom-0 inset-x-0 flex items-center justify-center rounded-b-2xl"
+                      style={{
+                        height: "20%",
+                        background: `linear-gradient(135deg, rgba(12,5,24,0.98), rgba(20,8,38,0.98))`,
+                        borderTop: `1px solid ${game.neonColor}25`,
+                      }}>
                       <motion.div
-                        className="px-8 py-2.5 rounded-xl text-sm font-bold btn-shimmer"
+                        className="px-8 py-2 rounded-xl text-sm font-bold btn-shimmer"
                         style={{
-                          background: `linear-gradient(135deg, ${game.neonColor}55, ${game.neonColor}25)`,
-                          border: `1px solid ${game.neonColor}70`,
+                          background: `linear-gradient(135deg, ${game.neonColor}45, ${game.neonColor}20)`,
+                          border: `1px solid ${game.neonColor}60`,
                           color: "#fff",
-                          backdropFilter: "blur(8px)",
                         }}
                         whileHover={{ scale: 1.06 }}
                       >
                         العب الآن
                       </motion.div>
                     </div>
+
+                    {/* Hover glow */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
+                      style={{ boxShadow: `inset 0 0 50px ${game.neonColor}20` }} />
                   </>
                 ) : (
                   /* ── Standard card ── */
