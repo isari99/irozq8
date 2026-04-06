@@ -395,15 +395,16 @@ export default function XOGame() {
             </motion.div>
           )}
 
-          {/* ── PLAYING ── */}
-          {(phase === "playing" || phase === "result") && (
+          {/* ── PLAYING — board only, no result inside ── */}
+          {phase === "playing" && (
             <motion.div key="playing"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.35 }}
               className="w-full max-w-lg space-y-5">
 
               {/* Score + Players */}
               <div className="grid grid-cols-3 items-center gap-3">
-                <PlayerAvatar player={players.X} isActive={phase === "playing" && currentMark === "X"} mark="X" />
+                <PlayerAvatar player={players.X} isActive={currentMark === "X"} mark="X" />
                 <div className="text-center space-y-1">
                   <p className="text-xl font-black text-purple-300/50">VS</p>
                   <div className="space-y-0.5 text-xs">
@@ -417,36 +418,33 @@ export default function XOGame() {
                     )}
                   </div>
                 </div>
-                <PlayerAvatar player={players.O} isActive={phase === "playing" && currentMark === "O"} mark="O" />
+                <PlayerAvatar player={players.O} isActive={currentMark === "O"} mark="O" />
               </div>
 
               {/* Turn indicator */}
               <AnimatePresence mode="wait">
-                {phase === "playing" && (
-                  <motion.div key={currentMark}
-                    initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className="text-center py-2.5 px-5 rounded-xl border"
-                    style={{
-                      borderColor: currentMark === "X" ? `${X_COLOR}40` : `${O_COLOR}40`,
-                      background: currentMark === "X" ? `${X_COLOR}10` : `${O_COLOR}10`,
-                    }}
-                  >
-                    <p className="text-sm font-black" style={{ color: currentMark === "X" ? X_COLOR : O_COLOR }}>
-                      دور {currentPlayer?.displayName}
-                      {" "}
-                      <span style={{ textShadow: `0 0 10px ${currentMark === "X" ? X_COLOR : O_COLOR}` }}>
-                        ({currentMark === "X" ? "✕" : "○"})
-                      </span>
-                      {" "}— اكتب رقم في الشات
-                    </p>
-                  </motion.div>
-                )}
+                <motion.div key={currentMark}
+                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="text-center py-2.5 px-5 rounded-xl border"
+                  style={{
+                    borderColor: currentMark === "X" ? `${X_COLOR}40` : `${O_COLOR}40`,
+                    background: currentMark === "X" ? `${X_COLOR}10` : `${O_COLOR}10`,
+                  }}
+                >
+                  <p className="text-sm font-black" style={{ color: currentMark === "X" ? X_COLOR : O_COLOR }}>
+                    دور {currentPlayer?.displayName}
+                    {" "}
+                    <span style={{ textShadow: `0 0 10px ${currentMark === "X" ? X_COLOR : O_COLOR}` }}>
+                      ({currentMark === "X" ? "✕" : "○"})
+                    </span>
+                    {" "}— اكتب رقم في الشات
+                  </p>
+                </motion.div>
               </AnimatePresence>
 
               {/* Board */}
               <div className="grid grid-cols-3 gap-3 max-w-[340px] mx-auto">
                 {board.map((cell, i) => {
-                  const isWin = winnerInfo?.combo?.includes(i);
                   const cellNum = i + 1;
                   const cellColor = cell === "X" ? X_COLOR : cell === "O" ? O_COLOR : null;
                   return (
@@ -454,16 +452,9 @@ export default function XOGame() {
                       key={i}
                       className="aspect-square rounded-2xl border flex items-center justify-center relative overflow-hidden"
                       style={{
-                        borderColor: isWin ? cellColor! : cell ? `${cellColor}50` : "rgba(74,32,96,0.6)",
-                        background: isWin
-                          ? `${cellColor}20`
-                          : cell
-                          ? "rgba(18,6,32,0.9)"
-                          : "rgba(12,4,22,0.7)",
-                        boxShadow: isWin ? `0 0 24px ${cellColor}40` : "none",
+                        borderColor: cell ? `${cellColor}50` : "rgba(74,32,96,0.6)",
+                        background: cell ? "rgba(18,6,32,0.9)" : "rgba(12,4,22,0.7)",
                       }}
-                      animate={isWin ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-                      transition={{ repeat: isWin ? Infinity : 0, duration: 1 }}
                     >
                       <AnimatePresence mode="wait">
                         {cell ? (
@@ -473,10 +464,7 @@ export default function XOGame() {
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ type: "spring", stiffness: 380, damping: 18 }}
                             className="text-4xl sm:text-5xl font-black"
-                            style={{
-                              color: cellColor!,
-                              textShadow: isWin ? `0 0 20px ${cellColor}` : `0 0 8px ${cellColor}80`,
-                            }}
+                            style={{ color: cellColor!, textShadow: `0 0 8px ${cellColor}80` }}
                           >
                             {cell === "X" ? "✕" : "○"}
                           </motion.span>
@@ -495,101 +483,166 @@ export default function XOGame() {
                 })}
               </div>
 
-              {/* Result overlay */}
-              <AnimatePresence>
-                {phase === "result" && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.85, y: 16 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    className="rounded-2xl border p-6 text-center space-y-4"
-                    style={{
-                      borderColor: winnerInfo
-                        ? winnerInfo.mark === "X" ? `${X_COLOR}45` : `${O_COLOR}45`
-                        : "rgba(255,255,255,0.12)",
-                      background: winnerInfo
-                        ? winnerInfo.mark === "X" ? `${X_COLOR}12` : `${O_COLOR}12`
-                        : "rgba(255,255,255,0.05)",
-                      boxShadow: winnerInfo
-                        ? `0 0 40px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}20`
-                        : "none",
-                    }}
-                  >
-                    {winnerPlayer && winnerInfo ? (
-                      <>
-                        <motion.div
-                          animate={{ y: [0, -8, 0] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                          className="relative w-24 h-24 mx-auto rounded-2xl overflow-hidden border-4"
-                          style={{
-                            borderColor: winnerInfo.mark === "X" ? X_COLOR : O_COLOR,
-                            boxShadow: `0 0 30px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}50`,
-                          }}
-                        >
-                          <img
-                            src={winnerPlayer.avatar} alt={winnerPlayer.displayName}
-                            className="w-full h-full object-cover"
-                            onError={e => {
-                              (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winnerPlayer.username}`;
-                            }}
-                          />
-                        </motion.div>
-                        <div>
-                          <p className="text-purple-300/50 text-sm">الفائز</p>
-                          <h3
-                            className="text-3xl font-black"
-                            style={{
-                              color: winnerInfo.mark === "X" ? X_COLOR : O_COLOR,
-                              textShadow: `0 0 20px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}`,
-                            }}
-                          >
-                            {winnerPlayer.displayName}
-                          </h3>
-                          <p className="text-4xl font-black mt-1"
-                            style={{ color: winnerInfo.mark === "X" ? X_COLOR : O_COLOR }}>
-                            {winnerInfo.mark === "X" ? "✕" : "○"} فاز
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-5xl font-black text-purple-300/60">½</div>
-                        <h3 className="text-3xl font-black text-purple-300">تعادل</h3>
-                      </>
-                    )}
+              {/* Reset players */}
+              <button
+                onClick={newGame}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-purple-400/35 hover:text-purple-300/60 border border-purple-500/15 transition-all text-xs"
+              >
+                <RotateCcw size={13} /> إعادة تعيين الكل وتغيير اللاعبين
+              </button>
+            </motion.div>
+          )}
 
-                    <div className="flex gap-3 justify-center pt-2">
-                      <motion.button
-                        onClick={rematch}
-                        whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm"
+          {/* ── RESULT — full separate page ── */}
+          {phase === "result" && (
+            <motion.div key="result"
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="w-full max-w-md flex flex-col items-center gap-6 text-center"
+            >
+              {winnerPlayer && winnerInfo ? (
+                <>
+                  {/* Decorative rings */}
+                  <div className="relative flex items-center justify-center">
+                    {[1, 2, 3].map(ring => (
+                      <motion.div
+                        key={ring}
+                        className="absolute rounded-full border"
                         style={{
-                          background: "rgba(0,229,255,0.12)",
-                          border: "1px solid rgba(0,229,255,0.4)",
-                          color: O_COLOR,
+                          width: 130 + ring * 55,
+                          height: 130 + ring * 55,
+                          borderColor: winnerInfo.mark === "X" ? `${X_COLOR}${20 - ring * 5}` : `${O_COLOR}${20 - ring * 5}`,
                         }}
-                      >
-                        <RotateCcw size={15} /> إعادة المباراة
-                      </motion.button>
-                      <button
-                        onClick={newGame}
-                        className="px-5 py-2.5 rounded-xl font-bold text-sm border border-purple-500/25 text-purple-400/60 hover:text-purple-300 transition-all"
-                      >
-                        لعبة جديدة
-                      </button>
+                        animate={{ scale: [1, 1.04, 1], opacity: [0.3, 0.6, 0.3] }}
+                        transition={{ repeat: Infinity, duration: 2 + ring * 0.4, delay: ring * 0.2 }}
+                      />
+                    ))}
+                    {/* Winner avatar */}
+                    <motion.div
+                      animate={{ y: [0, -10, 0] }}
+                      transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                      className="relative w-36 h-36 rounded-3xl overflow-hidden border-4 z-10"
+                      style={{
+                        borderColor: winnerInfo.mark === "X" ? X_COLOR : O_COLOR,
+                        boxShadow: `0 0 50px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}60, 0 0 100px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}20`,
+                      }}
+                    >
+                      <img
+                        src={winnerPlayer.avatar} alt={winnerPlayer.displayName}
+                        className="w-full h-full object-cover"
+                        onError={e => {
+                          (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winnerPlayer.username}`;
+                        }}
+                      />
+                      {/* Win mark overlay */}
+                      <div className="absolute bottom-1 right-1 w-9 h-9 rounded-xl flex items-center justify-center font-black text-lg"
+                        style={{
+                          background: "rgba(0,0,0,0.8)",
+                          color: winnerInfo.mark === "X" ? X_COLOR : O_COLOR,
+                          textShadow: `0 0 10px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}`,
+                        }}>
+                        {winnerInfo.mark === "X" ? "✕" : "○"}
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Text */}
+                  <div className="space-y-2">
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                      className="text-purple-300/50 text-base font-medium"
+                    >
+                      الفائز
+                    </motion.p>
+                    <motion.h2
+                      initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                      className="text-5xl font-black"
+                      style={{
+                        color: winnerInfo.mark === "X" ? X_COLOR : O_COLOR,
+                        textShadow: `0 0 30px ${winnerInfo.mark === "X" ? X_COLOR : O_COLOR}`,
+                      }}
+                    >
+                      {winnerPlayer.displayName}
+                    </motion.h2>
+                    <motion.p
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+                      className="text-2xl font-bold text-purple-200/60"
+                    >
+                      Congratulations
+                    </motion.p>
+                  </div>
+
+                  {/* Score summary */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+                    className="flex gap-6 px-8 py-3 rounded-2xl border border-purple-500/20"
+                    style={{ background: "rgba(26,10,46,0.6)" }}
+                  >
+                    <div className="text-center">
+                      <p className="text-2xl font-black" style={{ color: X_COLOR }}>{scores.X}</p>
+                      <p className="text-xs text-purple-400/50">{players.X?.displayName ?? "X"}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-black text-purple-400/40">-</p>
+                      {scores.draw > 0 && <p className="text-[10px] text-purple-400/30">تعادل {scores.draw}</p>}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-black" style={{ color: O_COLOR }}>{scores.O}</p>
+                      <p className="text-xs text-purple-400/50">{players.O?.displayName ?? "O"}</p>
                     </div>
                   </motion.div>
-                )}
-              </AnimatePresence>
+                </>
+              ) : (
+                /* Draw */
+                <>
+                  <div className="relative">
+                    <div className="flex gap-4">
+                      {[players.X, players.O].map((p, i) => p && (
+                        <motion.div key={i}
+                          animate={{ y: [0, -8, 0] }}
+                          transition={{ repeat: Infinity, duration: 2, delay: i * 0.3 }}
+                          className="w-28 h-28 rounded-2xl overflow-hidden border-2"
+                          style={{ borderColor: i === 0 ? X_COLOR : O_COLOR }}>
+                          <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-5xl font-black text-purple-300">تعادل</h2>
+                    <p className="text-purple-400/50 text-lg">لا فائز هالمرة</p>
+                  </div>
+                </>
+              )}
 
-              {/* Reset during play */}
-              {phase === "playing" && (
+              {/* Action buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+                className="flex gap-3"
+              >
+                <motion.button
+                  onClick={rematch}
+                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-xl font-black text-base"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(0,229,255,0.25), rgba(0,229,255,0.1))",
+                    border: "1px solid rgba(0,229,255,0.45)",
+                    color: O_COLOR,
+                    boxShadow: "0 0 20px rgba(0,229,255,0.15)",
+                  }}
+                >
+                  <RotateCcw size={17} /> إعادة المباراة
+                </motion.button>
                 <button
                   onClick={newGame}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-purple-400/35 hover:text-purple-300/60 border border-purple-500/15 transition-all text-xs"
+                  className="px-6 py-3.5 rounded-xl font-bold text-sm border border-purple-500/25 text-purple-400/55 hover:text-purple-300 hover:border-purple-500/45 transition-all"
                 >
-                  <RotateCcw size={13} /> إعادة تعيين الكل وتغيير اللاعبين
+                  لعبة جديدة
                 </button>
-              )}
+              </motion.div>
             </motion.div>
           )}
 
