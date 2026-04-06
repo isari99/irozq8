@@ -4,25 +4,23 @@ import { motion, AnimatePresence, useAnimate } from "framer-motion";
 import { ArrowRight, Tv2, Wifi, WifiOff, Users, Play, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface Player {
   username: string;
   displayName: string;
   avatar: string;
   number: number;
   alive: boolean;
-  hits: number;
+  hits: number;           // total hits received
+  revivedCount: number;   // 0 = never revived, 1 = already revived once
+  usedRevive: boolean;    // has this player used their one revive ability
 }
-type Phase =
-  | "idle"
-  | "joining"
-  | "roulette"
-  | "waiting_target"
-  | "shooting"
-  | "result"
-  | "game_over";
+type Phase = "joining" | "spinning" | "waiting_target" | "shooting" | "result" | "game_over";
 
-// ─── Sound Engine ────────────────────────────────────────────────────────────
+const MAX_HITS = 7;
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// ─── Soft Sound Engine ────────────────────────────────────────────────────────
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private get() {
@@ -31,120 +29,118 @@ class SoundEngine {
   }
   gunshot() {
     const ctx = this.get();
-    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.28), ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++)
-      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.045));
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(1, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.28);
-    src.connect(g); g.connect(ctx.destination); src.start();
-  }
-  hit() {
-    const ctx = this.get();
+    // Soft "thud" pop
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    osc.type = "sawtooth"; osc.frequency.setValueAtTime(110, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.18);
-    g.gain.setValueAtTime(0.55, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
-    osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.18);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.12);
+    g.gain.setValueAtTime(0.45, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.18);
   }
   death() {
     const ctx = this.get();
-    [80, 60, 40].forEach((f, i) => {
+    [90, 68, 50].forEach((f, i) => {
       const osc = ctx.createOscillator(); const g = ctx.createGain();
       osc.frequency.value = f;
-      g.gain.setValueAtTime(0.4, ctx.currentTime + i * 0.14);
-      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.14 + 0.32);
+      g.gain.setValueAtTime(0.28, ctx.currentTime + i * 0.14);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.14 + 0.3);
       osc.connect(g); g.connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.14); osc.stop(ctx.currentTime + i * 0.14 + 0.35);
+      osc.start(ctx.currentTime + i * 0.14); osc.stop(ctx.currentTime + i * 0.14 + 0.32);
     });
   }
   survive() {
     const ctx = this.get();
-    [400, 500, 650].forEach((f, i) => {
+    [440, 550, 660].forEach((f, i) => {
       const osc = ctx.createOscillator(); const g = ctx.createGain();
       osc.type = "sine"; osc.frequency.value = f;
-      g.gain.setValueAtTime(0.28, ctx.currentTime + i * 0.1);
-      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.22);
+      g.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.09);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.09 + 0.18);
       osc.connect(g); g.connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.1); osc.stop(ctx.currentTime + i * 0.1 + 0.25);
+      osc.start(ctx.currentTime + i * 0.09); osc.stop(ctx.currentTime + i * 0.09 + 0.2);
     });
+  }
+  revive() {
+    const ctx = this.get();
+    [330, 440, 550, 660].forEach((f, i) => {
+      const osc = ctx.createOscillator(); const g = ctx.createGain();
+      osc.type = "sine"; osc.frequency.value = f;
+      g.gain.setValueAtTime(0.22, ctx.currentTime + i * 0.08);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.14);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.08); osc.stop(ctx.currentTime + i * 0.08 + 0.16);
+    });
+  }
+  spinTick() {
+    const ctx = this.get();
+    const osc = ctx.createOscillator(); const g = ctx.createGain();
+    osc.frequency.value = 900; g.gain.setValueAtTime(0.06, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.04);
   }
 }
 const sound = new SoundEngine();
 
 // ─── Blood Splatter ──────────────────────────────────────────────────────────
 const BloodEffect = () => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl z-10"
-  >
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+    className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl z-10">
     {[...Array(7)].map((_, i) => (
       <motion.div key={i} className="absolute rounded-full"
         style={{
           background: "radial-gradient(circle, #cc0000, #7a0000)",
-          width: `${Math.random() * 38 + 14}px`,
-          height: `${Math.random() * 26 + 10}px`,
-          left: `${Math.random() * 80 + 5}%`,
-          top: `${Math.random() * 80 + 5}%`,
+          width: `${Math.random() * 35 + 12}px`, height: `${Math.random() * 24 + 9}px`,
+          left: `${Math.random() * 80 + 5}%`, top: `${Math.random() * 80 + 5}%`,
           transform: `rotate(${Math.random() * 360}deg)`,
         }}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 0.9 }}
-        transition={{ delay: i * 0.04, duration: 0.18 }}
-      />
+        initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 0.9 }}
+        transition={{ delay: i * 0.04, duration: 0.16 }} />
     ))}
     <motion.div className="absolute inset-0 rounded-2xl"
-      initial={{ opacity: 0 }} animate={{ opacity: 0.48 }}
-      style={{ background: "rgba(170,0,0,0.48)" }} />
+      initial={{ opacity: 0 }} animate={{ opacity: 0.45 }}
+      style={{ background: "rgba(160,0,0,0.45)" }} />
     <div className="absolute inset-0 flex items-center justify-center">
-      <span className="text-5xl drop-shadow-lg">💀</span>
+      <span className="text-5xl">💀</span>
     </div>
   </motion.div>
 );
 
-// ─── Player Card ─────────────────────────────────────────────────────────────
+// ─── Player Card (grid view) ──────────────────────────────────────────────────
 const PlayerCard = ({ player, isShooter, isTarget }: {
   player: Player; isShooter?: boolean; isTarget?: boolean;
 }) => (
   <motion.div layout
-    initial={{ opacity: 0, scale: 0.8 }}
-    animate={{ opacity: player.alive ? 1 : 0.3, scale: 1 }}
+    initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: player.alive ? 1 : 0.3, scale: 1 }}
     exit={{ opacity: 0, scale: 0.4 }}
     className="relative rounded-2xl border overflow-hidden"
     style={{
       borderColor: isShooter ? "#ffd600" : isTarget ? "#ef4444" : player.alive ? "#3d1860" : "#1a0a2a",
       background: isShooter ? "#ffd60015" : isTarget ? "#ef444415" : "rgba(26,10,46,0.85)",
-      boxShadow: isShooter ? "0 0 20px #ffd60035" : isTarget ? "0 0 20px #ef444435" : "none",
-    }}
-  >
+      boxShadow: isShooter ? "0 0 18px #ffd60030" : isTarget ? "0 0 18px #ef444430" : "none",
+    }}>
     {!player.alive && <BloodEffect />}
     {player.alive && player.hits > 0 && (
-      <div className="absolute top-1.5 right-1.5 flex gap-0.5 flex-wrap justify-end max-w-[75%] z-10">
-        {[...Array(player.hits)].map((_, i) => <span key={i} className="text-[11px]">🩸</span>)}
+      <div className="absolute top-1.5 right-1.5 z-10 flex gap-0.5 flex-wrap justify-end max-w-[75%]">
+        {[...Array(Math.min(player.hits, 7))].map((_, i) => <span key={i} className="text-[11px]">🩸</span>)}
       </div>
     )}
     {isShooter && <div className="absolute top-1.5 left-1.5 z-10 text-lg leading-none">👑</div>}
     {isTarget && <div className="absolute top-1.5 left-1.5 z-10 text-lg leading-none">🎯</div>}
+    {player.revivedCount > 0 && player.alive && (
+      <div className="absolute top-1.5 left-1.5 z-10 text-xs leading-none">💚</div>
+    )}
     <div className="relative aspect-square overflow-hidden">
-      <img src={player.avatar} alt={player.displayName}
-        className="w-full h-full object-cover"
+      <img src={player.avatar} alt={player.displayName} className="w-full h-full object-cover"
         onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${player.username}`; }} />
       <div className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border-2"
-        style={{
-          background: isShooter ? "#ffd600" : isTarget ? "#ef4444" : "#e040fb",
-          borderColor: "#0a0a1a",
-          color: isShooter ? "#0a0a1a" : "#fff",
-        }}>
+        style={{ background: isShooter ? "#ffd600" : isTarget ? "#ef4444" : "#e040fb", borderColor: "#0a0a1a", color: isShooter ? "#0a0a1a" : "#fff" }}>
         {player.number}
       </div>
     </div>
-    <div className="px-1.5 py-1.5 text-center">
+    <div className="px-1 py-1.5 text-center">
       <p className="text-xs font-bold truncate"
         style={{ color: !player.alive ? "#4b5563" : isShooter ? "#ffd600" : isTarget ? "#ef4444" : "#e2d0f0", textDecoration: !player.alive ? "line-through" : "none" }}>
         {player.displayName}
@@ -152,6 +148,88 @@ const PlayerCard = ({ player, isShooter, isTarget }: {
     </div>
   </motion.div>
 );
+
+// ─── Spinning Wheel ───────────────────────────────────────────────────────────
+const SpinningWheel = ({ players, wheelDeg }: { players: Player[]; wheelDeg: number }) => {
+  const N = players.length;
+  if (N === 0) return null;
+  const size = 400;
+  const radius = N <= 3 ? 135 : N <= 5 ? 155 : N <= 7 ? 168 : 178;
+  const avatarSize = N <= 3 ? 78 : N <= 5 ? 66 : N <= 7 ? 56 : 48;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  return (
+    <div className="relative mx-auto flex-shrink-0" style={{ width: size, height: size }}>
+      {/* Outer decorative rings */}
+      <div className="absolute inset-0 rounded-full border border-pink-500/20 pointer-events-none" />
+      <div className="absolute rounded-full border border-purple-500/10 pointer-events-none"
+        style={{ inset: avatarSize / 2 + 6 }} />
+
+      {/* Spoke lines (static) */}
+      <svg className="absolute inset-0 pointer-events-none" width={size} height={size}>
+        {players.map((_, i) => {
+          const a = ((2 * Math.PI) / N) * i - Math.PI / 2;
+          return <line key={i} x1={cx} y1={cy}
+            x2={cx + radius * Math.cos(a)} y2={cy + radius * Math.sin(a)}
+            stroke="#e040fb08" strokeWidth="1" />;
+        })}
+        <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#e040fb10" strokeWidth="1" />
+      </svg>
+
+      {/* Fixed top pointer */}
+      <div className="absolute z-30 pointer-events-none flex flex-col items-center"
+        style={{ top: 4, left: cx - 14, width: 28 }}>
+        <div className="text-2xl leading-none" style={{ color: "#e040fb", filter: "drop-shadow(0 0 8px #e040fb)" }}>▼</div>
+      </div>
+
+      {/* Rotating ring of players */}
+      <motion.div className="absolute inset-0"
+        animate={{ rotate: wheelDeg }}
+        transition={{ duration: 3.6, ease: [0.15, 0.6, 0.3, 1.0] }}>
+        {players.map((p, i) => {
+          const a = ((2 * Math.PI) / N) * i; // 0 = top
+          const px = cx + radius * Math.sin(a) - avatarSize / 2;
+          const py = cy - radius * Math.cos(a) - avatarSize / 2;
+          return (
+            <div key={p.username} className="absolute" style={{ left: px, top: py, width: avatarSize, height: avatarSize }}>
+              <div className="relative w-full h-full">
+                <div className={`w-full h-full rounded-full overflow-hidden border-2 ${p.alive ? "" : "opacity-35"}`}
+                  style={{ borderColor: p.alive ? "#e040fb80" : "#330011", boxShadow: p.alive ? "0 0 8px #e040fb30" : "none" }}>
+                  <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
+                    onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                </div>
+                {!p.alive && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/65">
+                    <span style={{ fontSize: avatarSize * 0.38 }}>💀</span>
+                  </div>
+                )}
+                {/* Number badge */}
+                <div className="absolute -bottom-1 -right-1 rounded-full bg-pink-600 text-white font-black flex items-center justify-center border-2 border-black"
+                  style={{ width: Math.max(17, avatarSize * 0.28), height: Math.max(17, avatarSize * 0.28), fontSize: Math.max(8, avatarSize * 0.14) }}>
+                  {p.number}
+                </div>
+                {/* Hit dots */}
+                {p.alive && p.hits > 0 && (
+                  <div className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-red-600/80 text-white flex items-center justify-center border border-black"
+                    style={{ fontSize: 8 }}>
+                    {p.hits}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </motion.div>
+
+      {/* Center hub */}
+      <div className="absolute z-20 rounded-full bg-black/90 border-2 border-pink-500/60 flex items-center justify-center"
+        style={{ width: 76, height: 76, left: cx - 38, top: cy - 38, boxShadow: "0 0 24px #e040fb50, inset 0 0 16px #00000090" }}>
+        <span className="text-4xl">🔫</span>
+      </div>
+    </div>
+  );
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function WheelGame() {
@@ -163,25 +241,28 @@ export default function WheelGame() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [shooter, setShooter] = useState<Player | null>(null);
   const [target, setTarget] = useState<Player | null>(null);
-  const [rouletteHL, setRouletteHL] = useState<string | null>(null);
-  const [currentBullet, setCurrentBullet] = useState(0);
-  const [totalBullets, setTotalBullets] = useState(0);
+  const [wheelDeg, setWheelDeg] = useState(0);
   const [survived, setSurvived] = useState<boolean | null>(null);
   const [funnyMsg, setFunnyMsg] = useState("");
+  const [resultMsg, setResultMsg] = useState("");
   const [flashScreen, setFlashScreen] = useState(false);
   const [joinMsg, setJoinMsg] = useState("");
   const [twitchConnected, setTwitchConnected] = useState(false);
+  const [isReviveAction, setIsReviveAction] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const phaseRef = useRef(phase);
-  const shooterRef = useRef(shooter);
-  const playersRef = useRef(players);
+  const phaseRef = useRef<Phase>("joining");
+  const shooterRef = useRef<Player | null>(null);
+  const playersRef = useRef<Player[]>([]);
+  const wheelDegRef = useRef(0);
+  const lastShooterRef = useRef<string | null>(null);
+
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { shooterRef.current = shooter; }, [shooter]);
   useEffect(() => { playersRef.current = players; }, [players]);
 
-  // ── Twitch IRC (browser direct) ──────────────────────────────────────────
-  const connectTwitch = (channel: string) => {
+  // ── Twitch IRC (direct from browser) ────────────────────────────────────
+  const connectTwitch = useCallback((channel: string) => {
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     const ch = channel.toLowerCase().replace(/^#/, "");
     const ws = new WebSocket("wss://irc-ws.chat.twitch.tv");
@@ -201,109 +282,157 @@ export default function WheelGame() {
       }
     };
     ws.onclose = () => setTwitchConnected(false);
-  };
+  }, []);
 
-  // ── Auto-connect on mount using logged-in username as channel ────────────
   useEffect(() => {
     if (user?.username) connectTwitch(user.username);
     return () => { wsRef.current?.close(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.username]);
 
+  // ── Chat message handler ─────────────────────────────────────────────────
   const handleChatMsg = useCallback((username: string, text: string) => {
     const msg = text.trim().toLowerCase();
     const ph = phaseRef.current;
     const sh = shooterRef.current;
     const pl = playersRef.current;
 
+    // JOIN during joining phase
     if (msg === "join" && ph === "joining") {
       setPlayers(prev => {
         if (prev.find(p => p.username === username)) return prev;
         const num = prev.length + 1;
         setJoinMsg(`✅ ${username} انضم!`);
         setTimeout(() => setJoinMsg(""), 2500);
-        return [...prev, {
-          username,
-          displayName: username,
-          avatar: `https://unavatar.io/twitch/${username}`,
-          number: num,
-          alive: true,
-          hits: 0,
-        }];
+        return [...prev, { username, displayName: username, avatar: `https://unavatar.io/twitch/${username}`, number: num, alive: true, hits: 0, revivedCount: 0, usedRevive: false }];
       });
+      return;
     }
 
+    // Target/revive selection during waiting_target phase
     if (ph === "waiting_target" && sh && username === sh.username) {
       const num = parseInt(msg, 10);
       if (!isNaN(num) && num >= 1) {
-        const tgt = pl.find(p => p.number === num && p.alive && p.username !== sh.username);
-        if (tgt) runShootingSequence(sh, tgt);
+        const found = pl.find(p => p.number === num);
+        if (!found) return;
+        if (found.alive && found.username !== sh.username) {
+          // Shoot alive player
+          runShootingSequence(sh, found);
+        } else if (!found.alive && found.revivedCount === 0 && !sh.usedRevive) {
+          // Revive dead player
+          runRevive(sh, found);
+        }
       }
     }
   }, []);
 
-  useEffect(() => () => { wsRef.current?.close(); }, []);
-
-  // ── Screen shake ──────────────────────────────────────────────────────────
+  // ── Screen shake ─────────────────────────────────────────────────────────
   const shakeScreen = async () => {
-    await animate(scope.current, { x: [0, -10, 10, -7, 7, -4, 4, 0] }, { duration: 0.4 });
+    await animate(scope.current, { x: [0, -10, 10, -7, 7, -4, 4, 0] }, { duration: 0.35 });
   };
 
-  // ── Roulette ──────────────────────────────────────────────────────────────
-  const runRoulette = useCallback(async (alive: Player[]) => {
-    setPhase("roulette");
-    setShooter(null); setTarget(null); setFunnyMsg(""); setSurvived(null);
-    const spins = 22 + Math.floor(Math.random() * 14);
-    for (let i = 0; i < spins; i++) {
-      const p = alive[i % alive.length];
-      setRouletteHL(p.username);
-      await new Promise(r => setTimeout(r, 55 + (i / spins) * 200));
+  // ── Spinning wheel roulette ──────────────────────────────────────────────
+  const runRoulette = useCallback(async (alivePlayers: Player[], allPlayers: Player[]) => {
+    setPhase("spinning");
+    setShooter(null); setTarget(null);
+    setFunnyMsg(""); setResultMsg(""); setSurvived(null); setIsReviveAction(false);
+
+    // Pick player (avoid repeating last shooter if possible)
+    let candidates = alivePlayers;
+    if (alivePlayers.length > 1 && lastShooterRef.current) {
+      const nonRepeat = alivePlayers.filter(p => p.username !== lastShooterRef.current);
+      if (nonRepeat.length > 0) candidates = nonRepeat;
     }
-    const chosen = alive[Math.floor(Math.random() * alive.length)];
-    setRouletteHL(chosen.username);
-    await new Promise(r => setTimeout(r, 700));
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // Compute target wheel angle
+    const N = allPlayers.length;
+    const chosenIdx = allPlayers.findIndex(p => p.username === chosen.username);
+    const anglePerPlayer = 360 / N;
+    const currentDeg = wheelDegRef.current;
+    const currentMod = ((currentDeg % 360) + 360) % 360;
+    const targetMod = ((-chosenIdx * anglePerPlayer) % 360 + 360) % 360;
+    let delta = (targetMod - currentMod + 360) % 360;
+    if (delta < 10) delta += 360;
+    const extraSpins = (Math.floor(Math.random() * 3) + 5) * 360;
+    const newDeg = currentDeg + extraSpins + delta;
+    wheelDegRef.current = newDeg;
+    setWheelDeg(newDeg);
+
+    // Tick sounds during spin
+    let elapsed = 0;
+    const totalDuration = 3700;
+    let interval = 80;
+    const ticker = setInterval(() => {
+      sound.spinTick();
+      elapsed += interval;
+      interval = Math.min(interval * 1.12, 350);
+      if (elapsed >= totalDuration) clearInterval(ticker);
+    }, interval);
+
+    await sleep(totalDuration);
+    clearInterval(ticker);
+
+    lastShooterRef.current = chosen.username;
     setShooter(chosen);
     setPhase("waiting_target");
   }, []);
 
-  // ── Shooting sequence ────────────────────────────────────────────────────
+  // ── Revive sequence ──────────────────────────────────────────────────────
+  const runRevive = useCallback(async (sh: Player, revived: Player) => {
+    setTarget(revived);
+    setIsReviveAction(true);
+    setPhase("shooting");
+    sound.revive();
+    await sleep(1200);
+    setPlayers(prev => prev.map(p => {
+      if (p.username === revived.username) return { ...p, alive: true, revivedCount: 1 };
+      if (p.username === sh.username) return { ...p, usedRevive: true };
+      return p;
+    }));
+    setResultMsg(`💚 ${revived.displayName} رجع للحياة!`);
+    setFunnyMsg("😏 لا تجحدها!");
+    setSurvived(true);
+    setPhase("result");
+  }, []);
+
+  // ── Shooting sequence (single bullet) ───────────────────────────────────
   const runShootingSequence = useCallback(async (sh: Player, tgt: Player) => {
     setTarget(tgt);
+    setIsReviveAction(false);
     setPhase("shooting");
-    setFunnyMsg("");
-    setSurvived(null);
+    setFunnyMsg(""); setResultMsg(""); setSurvived(null);
 
-    const bullets = Math.floor(Math.random() * 5) + 1; // 1–5 bullets
-    const dies = Math.random() < 0.42;
-    setTotalBullets(bullets);
-    setCurrentBullet(0);
+    await sleep(700);
 
-    for (let b = 1; b <= bullets; b++) {
-      await new Promise(r => setTimeout(r, 650));
-      setCurrentBullet(b);
-      // Flash
-      setFlashScreen(true);
-      setTimeout(() => setFlashScreen(false), 90);
-      sound.gunshot();
-      await new Promise(r => setTimeout(r, 90));
-      shakeScreen();
-      sound.hit();
-      if (b === 3 && !dies) setFunnyMsg("😂 بس بسبع أرواح!");
-      await new Promise(r => setTimeout(r, 250));
-    }
+    // Single bullet
+    setFlashScreen(true);
+    setTimeout(() => setFlashScreen(false), 85);
+    sound.gunshot();
+    await sleep(85);
+    shakeScreen();
+    await sleep(600);
 
-    await new Promise(r => setTimeout(r, 500));
+    // Determine death: forced at MAX_HITS, otherwise 35% chance
+    const newHits = tgt.hits + 1;
+    const forcedDeath = newHits >= MAX_HITS;
+    const dies = forcedDeath || Math.random() < 0.38;
 
     if (dies) {
       sound.death();
-      setFunnyMsg("💀 وداعاً!");
+      setResultMsg("GG تعيش وتأكل غيرها");
+      setFunnyMsg("💀");
       setSurvived(false);
-      setPlayers(prev => prev.map(p => p.username === tgt.username ? { ...p, alive: false } : p));
+      setPlayers(prev => prev.map(p => p.username === tgt.username ? { ...p, alive: false, hits: newHits } : p));
     } else {
       sound.survive();
-      if (!dies) setFunnyMsg("😏 لا تجحدها!");
+      setPlayers(prev => prev.map(p => p.username === tgt.username ? { ...p, hits: newHits } : p));
       setSurvived(true);
-      setPlayers(prev => prev.map(p => p.username === tgt.username ? { ...p, hits: p.hits + 1 } : p));
+      if (newHits >= 3) {
+        setFunnyMsg("😂 بس بسبع أرواح!");
+      } else {
+        setFunnyMsg("نجا!");
+      }
     }
 
     setPhase("result");
@@ -312,22 +441,23 @@ export default function WheelGame() {
   const handleStartGame = () => {
     const alive = players.filter(p => p.alive);
     if (alive.length < 2) return;
-    runRoulette(alive);
+    runRoulette(alive, players);
   };
 
   const handleNextTurn = () => {
     const alive = players.filter(p => p.alive);
     if (alive.length <= 1) { setPhase("game_over"); return; }
-    runRoulette(alive);
+    runRoulette(alive, players);
   };
 
   const resetGame = () => {
     setPhase("joining");
     setPlayers([]);
-    setShooter(null);
-    setTarget(null);
-    setFunnyMsg("");
-    setSurvived(null);
+    setShooter(null); setTarget(null);
+    setFunnyMsg(""); setResultMsg(""); setSurvived(null);
+    setIsReviveAction(false);
+    wheelDegRef.current = 0; setWheelDeg(0);
+    lastShooterRef.current = null;
   };
 
   const alivePlayers = players.filter(p => p.alive);
@@ -336,22 +466,21 @@ export default function WheelGame() {
   return (
     <motion.div ref={scope} className="min-h-screen gradient-bg relative overflow-hidden flex flex-col" dir="rtl">
 
-      {/* Screen flash */}
+      {/* Flash */}
       <AnimatePresence>
         {flashScreen && (
-          <motion.div key="flash" initial={{ opacity: 0.9 }} animate={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-            className="fixed inset-0 bg-white z-[100] pointer-events-none" />
+          <motion.div key="flash" initial={{ opacity: 0.85 }} animate={{ opacity: 0 }}
+            transition={{ duration: 0.1 }} className="fixed inset-0 bg-white z-[100] pointer-events-none" />
         )}
       </AnimatePresence>
 
-      {/* Ambient glows */}
+      {/* Glows */}
       <div className="absolute top-0 right-0 w-[450px] h-[450px] rounded-full opacity-10 pointer-events-none"
         style={{ background: "radial-gradient(circle, #e040fb, transparent)", filter: "blur(80px)" }} />
       <div className="absolute bottom-0 left-0 w-[450px] h-[450px] rounded-full opacity-10 pointer-events-none"
         style={{ background: "radial-gradient(circle, #ff4444, transparent)", filter: "blur(80px)" }} />
 
-      {/* ── HEADER ────────────────────────────────────────────────────────── */}
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-purple-500/20 flex-shrink-0 z-10"
         style={{ background: "rgba(10,5,20,0.9)", backdropFilter: "blur(16px)" }}>
         <button onClick={() => navigate("/")}
@@ -368,30 +497,27 @@ export default function WheelGame() {
             {twitchConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
             {twitchConnected ? `#${user?.username}` : "جارٍ الاتصال..."}
           </div>
-          {user && (
-            <button onClick={logout} className="text-purple-400/30 hover:text-red-400 transition-colors">خروج</button>
-          )}
+          {user && <button onClick={logout} className="text-purple-400/30 hover:text-red-400 transition-colors">خروج</button>}
         </div>
       </header>
 
-      {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 overflow-y-auto">
+      {/* ── CONTENT ─────────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 relative z-10 overflow-y-auto">
         <AnimatePresence mode="wait">
 
           {/* ── JOINING ── */}
           {phase === "joining" && (
             <motion.div key="joining"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-5xl space-y-6"
-            >
+              className="w-full max-w-5xl space-y-5">
               <div className="text-center space-y-3">
                 <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border ${twitchConnected ? "border-green-500/40 bg-green-500/10 text-green-300" : "border-gray-700 text-gray-500"}`}>
-                  {twitchConnected ? <><Wifi size={14} />#{user?.username}</> : <><WifiOff size={14} />جارٍ الاتصال...</>}
+                  {twitchConnected ? <><Wifi size={14} />#{user?.username} متصل</> : <><WifiOff size={14} />جارٍ الاتصال...</>}
                 </div>
                 <h2 className="text-4xl sm:text-5xl font-black text-white">
                   اكتب <span className="neon-text-pink">join</span> في الشات
                 </h2>
-                <p className="text-purple-300/50 text-lg">{players.length} لاعب انضم حتى الآن</p>
+                <p className="text-purple-300/50 text-lg">{players.length} لاعب انضم</p>
               </div>
 
               <AnimatePresence>
@@ -406,16 +532,14 @@ export default function WheelGame() {
 
               {players.length > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                  <AnimatePresence>
-                    {players.map(p => <PlayerCard key={p.username} player={p} />)}
-                  </AnimatePresence>
+                  <AnimatePresence>{players.map(p => <PlayerCard key={p.username} player={p} />)}</AnimatePresence>
                 </div>
               )}
 
-              <div className="flex gap-3 justify-center flex-wrap">
+              <div className="flex justify-center">
                 <motion.button onClick={handleStartGame} disabled={players.length < 2}
                   whileHover={players.length >= 2 ? { scale: 1.04 } : {}} whileTap={players.length >= 2 ? { scale: 0.97 } : {}}
-                  className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-lg font-black disabled:opacity-30 transition-all"
+                  className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-lg font-black disabled:opacity-30"
                   style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 25px #e040fb30" }}>
                   <Play size={20} fill="white" /> ابدأ اللعبة ({players.length})
                 </motion.button>
@@ -423,63 +547,56 @@ export default function WheelGame() {
             </motion.div>
           )}
 
-          {/* ── ROULETTE ── */}
-          {phase === "roulette" && (
-            <motion.div key="roulette"
+          {/* ── SPINNING ── */}
+          {phase === "spinning" && (
+            <motion.div key="spinning"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="w-full max-w-5xl space-y-6"
-            >
-              <h2 className="text-3xl sm:text-4xl font-black text-center text-white">🎰 من يطلق الرصاصة؟</h2>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                {players.filter(p => p.alive).map(p => (
-                  <motion.div key={p.username}
-                    animate={rouletteHL === p.username
-                      ? { scale: 1.12, boxShadow: "0 0 28px #ffd600" }
-                      : { scale: 1, boxShadow: "0 0 0px transparent" }}
-                    transition={{ duration: 0.1 }}
-                    className="rounded-2xl overflow-hidden border-2 transition-colors"
-                    style={{ borderColor: rouletteHL === p.username ? "#ffd600" : "#2d1450" }}>
-                    <img src={p.avatar} alt={p.displayName} className="w-full aspect-square object-cover"
-                      onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-                    <p className="text-center text-xs font-bold py-1 px-1 truncate"
-                      style={{ color: rouletteHL === p.username ? "#ffd600" : "#c4a8e0" }}>
-                      {p.displayName}
-                    </p>
-                  </motion.div>
-                ))}
-              </div>
+              className="w-full max-w-5xl flex flex-col items-center gap-6">
+              <h2 className="text-3xl font-black text-white">🎰 الروليت يختار...</h2>
+              <SpinningWheel players={players} wheelDeg={wheelDeg} />
+              <p className="text-purple-300/40 text-sm">
+                <Users size={13} className="inline ml-1" />{alivePlayers.length} لاعب حي
+              </p>
             </motion.div>
           )}
 
-          {/* ── WAITING FOR TARGET ── */}
+          {/* ── WAITING TARGET ── */}
           {phase === "waiting_target" && shooter && (
             <motion.div key="waiting"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-5xl space-y-5"
-            >
+              className="w-full max-w-5xl space-y-5">
               <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-5">
-                  <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-4 border-yellow-400"
-                    style={{ boxShadow: "0 0 30px #ffd600" }}>
+                <div className="flex items-center justify-center gap-4">
+                  <div className="relative w-22 h-22 rounded-2xl overflow-hidden border-3 border-yellow-400 flex-shrink-0"
+                    style={{ width: 88, height: 88, border: "3px solid #ffd600", boxShadow: "0 0 28px #ffd60050" }}>
                     <img src={shooter.avatar} alt={shooter.displayName} className="w-full h-full object-cover"
                       onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${shooter.username}`; }} />
                   </div>
                   <div className="text-right">
                     <p className="text-purple-300/50 text-sm">دور اللاعب</p>
                     <p className="text-3xl font-black text-yellow-400">{shooter.displayName}</p>
-                    <p className="text-2xl mt-1">🔫</p>
+                    <p className="text-xl">🔫 يطلق النار</p>
                   </div>
                 </div>
                 <div className="inline-block px-6 py-3 rounded-2xl border border-orange-500/40 bg-orange-500/10">
                   <p className="text-xl font-black text-orange-200">
-                    يا <span className="text-yellow-400">{shooter.displayName}</span> — اكتب رقم هدفك في الشات
+                    اكتب <span className="text-yellow-300">رقم اللاعب</span> في الشات لتستهدفه
                   </p>
+                  {!shooter.usedRevive && players.some(p => !p.alive && p.revivedCount === 0) && (
+                    <p className="text-sm text-green-400/70 mt-1">
+                      💚 أو اكتب رقم لاعب ميت لإنعاشه (متاح مرة واحدة)
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Spinning wheel in waiting mode */}
+              <div className="flex justify-center">
+                <SpinningWheel players={players} wheelDeg={wheelDeg} />
+              </div>
+
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                {players.map(p => (
-                  <PlayerCard key={p.username} player={p} isShooter={p.username === shooter.username} />
-                ))}
+                {players.map(p => <PlayerCard key={p.username} player={p} isShooter={p.username === shooter.username} />)}
               </div>
             </motion.div>
           )}
@@ -488,70 +605,46 @@ export default function WheelGame() {
           {phase === "shooting" && shooter && target && (
             <motion.div key="shooting"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="w-full max-w-2xl"
-            >
+              className="w-full max-w-2xl">
               <div className="rounded-3xl border border-red-500/30 overflow-hidden"
                 style={{ background: "linear-gradient(135deg, rgba(30,5,35,0.98), rgba(10,5,42,0.98))" }}>
-                <div className="h-[3px]" style={{ background: "linear-gradient(90deg, #e040fb, #ef4444, #ff6d00)" }} />
-                <div className="flex items-center justify-between px-6 sm:px-10 py-8 gap-4">
+                <div className="h-[3px]"
+                  style={{ background: isReviveAction ? "linear-gradient(90deg, #22c55e, #16a34a)" : "linear-gradient(90deg, #e040fb, #ef4444, #ff6d00)" }} />
+                <div className="flex items-center justify-between px-8 py-10 gap-6">
                   {/* Shooter */}
                   <div className="flex flex-col items-center gap-3">
-                    <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-yellow-400"
-                      style={{ boxShadow: "0 0 25px #ffd60040" }}>
+                    <div className="w-32 h-32 rounded-2xl overflow-hidden border-2 border-yellow-400"
+                      style={{ boxShadow: "0 0 22px #ffd60040" }}>
                       <img src={shooter.avatar} alt={shooter.displayName} className="w-full h-full object-cover"
                         onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${shooter.username}`; }} />
                     </div>
                     <p className="text-yellow-400 font-black text-base">{shooter.displayName}</p>
-                    <span className="text-4xl">🔫</span>
+                    <span className="text-4xl">{isReviveAction ? "💚" : "🔫"}</span>
                   </div>
 
-                  {/* Center: bullets */}
-                  <div className="flex flex-col items-center gap-4 flex-shrink-0">
-                    <div className="flex gap-2 flex-wrap justify-center max-w-[120px]">
-                      {[...Array(totalBullets)].map((_, i) => (
-                        <motion.div key={i}
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1, background: i < currentBullet ? "#ef4444" : "#2d1450" }}
-                          transition={{ delay: i * 0.05 }}
-                          className="w-4 h-4 rounded-full border border-red-900/50" />
-                      ))}
-                    </div>
-                    {currentBullet > 0 && (
-                      <motion.div key={currentBullet}
-                        initial={{ x: -60, opacity: 1, scale: 1.4 }}
-                        animate={{ x: 60, opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.32 }}
-                        className="text-2xl">🔴</motion.div>
-                    )}
-                    <p className="text-red-500/60 text-sm font-bold">{currentBullet}/{totalBullets}</p>
+                  {/* Center arrow */}
+                  <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                    <motion.div
+                      animate={{ x: [0, 12, 0] }}
+                      transition={{ repeat: Infinity, duration: 0.5 }}
+                      className="text-3xl"
+                    >{isReviveAction ? "✨" : "→"}</motion.div>
                   </div>
 
                   {/* Target */}
                   <div className="flex flex-col items-center gap-3">
                     <motion.div
-                      animate={currentBullet > 0 ? { x: [-4, 4, -3, 3, 0] } : {}}
+                      animate={!isReviveAction ? { x: [-3, 3, -2, 2, 0] } : {}}
                       transition={{ duration: 0.3 }}
-                      className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-red-500"
-                      style={{ boxShadow: "0 0 25px #ef444440" }}>
+                      className="w-32 h-32 rounded-2xl overflow-hidden border-2"
+                      style={{ borderColor: isReviveAction ? "#22c55e" : "#ef4444", boxShadow: isReviveAction ? "0 0 22px #22c55e40" : "0 0 22px #ef444440" }}>
                       <img src={target.avatar} alt={target.displayName} className="w-full h-full object-cover"
                         onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${target.username}`; }} />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-4xl opacity-70">🎯</span>
-                      </div>
                     </motion.div>
-                    <p className="text-red-400 font-black text-base">{target.displayName}</p>
-                    <span className="text-4xl">😰</span>
+                    <p style={{ color: isReviveAction ? "#22c55e" : "#ef4444" }} className="font-black text-base">{target.displayName}</p>
+                    <span className="text-4xl">{isReviveAction ? "💀" : "😰"}</span>
                   </div>
                 </div>
-
-                <AnimatePresence>
-                  {funnyMsg && (
-                    <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                      className="text-center text-2xl sm:text-3xl font-black pb-6 text-yellow-300 px-4">
-                      {funnyMsg}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
               </div>
             </motion.div>
           )}
@@ -560,16 +653,26 @@ export default function WheelGame() {
           {phase === "result" && target && survived !== null && (
             <motion.div key="result"
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="w-full max-w-5xl space-y-6 text-center"
-            >
-              <motion.div initial={{ y: -15 }} animate={{ y: 0 }}
-                className={`inline-block px-8 py-4 rounded-2xl border text-2xl sm:text-3xl font-black ${
-                  survived ? "border-green-500/50 bg-green-500/15 text-green-400" : "border-red-500/50 bg-red-500/15 text-red-400"
-                }`}>
-                {survived ? `😏 ${target.displayName} نجا من الموت!` : `💀 ${target.displayName} لقي ربه!`}
-              </motion.div>
+              className="w-full max-w-5xl space-y-5 text-center">
 
-              {funnyMsg && <p className="text-2xl font-black text-yellow-300">{funnyMsg}</p>}
+              <motion.div initial={{ y: -15 }} animate={{ y: 0 }}>
+                <div className={`inline-block px-8 py-4 rounded-2xl border text-2xl sm:text-3xl font-black ${
+                  survived
+                    ? (isReviveAction ? "border-green-500/50 bg-green-500/15 text-green-400" : "border-cyan-500/50 bg-cyan-500/15 text-cyan-300")
+                    : "border-red-500/50 bg-red-500/15 text-red-400"
+                }`}>
+                  {isReviveAction
+                    ? `💚 ${target.displayName} رجع للحياة!`
+                    : survived
+                    ? `${funnyMsg || "نجا!"}`
+                    : "GG تعيش وتأكل غيرها"}
+                </div>
+                {!isReviveAction && !survived && <p className="text-5xl mt-3">💀</p>}
+                {!isReviveAction && survived && funnyMsg && (
+                  <p className="text-xl text-yellow-300 mt-2 font-bold">{funnyMsg}</p>
+                )}
+                {isReviveAction && <p className="text-xl text-green-400/70 mt-2">😏 لا تجحدها!</p>}
+              </motion.div>
 
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                 {players.map(p => (
@@ -580,13 +683,13 @@ export default function WheelGame() {
               </div>
 
               <div className="flex gap-3 justify-center items-center flex-wrap">
-                <span className="text-purple-300/50 text-sm">
-                  <Users size={14} className="inline ml-1" />{alivePlayers.length} لاعب حي
+                <span className="text-purple-300/40 text-sm">
+                  <Users size={13} className="inline ml-1" />{alivePlayers.length} حي
                 </span>
                 <motion.button onClick={handleNextTurn}
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-8 py-4 rounded-xl text-xl font-black btn-shimmer"
-                  style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 30px #e040fb40" }}>
+                  className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-xl font-black"
+                  style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 28px #e040fb35" }}>
                   <Play size={22} fill="white" />
                   {alivePlayers.length > 1 ? "الجولة التالية 🔫" : "النهاية 🏆"}
                 </motion.button>
@@ -598,11 +701,10 @@ export default function WheelGame() {
           {phase === "game_over" && (
             <motion.div key="gameover"
               initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-6"
-            >
+              className="text-center space-y-6">
               {winner && (
                 <motion.div animate={{ y: [0, -12, 0] }} transition={{ repeat: Infinity, duration: 2.2 }}
-                  className="relative w-44 h-44 rounded-3xl overflow-hidden border-4 border-yellow-400 mx-auto shadow-2xl"
+                  className="relative w-44 h-44 rounded-3xl overflow-hidden border-4 border-yellow-400 mx-auto"
                   style={{ boxShadow: "0 0 60px #ffd600" }}>
                   <img src={winner.avatar} alt={winner.displayName} className="w-full h-full object-cover"
                     onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winner.username}`; }} />
@@ -618,7 +720,7 @@ export default function WheelGame() {
                 </h2>
                 <p className="text-yellow-400 text-2xl mt-2">🏆 آخر من بقي!</p>
               </div>
-              <div className="flex gap-3 justify-center flex-wrap">
+              <div className="flex gap-3 justify-center">
                 <motion.button onClick={resetGame}
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-lg"
@@ -627,7 +729,7 @@ export default function WheelGame() {
                 </motion.button>
                 <button onClick={() => navigate("/")}
                   className="px-6 py-3 rounded-xl font-bold text-lg border border-gray-700 text-gray-500 hover:text-red-400 hover:border-red-500/40 transition-all">
-                  الصفحة الرئيسية
+                  الرئيسية
                 </button>
               </div>
             </motion.div>
@@ -636,8 +738,8 @@ export default function WheelGame() {
         </AnimatePresence>
       </div>
 
-      {/* Bottom status bar during game */}
-      {["waiting_target", "roulette", "result"].includes(phase) && (
+      {/* Bottom status bar */}
+      {["waiting_target", "spinning", "result"].includes(phase) && (
         <div className="flex-shrink-0 border-t border-purple-500/20 px-5 py-2 flex items-center justify-between text-xs z-10"
           style={{ background: "rgba(10,5,20,0.85)" }}>
           <span className="flex items-center gap-1.5 text-purple-400/50">

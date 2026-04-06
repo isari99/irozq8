@@ -43,14 +43,15 @@ const games = [
   {
     id: "wheel-game",
     title: "الشخصنة",
-    description: "دخول عبر Twitch • اختر هدفك • نظام طلقات عشوائي",
+    description: "",
     icon: CircleDot,
     color: "from-orange-500 to-red-600",
-    borderColor: "border-orange-500/40",
-    glowColor: "shadow-orange-500/30",
-    neonColor: "#ff6d00",
+    borderColor: "border-pink-500/50",
+    glowColor: "shadow-pink-500/30",
+    neonColor: "#e040fb",
     path: "/wheel-game",
     emoji: "🔫",
+    heroImage: "/shakhsana.png",
   },
 ];
 
@@ -158,86 +159,83 @@ export default function Home() {
 
         {/* Game cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
-          {games.map((game, index) => (
-            <motion.div
-              key={game.id}
-              initial={{ opacity: 0, y: 60 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + index * 0.15, duration: 0.6, ease: "easeOut" }}
-              onClick={() => navigate(game.path)}
-              className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} p-6 flex flex-col items-center gap-4 relative overflow-hidden group`}
-              style={{
-                background: "linear-gradient(135deg, rgba(26,10,46,0.9), rgba(10,26,46,0.9))",
-                boxShadow: `0 8px 32px ${game.neonColor}20`,
-              }}
-              whileHover={{ scale: 1.04, y: -8 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              {/* Card glow on hover */}
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
-                style={{ background: `radial-gradient(circle at center, ${game.neonColor}15, transparent 70%)` }}
-              />
-
-              {/* Top accent line */}
-              <div
-                className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
-                style={{ background: `linear-gradient(90deg, transparent, ${game.neonColor}, transparent)` }}
-              />
-
-              {/* Logo */}
+          {games.map((game, index) => {
+            const heroImage = (game as any).heroImage as string | undefined;
+            return (
               <motion.div
-                className="relative"
-                animate={{ y: [0, -5, 0] }}
-                transition={{ duration: 3, repeat: Infinity, delay: index * 0.5 }}
-              >
-                <div
-                  className="absolute inset-0 blur-xl opacity-60 rounded-full"
-                  style={{ background: game.neonColor }}
-                />
-                <img
-                  src="/rose-logo.png"
-                  alt="روز"
-                  className="relative w-20 h-20 rounded-full object-cover border-2"
-                  style={{
-                    borderColor: `${game.neonColor}60`,
-                    filter: `drop-shadow(0 0 10px ${game.neonColor})`,
-                  }}
-                />
-                <div
-                  className="absolute -top-1 -right-1 text-2xl"
-                >
-                  {game.emoji}
-                </div>
-              </motion.div>
-
-              {/* Card content */}
-              <div className="text-center z-10">
-                <h3
-                  className="text-2xl font-bold mb-2"
-                  style={{ color: game.neonColor, textShadow: `0 0 15px ${game.neonColor}` }}
-                >
-                  {game.title}
-                </h3>
-                <p className="text-purple-300/70 text-sm leading-relaxed">
-                  {game.description}
-                </p>
-              </div>
-
-              {/* Play button */}
-              <motion.div
-                className="mt-2 px-8 py-2.5 rounded-xl text-sm font-bold z-10 btn-shimmer"
+                key={game.id}
+                initial={{ opacity: 0, y: 60 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.15, duration: 0.6, ease: "easeOut" }}
+                onClick={() => navigate(game.path)}
+                className={`game-card cursor-pointer rounded-2xl border ${game.borderColor} relative overflow-hidden group ${heroImage ? "min-h-[320px]" : "p-6 flex flex-col items-center gap-4"}`}
                 style={{
-                  background: `linear-gradient(135deg, ${game.neonColor}30, ${game.neonColor}10)`,
-                  border: `1px solid ${game.neonColor}50`,
-                  color: game.neonColor,
+                  background: "linear-gradient(135deg, rgba(26,10,46,0.9), rgba(10,26,46,0.9))",
+                  boxShadow: `0 8px 32px ${game.neonColor}20`,
                 }}
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.04, y: -8 }}
+                whileTap={{ scale: 0.97 }}
               >
-                العب الآن
+                {heroImage ? (
+                  /* ── Full-image hero card (الشخصنة) ── */
+                  <>
+                    <img src={heroImage} alt={game.title}
+                      className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 rounded-2xl"
+                      style={{ background: "linear-gradient(to top, rgba(8,4,18,0.93) 25%, rgba(8,4,18,0.05) 65%)" }} />
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
+                      style={{ boxShadow: `inset 0 0 50px ${game.neonColor}25` }} />
+                    <div className="absolute bottom-5 inset-x-0 flex justify-center z-10">
+                      <motion.div
+                        className="px-8 py-2.5 rounded-xl text-sm font-bold btn-shimmer"
+                        style={{
+                          background: `linear-gradient(135deg, ${game.neonColor}55, ${game.neonColor}25)`,
+                          border: `1px solid ${game.neonColor}70`,
+                          color: "#fff",
+                          backdropFilter: "blur(8px)",
+                        }}
+                        whileHover={{ scale: 1.06 }}
+                      >
+                        العب الآن
+                      </motion.div>
+                    </div>
+                  </>
+                ) : (
+                  /* ── Standard card ── */
+                  <>
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
+                      style={{ background: `radial-gradient(circle at center, ${game.neonColor}15, transparent 70%)` }} />
+                    <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+                      style={{ background: `linear-gradient(90deg, transparent, ${game.neonColor}, transparent)` }} />
+                    <motion.div className="relative"
+                      animate={{ y: [0, -5, 0] }}
+                      transition={{ duration: 3, repeat: Infinity, delay: index * 0.5 }}>
+                      <div className="absolute inset-0 blur-xl opacity-60 rounded-full" style={{ background: game.neonColor }} />
+                      <img src="/rose-logo.png" alt="روز" className="relative w-20 h-20 rounded-full object-cover border-2"
+                        style={{ borderColor: `${game.neonColor}60`, filter: `drop-shadow(0 0 10px ${game.neonColor})` }} />
+                      <div className="absolute -top-1 -right-1 text-2xl">{game.emoji}</div>
+                    </motion.div>
+                    <div className="text-center z-10">
+                      <h3 className="text-2xl font-bold mb-2"
+                        style={{ color: game.neonColor, textShadow: `0 0 15px ${game.neonColor}` }}>
+                        {game.title}
+                      </h3>
+                      <p className="text-purple-300/70 text-sm leading-relaxed">{game.description}</p>
+                    </div>
+                    <motion.div className="mt-2 px-8 py-2.5 rounded-xl text-sm font-bold z-10 btn-shimmer"
+                      style={{
+                        background: `linear-gradient(135deg, ${game.neonColor}30, ${game.neonColor}10)`,
+                        border: `1px solid ${game.neonColor}50`,
+                        color: game.neonColor,
+                      }}
+                      whileHover={{ scale: 1.05 }}>
+                      العب الآن
+                    </motion.div>
+                  </>
+                )}
               </motion.div>
-            </motion.div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Footer */}
