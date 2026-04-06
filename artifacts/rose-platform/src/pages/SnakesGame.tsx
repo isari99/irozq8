@@ -238,13 +238,13 @@ function GameBoard({ players }: { players: Player[] }) {
                 {toArabic(num)}
               </span>
 
-              {/* Goal star */}
+              {/* Goal trophy */}
               {isGoal && (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
-                  <motion.span style={{ fontSize: "clamp(10px, 2.5cqw, 28px)" }}
-                    animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 5, repeat: Infinity, ease: "linear" }}>
-                    ⭐
+                  <motion.span style={{ fontSize: "clamp(10px, 2.5cqw, 28px)", filter: "drop-shadow(0 0 4px gold)" }}
+                    animate={{ scale: [1, 1.18, 1], y: [0, -2, 0] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}>
+                    🏆
                   </motion.span>
                 </div>
               )}
@@ -374,7 +374,8 @@ export default function SnakesGame() {
       return;
     }
 
-    if (msg === "roll" && ph === "playing" && !isAnimRef.current) {
+    const isRollCmd = msg === "roll" || msg === "رول" || msg === "ارم" || msg === "ارمِ" || msg === "ارمي";
+    if (isRollCmd && ph === "playing" && !isAnimRef.current) {
       const cur = playersRef.current[currentIdxRef.current];
       if (!cur || cur.username !== username) return;
       startRollRef.current();
@@ -497,6 +498,7 @@ export default function SnakesGame() {
   };
 
   const currentPlayer = players[currentPlayerIdx] ?? null;
+  const sidebarW = players.length <= 2 ? "185px" : players.length <= 4 ? "210px" : "235px";
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" dir="rtl"
@@ -593,25 +595,25 @@ export default function SnakesGame() {
             <motion.div key="playing"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex-1 flex overflow-hidden"
-              style={{ padding: "14px", gap: "12px" }}>
+              style={{ padding: "12px", gap: "12px" }}>
 
-              {/* ── Board (square, fills height) ── */}
-              <div style={{ height: "100%", aspectRatio: "1", flexShrink: 0, containerType: "inline-size" }}>
-                <GameBoard players={players} />
-              </div>
-
-              {/* ── Minimal right sidebar ── */}
-              <div style={{ width: "200px", flexShrink: 0 }}
+              {/* ── Sidebar — FIRST in RTL = visual RIGHT ── */}
+              <motion.div
+                animate={{ width: sidebarW }}
+                transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                style={{ flexShrink: 0, overflow: "hidden" }}
                 className="flex flex-col gap-2.5 overflow-y-auto">
 
-                {/* Current player */}
+                {/* Current player card */}
                 {currentPlayer && (
                   <div className="rounded-2xl border p-3"
-                    style={{ borderColor: currentPlayer.color + "55", background: currentPlayer.color + "0d" }}>
-                    <p className="text-[10px] text-purple-400/50 mb-1.5 text-center font-bold">الدور على</p>
+                    style={{ borderColor: currentPlayer.color + "60", background: currentPlayer.color + "10" }}>
+                    <p className="text-[9px] text-purple-400/50 mb-2 text-center font-bold tracking-wide uppercase">
+                      الدور على
+                    </p>
                     <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden border-2 flex-shrink-0"
-                        style={{ borderColor: currentPlayer.color }}>
+                      <div className="w-11 h-11 rounded-xl overflow-hidden border-2 flex-shrink-0"
+                        style={{ borderColor: currentPlayer.color, boxShadow: `0 0 12px ${currentPlayer.color}50` }}>
                         <img src={currentPlayer.avatar} alt={currentPlayer.displayName}
                           className="w-full h-full object-cover"
                           onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${currentPlayer.username}`; }} />
@@ -620,44 +622,45 @@ export default function SnakesGame() {
                         <p className="text-sm font-black truncate" style={{ color: currentPlayer.color }}>
                           {currentPlayer.displayName}
                         </p>
-                        <p className="text-[10px] text-purple-400/50">
-                          {currentPlayer.position === 0 ? "لم يبدأ" : `#${toArabic(currentPlayer.position)}`}
+                        <p className="text-[10px] text-purple-400/50 mt-0.5">
+                          {currentPlayer.position === 0 ? "لم يبدأ" : `المربع ${toArabic(currentPlayer.position)}`}
                         </p>
                       </div>
                     </div>
                     {!isAnimating ? (
-                      <motion.p animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.4 }}
-                        className="text-center text-[11px] mt-2 font-bold" style={{ color: currentPlayer.color + "cc" }}>
-                        اكتب <span className="text-white font-black">roll</span>
-                      </motion.p>
+                      <motion.div animate={{ opacity: [0.6, 1, 0.6] }} transition={{ repeat: Infinity, duration: 1.4 }}
+                        className="mt-2.5 text-center text-[10px] font-bold py-1.5 rounded-lg"
+                        style={{ background: currentPlayer.color + "20", color: currentPlayer.color }}>
+                        اكتب <span className="font-black text-white">roll</span> أو <span className="font-black text-white">رول</span>
+                      </motion.div>
                     ) : (
-                      <p className="text-center text-[10px] mt-1.5 text-purple-400/40">جارٍ الحركة...</p>
+                      <p className="text-center text-[10px] mt-2 text-purple-400/40">جارٍ الحركة...</p>
                     )}
                   </div>
                 )}
 
-                {/* Dice */}
+                {/* Dice result */}
                 {diceValue !== null && (
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="flex flex-col items-center gap-1.5">
                     <motion.div
                       animate={isRolling ? { rotate: [-15, 15, -10, 10, -5, 5, 0] } : {}}
                       transition={{ duration: 0.15 }}>
-                      <DiceFace value={diceValue} size={72} color={currentPlayer?.color ?? "#e040fb"} />
+                      <DiceFace value={diceValue} size={68} color={currentPlayer?.color ?? "#e040fb"} />
                     </motion.div>
                     {!isRolling && (
                       <p className="text-[10px] font-bold" style={{ color: currentPlayer?.color ?? "#e040fb" }}>
-                        رمية: {toArabic(diceValue)}
+                        رمية {toArabic(diceValue)}
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* Snake/Ladder action */}
+                {/* Snake / Ladder message */}
                 <AnimatePresence>
                   {lastAction && (
                     <motion.div key={lastAction}
                       initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                      className="rounded-xl border p-2.5 text-center font-black text-xs"
+                      className="rounded-xl border p-2.5 text-center font-black text-[11px] leading-snug"
                       style={{
                         borderColor: lastAction.includes("سلم") ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)",
                         background: lastAction.includes("سلم") ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.10)",
@@ -668,35 +671,36 @@ export default function SnakesGame() {
                   )}
                 </AnimatePresence>
 
-                {/* Players list */}
-                <div className="flex-1 rounded-2xl border border-purple-500/20 overflow-hidden flex flex-col"
+                {/* Players list — compact, dynamic */}
+                <div className="flex-1 rounded-2xl border border-purple-500/20 flex flex-col overflow-hidden"
                   style={{ background: "rgba(10,4,24,0.80)", minHeight: 0 }}>
                   <div className="px-2.5 py-1.5 border-b border-purple-500/15 flex items-center gap-1.5 flex-shrink-0">
-                    <Users size={10} className="text-purple-400/50" />
-                    <span className="text-[10px] font-bold text-purple-400/50">اللاعبون ({players.length})</span>
+                    <Users size={10} className="text-purple-400/40" />
+                    <span className="text-[9px] font-bold text-purple-400/40">اللاعبون ({players.length})</span>
                   </div>
                   <div className="overflow-y-auto divide-y divide-purple-500/10">
                     {players.map((p, idx) => (
                       <div key={p.username}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5"
-                        style={{ background: idx === currentPlayerIdx && !isAnimating ? p.color + "0d" : "transparent" }}>
-                        <div className="w-5 h-5 rounded-md overflow-hidden border flex-shrink-0"
-                          style={{ borderColor: p.color + "60" }}>
-                          <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 transition-colors"
+                        style={{ background: idx === currentPlayerIdx && !isAnimating ? p.color + "12" : "transparent" }}>
+                        <div className="relative flex-shrink-0">
+                          <div className="w-6 h-6 rounded-md overflow-hidden border"
+                            style={{ borderColor: p.color + "70" }}>
+                            <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
+                              onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                          </div>
+                          {idx === currentPlayerIdx && !isAnimating && (
+                            <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1 }}
+                              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+                              style={{ background: p.color }} />
+                          )}
                         </div>
-                        <span className="flex-1 text-[10px] font-bold truncate" style={{ color: p.color }}>
+                        <span className="flex-1 text-[10px] font-bold truncate" style={{ color: idx === currentPlayerIdx ? p.color : p.color + "99" }}>
                           {p.displayName}
                         </span>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {idx === currentPlayerIdx && !isAnimating && (
-                            <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1 }}
-                              className="text-[8px] font-black" style={{ color: p.color }}>◀</motion.span>
-                          )}
-                          <span className="text-[9px] text-purple-400/40 font-bold">
-                            {p.position === 0 ? "—" : toArabic(p.position)}
-                          </span>
-                        </div>
+                        <span className="text-[9px] text-purple-400/40 font-bold flex-shrink-0">
+                          {p.position === 0 ? "—" : toArabic(p.position)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -706,6 +710,17 @@ export default function SnakesGame() {
                   className="flex items-center justify-center gap-1 py-1.5 rounded-xl text-purple-400/25 hover:text-purple-300/40 text-[10px] border border-purple-500/10 transition-all">
                   <RotateCcw size={9} /> لعبة جديدة
                 </button>
+              </motion.div>
+
+              {/* ── Board — centered in remaining space ── */}
+              <div className="flex-1 flex items-center justify-center overflow-hidden">
+                <div style={{
+                  height: "92%",
+                  aspectRatio: "1",
+                  containerType: "inline-size",
+                }}>
+                  <GameBoard players={players} />
+                </div>
               </div>
             </motion.div>
           )}
@@ -714,45 +729,62 @@ export default function SnakesGame() {
           {phase === "finished" && winner && (
             <motion.div key="finished"
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col items-center justify-center p-6 gap-7 text-center overflow-y-auto">
+              className="flex-1 flex flex-col items-center justify-center p-6 gap-6 text-center overflow-y-auto">
 
-              <div className="relative flex items-center justify-center" style={{ width: 280, height: 280 }}>
+              {/* Trophy */}
+              <motion.div
+                initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 260, damping: 18, delay: 0.05 }}
+                style={{ fontSize: "88px", lineHeight: 1, filter: "drop-shadow(0 0 24px gold)" }}>
+                🏆
+              </motion.div>
+
+              {/* Winner avatar + rings */}
+              <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
                 {[1, 2, 3].map(ring => (
-                  <motion.div key={ring} className="absolute rounded-full border"
-                    style={{ width: 110 + ring * 55, height: 110 + ring * 55, borderColor: winner.color + (Math.max(55 - ring * 18, 8)).toString(16).padStart(2, "0") }}
-                    animate={{ scale: [1, 1.06, 1], opacity: [0.25, 0.55, 0.25] }}
-                    transition={{ repeat: Infinity, duration: 2 + ring * 0.5, delay: ring * 0.25 }} />
+                  <motion.div key={ring} className="absolute rounded-full"
+                    style={{
+                      width: 80 + ring * 46, height: 80 + ring * 46,
+                      border: `2px solid ${winner.color}`,
+                      opacity: 0.2 / ring,
+                    }}
+                    animate={{ scale: [1, 1.08, 1], opacity: [0.2 / ring, 0.45 / ring, 0.2 / ring] }}
+                    transition={{ repeat: Infinity, duration: 2 + ring * 0.4, delay: ring * 0.2 }} />
                 ))}
                 <motion.div
-                  animate={{ y: [0, -14, 0] }} transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-                  className="relative w-36 h-36 rounded-3xl overflow-hidden border-4 z-10"
-                  style={{ borderColor: winner.color, boxShadow: `0 0 60px ${winner.color}70` }}>
+                  animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                  className="relative w-28 h-28 rounded-3xl overflow-hidden border-4 z-10"
+                  style={{ borderColor: winner.color, boxShadow: `0 0 50px ${winner.color}70, 0 0 100px ${winner.color}30` }}>
                   <img src={winner.avatar} alt={winner.displayName} className="w-full h-full object-cover"
                     onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winner.username}`; }} />
                 </motion.div>
               </div>
 
-              <div className="space-y-3">
-                <p className="text-purple-300/50 text-xl font-bold">🏆 الفائز</p>
-                <motion.h2 className="text-6xl font-black"
-                  initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.25, type: "spring" }}
-                  style={{ color: winner.color, textShadow: `0 0 50px ${winner.color}` }}>
+              {/* Name */}
+              <div className="space-y-2">
+                <motion.h2 className="text-5xl font-black"
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, type: "spring" }}
+                  style={{ color: winner.color, textShadow: `0 0 40px ${winner.color}` }}>
                   {winner.displayName}
                 </motion.h2>
-                <p className="text-3xl font-bold text-purple-200/60">🎉 مبروك!</p>
+                <motion.p className="text-2xl font-bold text-white/50"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+                  🎉 مبروك على الفوز!
+                </motion.p>
               </div>
 
+              {/* Buttons */}
               <motion.div className="flex gap-4"
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
                 <motion.button onClick={handleRematch}
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-7 py-4 rounded-2xl font-black text-base border border-purple-500/35 text-purple-300 hover:border-purple-400/60 transition-all">
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-2xl font-black text-base border border-purple-500/35 text-purple-300 hover:border-purple-400/60 transition-all">
                   <RotateCcw size={18} /> إعادة اللعبة
                 </motion.button>
                 <motion.button onClick={handleNewGame}
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-7 py-4 rounded-2xl font-black text-base"
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-2xl font-black text-base"
                   style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 30px rgba(224,64,251,0.45)" }}>
                   <Play size={18} fill="white" /> جولة جديدة
                 </motion.button>
