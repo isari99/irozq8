@@ -32,6 +32,65 @@ function makeClips(duration: number, count = 14): Clip[] {
   });
 }
 
+// ─── Smart shuffle: no repeats, artist quota cap, no consecutive same artist ──
+function buildGameQueue(songs: Song[], count: number): GameClip[] {
+  // 1. Group by artist and shuffle each group internally
+  const byArtist = new Map<string, Song[]>();
+  for (const song of songs) {
+    if (!byArtist.has(song.artist)) byArtist.set(song.artist, []);
+    byArtist.get(song.artist)!.push(song);
+  }
+  for (const [, g] of byArtist) {
+    for (let i = g.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [g[i], g[j]] = [g[j], g[i]];
+    }
+  }
+
+  // 2. Find minimum per-artist cap so total available >= count
+  //    This prevents one artist from dominating (e.g. نانسي عجرم has 37 songs)
+  let cap = 1;
+  while (true) {
+    const total = [...byArtist.values()].reduce((s, g) => s + Math.min(g.length, cap), 0);
+    if (total >= count || cap > 100) break;
+    cap++;
+  }
+
+  // 3. Build capped bucket from all artists
+  const bucket: Song[] = [];
+  for (const [, g] of byArtist) bucket.push(...g.slice(0, cap));
+
+  // 4. Shuffle the bucket
+  for (let i = bucket.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bucket[i], bucket[j]] = [bucket[j], bucket[i]];
+  }
+
+  // 5. Take exactly the number of songs needed (no song repeats)
+  const selected = bucket.slice(0, Math.min(count, bucket.length));
+
+  // 6. Greedy rearrange to minimize consecutive same-artist songs
+  //    Always pick from different-artist candidates first;
+  //    fall back to same artist only when no other choice remains
+  const arranged: Song[] = [];
+  const remaining = [...selected];
+  while (remaining.length > 0) {
+    const lastArtist = arranged.length > 0 ? arranged[arranged.length - 1].artist : null;
+    const candidates = remaining.filter(s => s.artist !== lastArtist);
+    const pickFrom = candidates.length > 0 ? candidates : remaining;
+    const idx = Math.floor(Math.random() * pickFrom.length);
+    const chosen = pickFrom[idx];
+    arranged.push(chosen);
+    remaining.splice(remaining.indexOf(chosen), 1);
+  }
+
+  // 7. Assign one random clip per song
+  return arranged.map(song => ({
+    song,
+    clip: song.clips[Math.floor(Math.random() * song.clips.length)],
+  }));
+}
+
 declare global {
   interface Window {
     YT: any;
@@ -314,21 +373,11 @@ export default function SongGame() {
 
   // ── Game flow ─────────────────────────────────────────────────────────────
   const startGame = () => {
-    // Build a flat shuffled list of all song-clip combos
-    const all: GameClip[] = [];
-    for (const song of SONGS) {
-      for (const clip of song.clips) {
-        all.push({ song, clip });
-      }
-    }
-    // Fisher-Yates shuffle
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [all[i], all[j]] = [all[j], all[i]];
-    }
-    setGameClips(all);
+    // Smart shuffle: unique songs, no consecutive same artist, random clip per song
+    const queue = buildGameQueue(SONGS, totalRounds);
+    setGameClips(queue);
     setCurrentGameIndex(0);
-    activeClipRef.current = all[0];
+    activeClipRef.current = queue[0];
 
     setTeam1Score(0); setTeam2Score(0);
     setCurrentRound(0); setCurrentTurn(1);
