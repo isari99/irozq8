@@ -369,18 +369,37 @@ export default function SongGame() {
               transition={{ duration: 0.35 }}
               className="flex-1 flex flex-col items-center justify-center px-5 py-8 gap-8">
 
-              {/* Hero logo */}
+              {/* Hero logo — animated circular face */}
               <motion.div
                 animate={{ y: [0, -8, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 className="relative">
-                <div className="w-40 h-40 sm:w-52 sm:h-52 rounded-full overflow-hidden"
+
+                {/* Outer ambient glow */}
+                <div className="absolute rounded-full blur-3xl opacity-40"
+                  style={{ inset: -20, background: "radial-gradient(circle, #e040fb, #00e5ff)" }} />
+
+                {/* Rotating neon ring */}
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                  className="absolute rounded-full" style={{ inset: -5 }}>
+                  <div className="w-full h-full rounded-full" style={{
+                    background: "linear-gradient(135deg, #e040fb, transparent, #00e5ff, transparent, #e040fb)",
+                    mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), white calc(100% - 3px))",
+                    WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), white calc(100% - 3px))",
+                  }} />
+                </motion.div>
+
+                {/* Face video */}
+                <div className="relative w-40 h-40 sm:w-52 sm:h-52 rounded-full overflow-hidden"
                   style={{
-                    border: "3px solid rgba(224,64,251,0.4)",
-                    boxShadow: "0 0 60px rgba(224,64,251,0.35), 0 0 120px rgba(224,64,251,0.12)",
+                    border: "3px solid rgba(224,64,251,0.5)",
+                    boxShadow: "0 0 40px rgba(224,64,251,0.4), 0 0 80px rgba(224,64,251,0.15)",
                   }}>
-                  <img src="/song-logo.jpg" alt="لعبة الأغاني" className="w-full h-full object-cover" />
+                  <video src="/rose-face.mp4" autoPlay loop muted playsInline
+                    className="w-full h-full object-cover"
+                    style={{ objectPosition: "center top" }} />
                 </div>
+
                 {/* Floating notes */}
                 <div className="absolute inset-0 overflow-visible pointer-events-none">
                   <Note delay={0}    x={-20} color="#e040fb" s={22} />

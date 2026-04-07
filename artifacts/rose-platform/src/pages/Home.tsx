@@ -28,6 +28,7 @@ const games = [
     neonColor: "#e040fb",
     path: "/song-game",
     emoji: "🎵",
+    heroImage: "/song-logo-square.png",
   },
   {
     id: "xo-game",
@@ -102,19 +103,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen gradient-bg relative overflow-hidden" dir="rtl">
-
-      {/* ══ Full-page background logo video ══ */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 1 }}>
-        <video
-          src="/rose-face-portrait.mp4"
-          autoPlay loop muted playsInline
-          className="absolute w-full h-full object-cover"
-          style={{ objectPosition: "50% -15%", opacity: 0.12, filter: "blur(1px) saturate(2)" }}
-        />
-        {/* Dark vignette so it never competes with UI */}
-        <div className="absolute inset-0"
-          style={{ background: "radial-gradient(ellipse 80% 80% at 50% 30%, transparent 30%, rgba(5,0,18,0.6) 100%)" }} />
-      </div>
 
       {/* Background particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
