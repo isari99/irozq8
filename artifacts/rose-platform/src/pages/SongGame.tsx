@@ -9,13 +9,27 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Phase = "settings" | "control" | "play" | "ended";
 
+interface Clip { start: number; end: number; }
+
 interface Song {
   id: number;
   title: string;
   artist: string;
   youtubeId: string;
-  clipStart: number;
-  clipEnd: number;
+  clips: Clip[];
+}
+
+interface GameClip { song: Song; clip: Clip; }
+
+function makeClips(duration: number, count = 14): Clip[] {
+  const len = 18;
+  const skip = 12;
+  const usable = duration - skip - 15;
+  const step = Math.floor(usable / count);
+  return Array.from({ length: count }, (_, i) => {
+    const start = skip + i * step;
+    return { start, end: Math.min(start + len, duration - 5) };
+  });
 }
 
 declare global {
@@ -26,25 +40,57 @@ declare global {
   }
 }
 
-// ─── Song bank (clipEnd = clipStart + ~20-50s with vocals) ───────────────────
+// ─── Song bank — all IDs verified via YouTube oEmbed ─────────────────────────
 const SONGS: Song[] = [
-  {
-    id: 1,
-    title: "يا نور العين",
-    artist: "مطرف المطرف",
-    youtubeId: "WlqefHeYYR0",
-    clipStart: 45,   // 0:45 — vocal chorus
-    clipEnd: 65,     // 1:05 — 20 second clip
-  },
-  {
-    id: 2,
-    title: "يا طير خذ قلبي وشل",
-    artist: "راشد الماجد",
-    youtubeId: "joevqtOJFes",
-    clipStart: 35,   // 0:35 — skip musical intro, enter with vocals
-    clipEnd: 80,     // 1:20 — 45 second clip with full chorus
-  },
-  // { id: 3, title: "...", artist: "...", youtubeId: "...", clipStart: X, clipEnd: X+20~50 },
+  // ── خليجي ─────────────────────────────────────────────────────────────────
+  { id:  1, title: "يا نور العين",          artist: "مطرف المطرف",    youtubeId: "WlqefHeYYR0", clips: makeClips(253) },
+  { id:  2, title: "يا طير خذ قلبي وشل",   artist: "راشد الماجد",    youtubeId: "joevqtOJFes", clips: makeClips(270) },
+  { id:  3, title: "ندمان",                  artist: "نبيل شعيل",       youtubeId: "_nSq4Mtlfno", clips: makeClips(260) },
+  { id:  4, title: "يا عمري انا",            artist: "فرقة ميامي",      youtubeId: "5Gi9Q9P0bVI", clips: makeClips(248) },
+  { id:  5, title: "بشرة خير",               artist: "حسين الجسمي",     youtubeId: "QUBvVTNRp4Q", clips: makeClips(244) },
+  // ── عمرو دياب ─────────────────────────────────────────────────────────────
+  { id:  6, title: "نور العين",              artist: "عمرو دياب",       youtubeId: "KLJA-srM_yM", clips: makeClips(275) },
+  { id:  7, title: "تملى معاك",              artist: "عمرو دياب",       youtubeId: "EgmXTmj62ic", clips: makeClips(265) },
+  { id:  8, title: "وغلاوتك",                artist: "عمرو دياب",       youtubeId: "a_vfYHbLr7Y", clips: makeClips(248) },
+  { id:  9, title: "قمرين",                  artist: "عمرو دياب",       youtubeId: "z6RC2T3Q7rs", clips: makeClips(255) },
+  // ── نانسي عجرم ────────────────────────────────────────────────────────────
+  { id: 10, title: "أخاصمك آه",              artist: "نانسي عجرم",      youtubeId: "qzcIKpmEBHo", clips: makeClips(230) },
+  { id: 11, title: "يا سلام",                artist: "نانسي عجرم",      youtubeId: "1nlzrBWh0H8", clips: makeClips(218) },
+  { id: 12, title: "يا يا سحر عيونه",        artist: "نانسي عجرم",      youtubeId: "HnTWkN79PCo", clips: makeClips(225) },
+  { id: 13, title: "لون عيونك",              artist: "نانسي عجرم",      youtubeId: "jEGnvYKH18A", clips: makeClips(233) },
+  { id: 14, title: "قول تاني كده",           artist: "نانسي عجرم",      youtubeId: "3ObVN3QQiZ8", clips: makeClips(240) },
+  { id: 15, title: "أنا مصري",               artist: "نانسي عجرم",      youtubeId: "i0DPyHIkYGU", clips: makeClips(222) },
+  { id: 16, title: "يا طبطب ودلع",           artist: "نانسي عجرم",      youtubeId: "6fCBSQjpH8U", clips: makeClips(228) },
+  { id: 17, title: "ابن الجيران",             artist: "نانسي عجرم",      youtubeId: "cnxrq_ZOcoY", clips: makeClips(215) },
+  { id: 18, title: "ماشي حدي",               artist: "نانسي عجرم",      youtubeId: "dGxtAViYVnU", clips: makeClips(235) },
+  { id: 19, title: "من نظرة",                artist: "نانسي عجرم",      youtubeId: "UFn1-pTQ85s", clips: makeClips(220) },
+  { id: 20, title: "مين ده اللي نسيك",       artist: "نانسي عجرم",      youtubeId: "sG33uGCO_eE", clips: makeClips(230) },
+  { id: 21, title: "بتفكر في إيه",           artist: "نانسي عجرم",      youtubeId: "ef0nQ_BvAwg", clips: makeClips(218) },
+  { id: 22, title: "إنت إيه",                artist: "نانسي عجرم",      youtubeId: "X4ICDHjGImA", clips: makeClips(225) },
+  { id: 23, title: "أنا يللي بحبك",          artist: "نانسي عجرم",      youtubeId: "D_hH-bn5dD0", clips: makeClips(232) },
+  { id: 24, title: "إحساس جديد",             artist: "نانسي عجرم",      youtubeId: "YRadUqAv7i8", clips: makeClips(228) },
+  { id: 25, title: "اللي كان",               artist: "نانسي عجرم",      youtubeId: "c8hVPjZLJlA", clips: makeClips(222) },
+  { id: 26, title: "مشتاقة ليك",             artist: "نانسي عجرم",      youtubeId: "IqdyirMu84Y", clips: makeClips(235) },
+  { id: 27, title: "لمسة إيد",               artist: "نانسي عجرم",      youtubeId: "eIoFyl6AkkQ", clips: makeClips(228) },
+  { id: 28, title: "شيخ الشباب",             artist: "نانسي عجرم",      youtubeId: "vZ0OFwpvIv0", clips: makeClips(240) },
+  { id: 29, title: "يا كثر ما قيل",          artist: "نانسي عجرم",      youtubeId: "jcO2JJ61eHU", clips: makeClips(218) },
+  { id: 30, title: "وحشاني يا مصر",          artist: "نانسي عجرم",      youtubeId: "DWVaAJ0g0jQ", clips: makeClips(225) },
+  { id: 31, title: "سوبر نانسي",             artist: "نانسي عجرم",      youtubeId: "uilYWLa2h9E", clips: makeClips(232) },
+  { id: 32, title: "بدك تبقى فيك",           artist: "نانسي عجرم",      youtubeId: "d9x9IVxbgFk", clips: makeClips(228) },
+  { id: 33, title: "أعمل عاقلة",             artist: "نانسي عجرم",      youtubeId: "6mWD96Rx5Ds", clips: makeClips(220) },
+  { id: 34, title: "ما تيجي هنا",            artist: "نانسي عجرم",      youtubeId: "UBBxGHvjNFM", clips: makeClips(215) },
+  { id: 35, title: "حاسة بيك",               artist: "نانسي عجرم",      youtubeId: "bghEyqhcWzA", clips: makeClips(228) },
+  { id: 36, title: "ومعاك",                  artist: "نانسي عجرم",      youtubeId: "bytVUsDTqFI", clips: makeClips(232) },
+  { id: 37, title: "بدنا نولع الجو",         artist: "نانسي عجرم",      youtubeId: "iOP9PYLICK8", clips: makeClips(220) },
+  { id: 38, title: "راجل ابن راجل",          artist: "نانسي عجرم",      youtubeId: "r1VKP1OvifQ", clips: makeClips(225) },
+  { id: 39, title: "قلبي يا قلبي",           artist: "نانسي عجرم",      youtubeId: "dNQMH3WVMNs", clips: makeClips(218) },
+  { id: 40, title: "يللا",                   artist: "نانسي عجرم",      youtubeId: "jHEYg6VZoOw", clips: makeClips(222) },
+  { id: 41, title: "ما تعتذر",               artist: "نانسي عجرم",      youtubeId: "VllbR3q3v1U", clips: makeClips(228) },
+  { id: 42, title: "في حاجات",               artist: "نانسي عجرم",      youtubeId: "ozmj375CR3k", clips: makeClips(232) },
+  { id: 43, title: "إللي كان ومضى",          artist: "نانسي عجرم",      youtubeId: "A7Iv2FDZFwo", clips: makeClips(225) },
+  { id: 44, title: "مشتاق ليك",              artist: "نانسي عجرم",      youtubeId: "EWv3jQnUy5Y", clips: makeClips(218) },
+  { id: 45, title: "تيجي ننبسط",             artist: "نانسي عجرم",      youtubeId: "O-QgbPczoqM", clips: makeClips(220) },
+  { id: 46, title: "شيل عيونك عني",          artist: "نانسي عجرم",      youtubeId: "153qzppIdds", clips: makeClips(215) },
 ];
 
 const ROUND_OPTIONS = [5, 10, 15, 20, 25];
@@ -105,7 +151,10 @@ export default function SongGame() {
   const [team2ExtraUsed, setTeam2ExtraUsed] = useState(false);
   const [doubleActive, setDoubleActive] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+
+  // Shuffled game clips built at startGame; replaces currentSongIndex
+  const [gameClips, setGameClips] = useState<GameClip[]>([]);
+  const [currentGameIndex, setCurrentGameIndex] = useState(0);
 
   // Timer
   const [timeLeft, setTimeLeft] = useState(TIMER_BASE);
@@ -118,12 +167,14 @@ export default function SongGame() {
   const [audioState, setAudioState] = useState<"loading" | "playing" | "paused" | "stopped" | "error">("loading");
   const [volume, setVolume] = useState(60);
   const clipWatchRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Ref so timer callback can access current song without stale closure
-  const currentSongRef = useRef<Song>(SONGS[0]);
+  // Ref so timer callback can read clip without stale closure
+  const activeClipRef = useRef<GameClip>({ song: SONGS[0], clip: SONGS[0].clips[0] });
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const currentSong: Song = SONGS[currentSongIndex % SONGS.length];
-  currentSongRef.current = currentSong; // keep ref in sync for timer callback
+  const currentGC: GameClip = gameClips[currentGameIndex] ?? { song: SONGS[0], clip: SONGS[0].clips[0] };
+  const currentSong = currentGC.song;
+  const currentClip = currentGC.clip;
+  activeClipRef.current = currentGC; // keep ref in sync for timer callback
   const teamColor = (t: 1 | 2) => t === 1 ? "#e040fb" : "#00e5ff";
   const teamName = (t: 1 | 2) => t === 1 ? team1Name : team2Name;
   const currentDoubleUsed = currentTurn === 1 ? team1DoubleUsed : team2DoubleUsed;
@@ -147,13 +198,13 @@ export default function SongGame() {
           setDoubleActive(false);
           setShowAnswer(false);
           setTimeout(() => {
-            const song = currentSongRef.current;
+            const gc = activeClipRef.current;
             if (ytPlayerRef.current) {
               try {
-                ytPlayerRef.current.seekTo(song.clipStart, true);
+                ytPlayerRef.current.seekTo(gc.clip.start, true);
                 ytPlayerRef.current.playVideo();
                 setAudioState("playing");
-                startClipWatch(song);
+                startClipWatch(gc.clip);
               } catch (_) {}
             }
           }, 300);
@@ -184,13 +235,13 @@ export default function SongGame() {
     }
   }, []);
 
-  const startClipWatch = (song: Song) => {
+  const startClipWatch = (clip: Clip) => {
     clearClipWatch();
     clipWatchRef.current = setInterval(() => {
       if (!ytPlayerRef.current) return;
       try {
         const t = ytPlayerRef.current.getCurrentTime?.() ?? 0;
-        if (t >= song.clipEnd) {
+        if (t >= clip.end) {
           clearClipWatch();
           ytPlayerRef.current.pauseVideo();
           setAudioState("stopped");
@@ -205,11 +256,12 @@ export default function SongGame() {
     loadYouTubeAPI().then(() => {
       if (!ytContainerRef.current) return;
       destroyPlayer();
+      const gc = activeClipRef.current;
       ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
         height: "1", width: "1",
-        videoId: currentSong.youtubeId,
+        videoId: gc.song.youtubeId,
         playerVars: {
-          autoplay: 1, start: currentSong.clipStart,
+          autoplay: 1, start: gc.clip.start,
           controls: 0, modestbranding: 1, rel: 0, fs: 0,
           iv_load_policy: 3, disablekb: 1, playsinline: 1,
         },
@@ -218,7 +270,7 @@ export default function SongGame() {
             e.target.setVolume(volume);
             e.target.playVideo();
             setAudioState("playing");
-            startClipWatch(currentSong);
+            startClipWatch(gc.clip);
           },
           onStateChange: (e: any) => {
             const S = window.YT?.PlayerState;
@@ -231,7 +283,7 @@ export default function SongGame() {
       });
     }).catch(() => setAudioState("error"));
     return () => destroyPlayer();
-  }, [phase, currentSongIndex]);
+  }, [phase, currentGameIndex]);
 
   useEffect(() => {
     if (!ytPlayerRef.current) return;
@@ -244,7 +296,7 @@ export default function SongGame() {
   // ── Audio controls ────────────────────────────────────────────────────────
   const playAudio = () => {
     if (!ytPlayerRef.current) return;
-    try { ytPlayerRef.current.playVideo(); setAudioState("playing"); startClipWatch(currentSong); } catch (_) {}
+    try { ytPlayerRef.current.playVideo(); setAudioState("playing"); startClipWatch(currentClip); } catch (_) {}
   };
   const pauseAudio = () => {
     if (!ytPlayerRef.current) return;
@@ -253,17 +305,33 @@ export default function SongGame() {
   const replayAudio = () => {
     if (!ytPlayerRef.current) return;
     try {
-      ytPlayerRef.current.seekTo(currentSong.clipStart, true);
+      ytPlayerRef.current.seekTo(currentClip.start, true);
       ytPlayerRef.current.playVideo();
       setAudioState("playing");
-      startClipWatch(currentSong);
+      startClipWatch(currentClip);
     } catch (_) {}
   };
 
   // ── Game flow ─────────────────────────────────────────────────────────────
   const startGame = () => {
+    // Build a flat shuffled list of all song-clip combos
+    const all: GameClip[] = [];
+    for (const song of SONGS) {
+      for (const clip of song.clips) {
+        all.push({ song, clip });
+      }
+    }
+    // Fisher-Yates shuffle
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    setGameClips(all);
+    setCurrentGameIndex(0);
+    activeClipRef.current = all[0];
+
     setTeam1Score(0); setTeam2Score(0);
-    setCurrentRound(0); setCurrentTurn(1); setCurrentSongIndex(0);
+    setCurrentRound(0); setCurrentTurn(1);
     setTeam1DoubleUsed(false); setTeam2DoubleUsed(false);
     setTeam1ExtraUsed(false); setTeam2ExtraUsed(false);
     setDoubleActive(false); setShowAnswer(false);
@@ -306,7 +374,11 @@ export default function SongGame() {
     setShowAnswer(false);
     stopTimer();
     destroyPlayer();
-    setCurrentSongIndex(i => i + 1);
+    setCurrentGameIndex(i => {
+      const next2 = i + 1;
+      if (gameClips[next2]) activeClipRef.current = gameClips[next2];
+      return next2;
+    });
     if (next >= totalRounds) setPhase("ended");
     else { setCurrentTurn(t => t === 1 ? 2 : 1); setPhase("control"); }
   };
@@ -314,6 +386,7 @@ export default function SongGame() {
   const resetFull = () => {
     stopTimer(); destroyPlayer();
     setPhase("settings");
+    setGameClips([]); setCurrentGameIndex(0);
     setTeam1Name("الفريق الأول"); setTeam2Name("الفريق الثاني"); setTotalRounds(10);
   };
 
