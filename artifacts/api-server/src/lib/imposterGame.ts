@@ -19,6 +19,9 @@ interface RoomPlayer {
 
 interface GameRoom {
   code: string;
+  roomName: string;
+  category: Category;
+  durationMs: number;
   phase: "lobby" | "playing" | "voting" | "result";
   hostWs: ImposterWS;
   players: Map<string, RoomPlayer>;
@@ -34,22 +37,55 @@ interface GameRoom {
   gameTimer: ReturnType<typeof setTimeout> | null;
   turnTimer: ReturnType<typeof setTimeout> | null;
   timerInterval: ReturnType<typeof setInterval> | null;
+  usedWords: Set<string>;
 }
 
-// ─── Word Bank ────────────────────────────────────────────────────────────────
-const WORDS = [
-  "شاي","قهوة","عصير","حليب","كولا","ماء بارد",
-  "برجر","بيتزا","سوشي","مندي","كبسة","شاورما","فلافل",
-  "تفاح","موز","برتقال","مانجا","فراولة","بطيخ","رمان",
-  "أسد","فيل","نمر","قرد","دلفين","طاووس","زرافة","ببغاء",
-  "سيارة","طيارة","قطار","باص","دراجة","سفينة","مروحية",
-  "موبايل","لابتوب","كاميرا","تلفزيون","سماعة","تابلت",
-  "الكعبة","برج إيفل","أهرام مصر","برج خليفة","ديزني لاند",
-  "كرة القدم","كرة السلة","السباحة","التنس","الغولف",
-  "ساعة","نظارة","مفتاح","محفظة","خاتم","قلم",
-  "معلم","طبيب","شرطي","طباخ","رياضي","مصور","طيار",
-  "مطبخ","حديقة","مسجد","مستشفى","ملعب","مطار","شاطئ",
-];
+// ─── Category types ───────────────────────────────────────────────────────────
+export type Category = "دول" | "حيوانات" | "أكلات" | "أشياء" | "عام";
+
+// ─── Word Bank (per category) ─────────────────────────────────────────────────
+const WORD_BANK: Record<Category, string[]> = {
+  دول: [
+    "السعودية","مصر","الإمارات","الكويت","قطر","البحرين","عُمان","اليمن",
+    "الأردن","العراق","سوريا","لبنان","المغرب","تونس","الجزائر","ليبيا",
+    "السودان","تركيا","إيران","باكستان","الهند","الصين","اليابان","كوريا",
+    "إندونيسيا","ماليزيا","أمريكا","كندا","المكسيك","البرازيل","الأرجنتين",
+    "فرنسا","ألمانيا","إيطاليا","إسبانيا","البرتغال","هولندا","بلجيكا",
+    "السويد","النرويج","الدنمارك","فنلندا","روسيا","بولندا","اليونان",
+    "سويسرا","النمسا","أستراليا","نيوزيلندا","جنوب أفريقيا","نيجيريا","كينيا",
+  ],
+  حيوانات: [
+    "أسد","نمر","فهد","دب","ذئب","ثعلب","قرد","غوريلا","فيل","زرافة",
+    "وحيد القرن","حصان","جمل","بقرة","خروف","كلب","قطة","أرنب","سنجاب",
+    "كنغر","قنفذ","دلفين","حوت","قرش","أخطبوط","سلحفاة","تمساح","أفعى",
+    "ضفدع","طاووس","نسر","ببغاء","بطريق","نعامة","بومة","خفاش","عقرب",
+    "نمل","نحل","كوبرا","ثعلب قطبي","دب قطبي","فقمة","ضبع","قندس",
+  ],
+  أكلات: [
+    "برجر","بيتزا","سوشي","مندي","كبسة","شاورما","فلافل","شيش طاووق",
+    "كباب","مطبق","جريش","مرقوق","هريس","بيريياني","تاكو","باستا",
+    "لازانيا","ستيك","سمك مشوي","ربيان","حمص","متبل","فتوش","تبولة",
+    "كنافة","بقلاوة","أم علي","تشيز كيك","آيس كريم","وافل","شاكشوكة",
+    "فول مدمس","ملوخية","محشي","كوشري","دونات","كرواسون","كلوريا",
+    "بف باستري","فرنش تواست","لقيمات","خبيصة","عصيدة","مضغوط","مكبوس",
+  ],
+  أشياء: [
+    "موبايل","لابتوب","كاميرا","تلفزيون","سماعة","تابلت","ساعة","نظارة",
+    "مفتاح","محفظة","خاتم","قلم","دفتر","كتاب","مقص","مشط","مرآة",
+    "شمعة","مصباح","مروحة","مكيف","غسالة","ثلاجة","ميكروويف","كرسي",
+    "طاولة","سرير","وسادة","بطانية","حقيبة","شنطة سفر","مظلة","كرة",
+    "مقود","سيارة","دراجة","طائرة ورقية","لعبة بوردج","شطرنج","ورق لعب",
+    "عود","جيتار","ناي","بيانو","طبلة","ميكرفون","سماعات أذن",
+  ],
+  عام: [
+    "ديزني لاند","الكعبة المكرمة","برج إيفل","أهرام مصر","برج خليفة",
+    "كرة القدم","السباحة","التنس","الغولف","الملاكمة","ركوب الخيل",
+    "مطبخ","حديقة","مسجد","مستشفى","ملعب","مطار","شاطئ","جبل",
+    "صحراء","غابة","نهر","بحيرة","بركان","طبيب","شرطي","طباخ",
+    "رياضي","مصور","طيار","رائد فضاء","مدرسة","جامعة","سوق","مول",
+    "فندق","مطعم","سينما","مسرح","حفلة","رحلة","مخيم","غطس",
+  ],
+};
 
 // ─── Room store ────────────────────────────────────────────────────────────────
 export const rooms = new Map<string, GameRoom>();
@@ -86,6 +122,9 @@ function stateMsg(room: GameRoom) {
   return {
     type: "imposter:state",
     code: room.code,
+    roomName: room.roomName,
+    category: room.category,
+    durationMs: room.durationMs,
     phase: room.phase,
     players: publicPlayers(room),
     playerOrder: room.playerOrder,
@@ -104,6 +143,16 @@ function shuffle<T>(arr: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+/** Pick a random word from the category, avoiding previously used words in this session. */
+function pickWord(room: GameRoom): string {
+  const bank = WORD_BANK[room.category] ?? WORD_BANK["عام"];
+  const available = bank.filter(w => !room.usedWords.has(w));
+  const pool = available.length > 0 ? available : bank; // reset if exhausted
+  const word = pool[Math.floor(Math.random() * pool.length)];
+  room.usedWords.add(word);
+  return word;
 }
 
 // ─── Turn management ──────────────────────────────────────────────────────────
@@ -182,18 +231,30 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     let code = genCode();
     while (rooms.has(code)) code = genCode();
 
+    const rawCat = String(msg.category ?? "عام");
+    const category: Category = (["دول","حيوانات","أكلات","أشياء","عام"] as Category[]).includes(rawCat as Category)
+      ? (rawCat as Category) : "عام";
+
+    const rawDur = Number(msg.duration ?? 5);
+    const durationMins = [5, 10, 15, 20].includes(rawDur) ? rawDur : 5;
+    const durationMs = durationMins * 60_000;
+
+    const roomName = String(msg.roomName ?? "برا السالفة").slice(0, 30);
+
     const room: GameRoom = {
-      code, phase: "lobby", hostWs: ws,
+      code, roomName, category, durationMs,
+      phase: "lobby", hostWs: ws,
       players: new Map(), playerOrder: [],
       word: "", imposterId: "",
       currentTurnIdx: 0, currentTargetId: null,
       votes: {}, gameEndAt: 0, turnEndAt: 0, lastAnswer: null,
       gameTimer: null, turnTimer: null, timerInterval: null,
+      usedWords: new Set(),
     };
     rooms.set(code, room);
     ws.roomCode = code;
-    send(ws, { type: "imposter:created", code });
-    logger.info({ code }, "Imposter room created");
+    send(ws, { type: "imposter:created", code, roomName, category, durationMs });
+    logger.info({ code, category, durationMins }, "برا السالفة room created");
     return;
   }
 
@@ -214,7 +275,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     ws.roomCode = code;
     ws.playerId = playerId;
 
-    send(ws, { type: "imposter:joined", playerId, code });
+    send(ws, { type: "imposter:joined", playerId, code, roomName: room.roomName });
     broadcast(room, stateMsg(room));
     return;
   }
@@ -234,7 +295,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     if (!room || room.hostWs !== ws) return;
     if (room.players.size < 3) { send(ws, { type: "imposter:error", message: "يلزم ٣ لاعبين على الأقل" }); return; }
 
-    room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+    room.word = pickWord(room);
     const ids = Array.from(room.players.keys());
     room.imposterId = ids[Math.floor(Math.random() * ids.length)];
     room.playerOrder = shuffle([...ids]);
@@ -242,7 +303,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.currentTargetId = null;
     room.lastAnswer = null;
     room.phase = "playing";
-    room.gameEndAt = Date.now() + 5 * 60_000;
+    room.gameEndAt = Date.now() + room.durationMs;
     room.turnEndAt = Date.now() + 60_000;
 
     // Send roles privately
@@ -262,7 +323,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     send(first?.ws, { type: "imposter:your_turn" });
 
     // Timers
-    room.gameTimer = setTimeout(() => startVoting(room), 5 * 60_000);
+    room.gameTimer = setTimeout(() => startVoting(room), room.durationMs);
     room.turnTimer = setTimeout(() => advanceTurn(room), 60_000);
     room.timerInterval = setInterval(() => {
       if (room.phase !== "playing") { clearInterval(room.timerInterval!); room.timerInterval = null; return; }
@@ -273,7 +334,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
       });
     }, 1_000);
 
-    logger.info({ code: room.code, word: room.word, imposter: room.imposterId }, "Imposter game started");
+    logger.info({ code: room.code, word: room.word, category: room.category }, "برا السالفة game started");
     return;
   }
 
@@ -373,7 +434,7 @@ export function handleImposterDisconnect(ws: ImposterWS): void {
     if (room.turnTimer) clearTimeout(room.turnTimer);
     if (room.timerInterval) clearInterval(room.timerInterval);
     rooms.delete(code);
-    logger.info({ code }, "Imposter room closed (host left)");
+    logger.info({ code }, "برا السالفة room closed (host left)");
   } else {
     room.players.forEach(p => {
       if (p.ws === ws) { p.disconnected = true; p.ws = null; }

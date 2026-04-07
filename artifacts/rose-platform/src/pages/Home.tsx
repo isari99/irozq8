@@ -71,8 +71,8 @@ const games = [
   },
   {
     id: "imposter-game",
-    title: "لعبة الكذابين",
-    description: "اكتشف الكذاب قبل أن يكتشفك - لعبة جماعية أونلاين",
+    title: "برا السالفة",
+    description: "اكتشف من هو خارج الموضوع - لعبة جماعية أونلاين",
     icon: CircleDot,
     color: "from-red-600 to-pink-700",
     borderColor: "border-red-500/40",

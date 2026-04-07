@@ -49,7 +49,7 @@ function Router() {
       <Route path="/quiz"><ProtectedRoute component={QuizGame} /></Route>
       <Route path="/snakes-game"><ProtectedRoute component={SnakesGame} /></Route>
       <Route path="/fruits-game"><ProtectedRoute component={FruitsGame} /></Route>
-      <Route path="/imposter-game"><ProtectedRoute component={ImposterGame} /></Route>
+      <Route path="/imposter-game"><ImposterGame /></Route>
       <Route component={NotFound} />
     </Switch>
   );
