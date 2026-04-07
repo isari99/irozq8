@@ -24,33 +24,35 @@ const PLAYER_COLORS = [
 const MAX_PLAYERS = 8;
 
 /**
- * LADDERS — start < end (always go UP).
- * Landing on a ladder BASE teleports you to its TOP.
+ * LADDERS — base < top (always go UP).
+ * Landing on a ladder BASE teleports the player to its TOP.
+ * No ladder ends at or near cell 100 to avoid covering the trophy.
  */
 const LADDERS: Record<number, number> = {
-   4: 14,
-   9: 31,
-  20: 38,
-  28: 84,
-  40: 59,
-  51: 67,
-  63: 81,
-  71: 91,
+   4: 14,   // base  4 → top  14
+   9: 31,   // base  9 → top  31
+  20: 38,   // base 20 → top  38
+  28: 84,   // base 28 → top  84
+  40: 59,   // base 40 → top  59
+  51: 67,   // base 51 → top  67
+  63: 81,   // base 63 → top  81
+  71: 91,   // base 71 → top  91
 };
 
 /**
  * SNAKES — head > tail (always go DOWN).
- * Landing on a snake HEAD slides you to its TAIL.
+ * Landing on a snake HEAD slides the player to its TAIL.
+ * No snake starts in the top row (91-100) to avoid covering the trophy at 100.
  */
 const SNAKES: Record<number, number> = {
-  17:  7,
-  54: 34,
-  62: 19,
-  64:  3,
-  87: 24,
-  93: 73,
-  95: 75,
-  99: 78,
+  17:  7,   // head 17 → tail  7
+  54: 34,   // head 54 → tail 34
+  62: 19,   // head 62 → tail 19
+  64:  3,   // head 64 → tail  3
+  85: 35,   // head 85 → tail 35  (replaces 99→78, avoids top row)
+  87: 24,   // head 87 → tail 24
+  93: 73,   // head 93 → tail 73
+  95: 75,   // head 95 → tail 75
 };
 
 const SNAKE_COLORS = ["#FFD600","#22C55E","#3B82F6","#EC4899","#F97316","#8B5CF6","#EF4444","#06B6D4"];
@@ -95,10 +97,24 @@ function getCellGridPos(n: number) {
   return { col, displayRow, boardRow };
 }
 
-/** Center point of a cell in SVG viewBox units (0 0 10 10) */
+/**
+ * Center point of a cell in SVG viewBox units (0 0 10 10).
+ *
+ * CRITICAL — RTL correction:
+ * The CSS grid is rendered with dir="rtl", so gridColumn 1 = physical RIGHT.
+ * The SVG coordinate system always starts x=0 on the LEFT.
+ *
+ * Mapping: CSS gridColumn (col+1) → SVG x
+ *   In RTL:  gridColumn 1  = rightmost  → SVG x = 9.5
+ *            gridColumn 10 = leftmost   → SVG x = 0.5
+ *   Formula: SVG x = 9.5 - col   (NOT col + 0.5)
+ *
+ * Without this, all SVG snake/ladder drawings are mirror-flipped
+ * relative to the actual HTML grid cells.
+ */
 function getCellCenter(n: number) {
   const { col, displayRow } = getCellGridPos(n);
-  return { x: col + 0.5, y: displayRow + 0.5 };
+  return { x: 9.5 - col, y: displayRow + 0.5 };
 }
 
 function cellBg(col: number, boardRow: number) {
