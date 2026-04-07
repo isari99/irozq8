@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Wifi, WifiOff, X, RotateCcw, Play } from "lucide-react";
+import { ArrowRight, Wifi, WifiOff, X, Play } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -11,15 +11,23 @@ interface Player {
   avatar: string;
   color: string;
 }
-interface FruitCard {
+interface VotingCard {
   emoji: string;
   name: string;
   player: Player;
-  revealed: boolean;
 }
-type Phase = "lobby" | "playing";
+type Phase = "lobby" | "voting" | "winner";
+
+interface EliminationFlash {
+  player: Player;
+  fruit: string;
+  votes: number;
+  isTie: boolean;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+const ROUND_DURATION = 60;
+
 const COLORS = [
   "#e040fb","#00e5ff","#ffd600","#ff6d00",
   "#22c55e","#f43f5e","#a78bfa","#fb923c",
@@ -46,6 +54,9 @@ const FRUITS = [
   { emoji: "🥥", name: "جوز هند" },
 ];
 
+// set of all fruit names for fast chat matching
+const FRUIT_NAME_SET = new Set(FRUITS.map(f => f.name));
+
 function shuffle<T>(a: T[]): T[] {
   const arr = [...a];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -55,130 +66,241 @@ function shuffle<T>(a: T[]): T[] {
   return arr;
 }
 
-interface Toast { id: number; name: string }
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function FruitsGame() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
+  // ── Core state ─────────────────────────────────────────────────────────────
   const [phase, setPhase]               = useState<Phase>("lobby");
   const [twitchConnected, setTwitchConnected] = useState(false);
-  const [players, setPlayers]           = useState<Player[]>([]);
-  const [cards, setCards]               = useState<FruitCard[]>([]);
-  const [toasts, setToasts]             = useState<Toast[]>([]);
+  const [allPlayers, setAllPlayers]     = useState<Player[]>([]);   // all who joined
+  const [activePlayers, setActivePlayers] = useState<Player[]>([]); // currently in game
+  const [cards, setCards]               = useState<VotingCard[]>([]);
+  const [votes, setVotes]               = useState<Record<string, string>>({}); // voter→fruitEmoji
+  const [timeLeft, setTimeLeft]         = useState(ROUND_DURATION);
+  const [round, setRound]               = useState(1);
+  const [winner, setWinner]             = useState<Player | null>(null);
+  const [elimination, setElimination]   = useState<EliminationFlash | null>(null);
   const [joinMsg, setJoinMsg]           = useState("");
 
-  // ── Refs (same pattern as XO) ─────────────────────────────────────────────
-  const wsRef        = useRef<WebSocket | null>(null);
-  const phaseRef     = useRef<Phase>("lobby");
-  const playersRef   = useRef<Player[]>([]);
-  const connectedRef = useRef(false);
-  const toastCounter = useRef(0);
+  // ── Refs (stale-closure-safe) ─────────────────────────────────────────────
+  const wsRef            = useRef<WebSocket | null>(null);
+  const phaseRef         = useRef<Phase>("lobby");
+  const allPlayersRef    = useRef<Player[]>([]);
+  const activeRef        = useRef<Player[]>([]);
+  const cardsRef         = useRef<VotingCard[]>([]);
+  const votesRef         = useRef<Record<string, string>>({});
+  const connectedRef     = useRef(false);
+  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { phaseRef.current = phase; },    [phase]);
-  useEffect(() => { playersRef.current = players; }, [players]);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  useEffect(() => { allPlayersRef.current = allPlayers; }, [allPlayers]);
 
-  // ── Toast ─────────────────────────────────────────────────────────────────
-  const showToast = (name: string) => {
-    const id = ++toastCounter.current;
-    setToasts(prev => [...prev, { id, name }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-  };
+  // ── Timer countdown ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "voting") return;
+    if (timeLeft <= 0) { endRound(); return; }
+    const t = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, timeLeft]);
 
-  // ── Twitch IRC — exact same pattern as XO ────────────────────────────────
+  // ── Twitch IRC — identical to XO ──────────────────────────────────────────
   const connectTwitch = useCallback((channel: string) => {
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     const ch = channel.toLowerCase().replace(/^#/, "");
     const ws = new WebSocket("wss://irc-ws.chat.twitch.tv");
     wsRef.current = ws;
-
     ws.onopen = () => {
       ws.send("PASS SCHMOOPIIE");
       ws.send(`NICK justinfan${Math.floor(Math.random() * 89999) + 10000}`);
       ws.send(`JOIN #${ch}`);
     };
-
     ws.onmessage = e => {
       const lines = (e.data as string).split("\r\n").filter(Boolean);
       for (const line of lines) {
         if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); continue; }
-        if (line.includes("366") || line.includes("ROOMSTATE")) {
-          setTwitchConnected(true);
-          continue;
-        }
-        // ← same regex as XOGame exactly
+        if (line.includes("366") || line.includes("ROOMSTATE")) { setTwitchConnected(true); continue; }
         const m = line.match(/^(?:@[^ ]+ )?:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
         if (m) handleChatMsg(m[1], m[2].trim());
       }
     };
-
     ws.onclose = () => setTwitchConnected(false);
   }, []);
 
-  // Connect when user is ready — same pattern as XO
   if (!connectedRef.current && user?.username) {
     connectedRef.current = true;
     setTimeout(() => connectTwitch(user.username), 80);
   }
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => { wsRef.current?.close(); };
-  }, []);
+  useEffect(() => () => { wsRef.current?.close(); }, []);
 
-  // ── Chat handler — mirrors XO logic ──────────────────────────────────────
+  // ── Chat handler ───────────────────────────────────────────────────────────
   const handleChatMsg = useCallback((username: string, text: string) => {
     const msg = text.trim().toLowerCase();
     const ph  = phaseRef.current;
 
+    // ── JOIN ──
     if (msg === "join" && ph === "lobby") {
-      // No duplicates
-      if (playersRef.current.some(p => p.username === username)) return;
-
-      const color = COLORS[playersRef.current.length % COLORS.length];
+      if (allPlayersRef.current.some(p => p.username === username)) return;
+      const color = COLORS[allPlayersRef.current.length % COLORS.length];
       const newPlayer: Player = {
-        username,
-        displayName: username,
-        // Same avatar source as XO
+        username, displayName: username,
         avatar: `https://unavatar.io/twitch/${username}`,
         color,
       };
-
-      setPlayers(prev => {
+      setAllPlayers(prev => {
         if (prev.some(p => p.username === username)) return prev;
         const next = [...prev, newPlayer];
-        playersRef.current = next;
+        allPlayersRef.current = next;
         return next;
       });
-
       setJoinMsg(`${username} انضم! 🍉`);
       setTimeout(() => setJoinMsg(""), 2500);
+      return;
+    }
 
-      showToast(username);
+    // ── VOTE ──
+    if (ph === "voting") {
+      const trimmed = text.trim();
+      // Must be a valid fruit name in current round
+      if (!FRUIT_NAME_SET.has(trimmed)) return;
+      // Must be a joined player
+      if (!allPlayersRef.current.some(p => p.username === username)) return;
+      // No double voting
+      if (votesRef.current[username]) return;
+      // Must match an active card
+      const card = cardsRef.current.find(c => c.name === trimmed);
+      if (!card) return;
+
+      setVotes(prev => {
+        if (prev[username]) return prev;
+        const next = { ...prev, [username]: card.emoji };
+        votesRef.current = next;
+        return next;
+      });
     }
   }, []);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Start game ─────────────────────────────────────────────────────────────
   const handleStartGame = () => {
-    const active = playersRef.current;
-    if (active.length < 2) return;
-    const shuffledFruits  = shuffle(FRUITS).slice(0, active.length);
-    const shuffledPlayers = shuffle(active);
-    setCards(shuffledFruits.map((f, i) => ({ ...f, player: shuffledPlayers[i], revealed: false })));
-    setPhase("playing");
+    const players = allPlayersRef.current;
+    if (players.length < 2) return;
+    activeRef.current = [...players];
+    setActivePlayers([...players]);
+    beginRound([...players], 1);
   };
 
-  const handleReveal    = (idx: number) =>
-    setCards(prev => prev.map((c, i) => i === idx ? { ...c, revealed: true } : c));
-  const handleRevealAll = () =>
-    setCards(prev => prev.map(c => ({ ...c, revealed: true })));
-  const handleReset = () => { setCards([]); setPhase("lobby"); };
-  const handleRemovePlayer = (username: string) => {
-    const updated = players.filter(p => p.username !== username);
-    playersRef.current = updated;
-    setPlayers(updated);
+  // ── Begin a new round ──────────────────────────────────────────────────────
+  const beginRound = (players: Player[], roundNum: number) => {
+    const shuffledFruits   = shuffle(FRUITS).slice(0, players.length);
+    const shuffledPlayers  = shuffle([...players]);
+    const newCards: VotingCard[] = shuffledFruits.map((f, i) => ({
+      emoji: f.emoji, name: f.name, player: shuffledPlayers[i],
+    }));
+
+    cardsRef.current  = newCards;
+    votesRef.current  = {};
+    activeRef.current = players;
+
+    setCards(newCards);
+    setVotes({});
+    setRound(roundNum);
+    setTimeLeft(ROUND_DURATION);
+    phaseRef.current = "voting";
+    setPhase("voting");
   };
+
+  // ── End round & eliminate ──────────────────────────────────────────────────
+  const endRound = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+
+    const currentVotes = { ...votesRef.current };
+    const currentCards = [...cardsRef.current];
+    const currentActive = [...activeRef.current];
+
+    // Count votes per fruit emoji
+    const voteCounts: Record<string, number> = {};
+    currentCards.forEach(c => { voteCounts[c.emoji] = 0; });
+    Object.values(currentVotes).forEach(emoji => {
+      if (emoji in voteCounts) voteCounts[emoji] = (voteCounts[emoji] || 0) + 1;
+    });
+
+    const maxVotes = Math.max(...Object.values(voteCounts));
+
+    // No votes → tie → no elimination
+    if (maxVotes === 0) {
+      setElimination({ player: currentActive[0], fruit: "", votes: 0, isTie: true });
+      setTimeout(() => {
+        setElimination(null);
+        beginRound(currentActive, round + 1);
+      }, 2800);
+      return;
+    }
+
+    const topFruits = Object.entries(voteCounts).filter(([, v]) => v === maxVotes);
+
+    // Tie between multiple fruits → no elimination
+    if (topFruits.length > 1) {
+      setElimination({ player: currentActive[0], fruit: "", votes: maxVotes, isTie: true });
+      setTimeout(() => {
+        setElimination(null);
+        beginRound(currentActive, round + 1);
+      }, 2800);
+      return;
+    }
+
+    // Single most-voted fruit → eliminate its player
+    const eliminatedEmoji = topFruits[0][0];
+    const eliminatedCard  = currentCards.find(c => c.emoji === eliminatedEmoji);
+    if (!eliminatedCard) { beginRound(currentActive, round + 1); return; }
+
+    const remaining = currentActive.filter(p => p.username !== eliminatedCard.player.username);
+
+    // Show elimination flash
+    phaseRef.current = "lobby"; // pause chat handling during flash
+    setElimination({ player: eliminatedCard.player, fruit: eliminatedCard.emoji, votes: maxVotes, isTie: false });
+
+    setTimeout(() => {
+      setElimination(null);
+      if (remaining.length <= 1) {
+        // Winner!
+        setWinner(remaining[0] ?? null);
+        phaseRef.current = "winner";
+        setPhase("winner");
+      } else {
+        activeRef.current = remaining;
+        setActivePlayers(remaining);
+        beginRound(remaining, round + 1);
+      }
+    }, 3200);
+  };
+
+  // ── New game ───────────────────────────────────────────────────────────────
+  const handleNewGame = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    allPlayersRef.current = [];
+    activeRef.current = [];
+    cardsRef.current = [];
+    votesRef.current = {};
+    setAllPlayers([]); setActivePlayers([]); setCards([]); setVotes({});
+    setWinner(null); setElimination(null); setRound(1); setTimeLeft(ROUND_DURATION);
+    phaseRef.current = "lobby";
+    setPhase("lobby");
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const votedCount  = Object.keys(votes).length;
+  const totalVoters = allPlayers.length;
+
+  // Votes per card
+  const getCardVotes = (emoji: string) =>
+    Object.values(votes).filter(v => v === emoji).length;
+
+  // Timer color
+  const timerColor = timeLeft > 30 ? "#22c55e" : timeLeft > 10 ? "#ffd600" : "#ef4444";
+  const timerPct   = (timeLeft / ROUND_DURATION) * 100;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -187,113 +309,123 @@ export default function FruitsGame() {
 
       {/* Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(12)].map((_, i) => (
+        {[...Array(10)].map((_, i) => (
           <motion.div key={i} className="absolute rounded-full"
             style={{
               width: Math.random() * 3 + 1, height: Math.random() * 3 + 1,
-              background: i % 2 === 0 ? "#e040fb" : "#22c55e",
+              background: i % 2 === 0 ? "#22c55e" : "#e040fb",
               left: `${(i * 17 + 5) % 100}%`, top: `${(i * 23 + 11) % 100}%`,
             }}
-            animate={{ opacity: [0.15, 0.7, 0.15], scale: [1, 1.6, 1] }}
-            transition={{ duration: 2 + i * 0.3, repeat: Infinity, delay: i * 0.25 }} />
+            animate={{ opacity: [0.1, 0.5, 0.1], scale: [1, 1.8, 1] }}
+            transition={{ duration: 2.5 + i * 0.4, repeat: Infinity, delay: i * 0.3 }} />
         ))}
       </div>
 
-      {/* Join toasts */}
-      <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
-        <AnimatePresence>
-          {toasts.map(t => (
-            <motion.div key={t.id}
-              initial={{ opacity: 0, y: -20, scale: 0.85 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -12, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 280, damping: 24 }}
-              className="px-5 py-2 rounded-2xl text-sm font-black text-white whitespace-nowrap"
-              style={{
-                background: "rgba(34,197,94,0.18)",
-                border: "1px solid rgba(34,197,94,0.45)",
-                backdropFilter: "blur(12px)",
-                boxShadow: "0 0 24px rgba(34,197,94,0.3)",
-              }}>
-              🍉 انضم <span style={{ color: "#4ade80" }}>{t.name}</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+      {/* ─── Elimination overlay ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {elimination && (
+          <motion.div
+            key="elim"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6"
+            style={{ background: elimination.isTie ? "rgba(10,4,24,0.92)" : "rgba(8,2,18,0.96)", backdropFilter: "blur(16px)" }}>
+
+            {elimination.isTie ? (
+              <>
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                  style={{ fontSize: 90 }}>⚖️</motion.div>
+                <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                  className="text-5xl font-black text-white">تعادل!</motion.h2>
+                <p className="text-purple-300/60 text-xl font-bold">لا يوجد إقصاء — جولة جديدة</p>
+              </>
+            ) : (
+              <>
+                <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 240, damping: 18 }}
+                  style={{ fontSize: 80, lineHeight: 1 }}>🚨</motion.div>
+
+                <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+                  className="flex flex-col items-center gap-4">
+                  <span style={{ fontSize: 64 }}>{elimination.fruit}</span>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full blur-xl opacity-60"
+                      style={{ background: elimination.player.color, transform: "scale(1.3)" }} />
+                    <div className="relative w-28 h-28 rounded-full overflow-hidden border-4"
+                      style={{ borderColor: elimination.player.color, boxShadow: `0 0 40px ${elimination.player.color}80` }}>
+                      <img src={elimination.player.avatar} alt={elimination.player.displayName}
+                        className="w-full h-full object-cover"
+                        onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${elimination.player.username}`; }} />
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <h2 className="text-4xl font-black" style={{ color: elimination.player.color }}>
+                      {elimination.player.displayName}
+                    </h2>
+                    <p className="text-white/50 text-lg font-bold mt-1">
+                      خرج من اللعبة! ({elimination.votes} 🗳️)
+                    </p>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
 
-        {/* ══════════════════════════ LOBBY ══════════════════════════ */}
+        {/* ══════════════════════ LOBBY ══════════════════════════════════ */}
         {phase === "lobby" && (
           <motion.div key="lobby"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="relative z-10 min-h-screen flex flex-col">
 
-            {/* Top bar */}
+            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4">
               <button onClick={() => navigate("/")}
                 className="flex items-center gap-2 text-purple-400/50 hover:text-purple-300 transition-colors text-sm font-bold">
                 <ArrowRight size={16} /> الرئيسية
               </button>
-
-              {/* Connection status — same style as XO */}
               <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${
-                twitchConnected
-                  ? "border-purple-500/40 bg-purple-500/10 text-purple-300"
-                  : "border-gray-700/50 text-gray-600"
+                twitchConnected ? "border-purple-500/40 bg-purple-500/10 text-purple-300" : "border-gray-700/50 text-gray-600"
               }`}>
                 {twitchConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
                 {twitchConnected ? `#${user?.username}` : "جارٍ الاتصال..."}
               </div>
             </div>
 
-            {/* Main centered content */}
             <div className="flex-1 flex flex-col items-center justify-center px-5 pb-10 gap-8">
 
-              {/* Hero */}
+              {/* Title */}
               <div className="text-center space-y-3">
                 <motion.h1 className="font-black"
-                  style={{
-                    fontSize: "clamp(2.5rem, 8vw, 5rem)",
-                    color: "#22c55e",
-                    textShadow: "0 0 40px #22c55e80, 0 0 80px #22c55e30",
-                    lineHeight: 1.1,
-                  }}
+                  style={{ fontSize: "clamp(2.5rem,8vw,5rem)", color: "#22c55e",
+                    textShadow: "0 0 40px #22c55e80, 0 0 80px #22c55e30", lineHeight: 1.1 }}
                   initial={{ y: -24, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 220, damping: 22 }}>
                   حرب الفواكه 🍉
                 </motion.h1>
 
-                {/* Connection status badge — same as XO joining screen */}
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
                   className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border text-sm font-bold ${
-                    twitchConnected
-                      ? "border-green-500/40 bg-green-500/10 text-green-300"
-                      : "border-gray-700/40 text-gray-500"
+                    twitchConnected ? "border-green-500/40 bg-green-500/10 text-green-300" : "border-gray-700/40 text-gray-500"
                   }`}>
-                  {twitchConnected
-                    ? <><Wifi size={13} />#{user?.username} متصل</>
-                    : <><WifiOff size={13} />جارٍ الاتصال...</>}
+                  {twitchConnected ? <><Wifi size={13} />#{user?.username} متصل</> : <><WifiOff size={13} />جارٍ الاتصال...</>}
                 </motion.div>
 
-                <motion.div
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
                   className="flex items-center justify-center gap-2 flex-wrap">
                   <span className="text-white/40 text-lg font-bold">اكتب</span>
                   <span className="px-4 py-1.5 rounded-xl text-xl font-black"
-                    style={{
-                      background: "rgba(34,197,94,0.15)",
-                      border: "2px solid rgba(34,197,94,0.5)",
-                      color: "#4ade80",
-                      boxShadow: "0 0 20px rgba(34,197,94,0.3)",
-                    }}>
-                    join
-                  </span>
+                    style={{ background: "rgba(34,197,94,0.15)", border: "2px solid rgba(34,197,94,0.5)",
+                      color: "#4ade80", boxShadow: "0 0 20px rgba(34,197,94,0.3)" }}>join</span>
                   <span className="text-white/40 text-lg font-bold">في الشات للانضمام</span>
                 </motion.div>
               </div>
 
-              {/* Join flash — same as XO */}
+              {/* Join flash */}
               <AnimatePresence>
                 {joinMsg && (
                   <motion.div key={joinMsg}
@@ -304,50 +436,41 @@ export default function FruitsGame() {
                 )}
               </AnimatePresence>
 
-              {/* Players grid */}
+              {/* Players */}
               <div className="w-full max-w-3xl">
-                {players.length === 0 ? (
-                  <motion.div
-                    animate={{ opacity: [0.3, 0.7, 0.3] }}
-                    transition={{ repeat: Infinity, duration: 2.5 }}
+                {allPlayers.length === 0 ? (
+                  <motion.div animate={{ opacity: [0.3, 0.7, 0.3] }} transition={{ repeat: Infinity, duration: 2.5 }}
                     className="flex flex-col items-center gap-3 py-12">
                     <span style={{ fontSize: 52 }}>👀</span>
                     <p className="text-purple-400/40 text-base font-bold">في انتظار اللاعبين...</p>
                   </motion.div>
                 ) : (
-                  <motion.div className="grid gap-4"
+                  <div className="grid gap-4"
                     style={{ gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))" }}>
                     <AnimatePresence>
-                      {players.map((p, i) => (
+                      {allPlayers.map((p, i) => (
                         <motion.div key={p.username}
-                          initial={{ opacity: 0, scale: 0.5, y: 20 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          initial={{ opacity: 0, scale: 0.5, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.5 }}
                           transition={{ type: "spring", stiffness: 300, damping: 24, delay: i * 0.03 }}
                           className="relative flex flex-col items-center gap-2 p-3 rounded-2xl group"
-                          style={{
-                            border: `1.5px solid ${p.color}35`,
-                            background: `linear-gradient(135deg, ${p.color}12, ${p.color}06)`,
-                          }}>
-
-                          {/* Remove button */}
-                          <button onClick={() => handleRemovePlayer(p.username)}
-                            className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full items-center justify-center hidden group-hover:flex bg-red-500/20 hover:bg-red-500/60 text-red-400 transition-all z-10">
+                          style={{ border: `1.5px solid ${p.color}35`, background: `linear-gradient(135deg, ${p.color}12, ${p.color}06)` }}>
+                          <button onClick={() => {
+                            const u = allPlayers.filter(x => x.username !== p.username);
+                            allPlayersRef.current = u; setAllPlayers(u);
+                          }}
+                            className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full items-center justify-center hidden group-hover:flex bg-red-500/20 hover:bg-red-500/60 text-red-400 z-10">
                             <X size={10} />
                           </button>
-
-                          {/* Circular avatar */}
                           <div className="relative">
                             <div className="absolute inset-0 rounded-full blur-md opacity-50"
                               style={{ background: p.color, transform: "scale(1.1)" }} />
                             <div className="relative w-16 h-16 rounded-full overflow-hidden border-2"
                               style={{ borderColor: p.color, boxShadow: `0 0 14px ${p.color}55` }}>
-                              <img src={p.avatar} alt={p.displayName}
-                                className="w-full h-full object-cover"
+                              <img src={p.avatar} alt={p.displayName} className="w-full h-full object-cover"
                                 onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
                             </div>
                           </div>
-
                           <p className="text-xs font-black truncate w-full text-center"
                             style={{ color: p.color, textShadow: `0 0 8px ${p.color}55` }}>
                             {p.displayName}
@@ -355,136 +478,217 @@ export default function FruitsGame() {
                         </motion.div>
                       ))}
                     </AnimatePresence>
-                  </motion.div>
+                  </div>
                 )}
               </div>
 
-              {players.length > 0 && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="text-purple-400/40 text-sm font-bold">
-                  {players.length} لاعب في اللوبي
-                </motion.p>
+              {allPlayers.length > 0 && (
+                <p className="text-purple-400/40 text-sm font-bold">{allPlayers.length} لاعب في اللوبي</p>
               )}
 
-              {/* Start button — only when 2+ players */}
               <AnimatePresence>
-                {players.length >= 2 && (
+                {allPlayers.length >= 2 && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                    transition={{ type: "spring", stiffness: 260, damping: 22 }}>
+                    initial={{ opacity: 0, scale: 0.8, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 260, damping: 22 }}>
                     <motion.button onClick={handleStartGame}
                       animate={{ scale: [1, 1.03, 1], boxShadow: ["0 0 30px #22c55e55","0 0 60px #22c55e88","0 0 30px #22c55e55"] }}
                       transition={{ repeat: Infinity, duration: 2 }}
                       whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.96 }}
                       className="flex items-center gap-3 px-14 py-5 rounded-3xl font-black text-2xl text-white"
                       style={{ background: "linear-gradient(135deg, #16a34a, #22c55e, #4ade80)" }}>
-                      <Play size={26} fill="white" />
-                      بدء اللعبة ({players.length})
+                      <Play size={26} fill="white" /> بدء اللعبة ({allPlayers.length})
                     </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
-
             </div>
           </motion.div>
         )}
 
-        {/* ══════════════════════════ PLAYING ══════════════════════════ */}
-        {phase === "playing" && (
-          <motion.div key="playing"
+        {/* ══════════════════════ VOTING ═════════════════════════════════ */}
+        {phase === "voting" && (
+          <motion.div key="voting"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="relative z-10 flex flex-col items-center min-h-screen px-4 py-8 gap-5">
+            className="relative z-10 min-h-screen flex flex-col">
 
-            <div className="flex items-center justify-between w-full max-w-4xl">
-              <button onClick={handleReset}
-                className="flex items-center gap-1.5 text-purple-400/45 hover:text-purple-300 transition-colors text-sm font-bold">
-                <RotateCcw size={14} /> إعادة
-              </button>
-              <h2 className="text-xl font-black"
-                style={{ color: "#22c55e", textShadow: "0 0 16px #22c55e60" }}>
-                🍉 حرب الفواكه
-              </h2>
-              <motion.button onClick={handleRevealAll}
-                className="px-4 py-1.5 rounded-xl text-sm font-black"
-                style={{
-                  background: "rgba(124,58,237,0.2)",
-                  border: "1px solid rgba(167,139,250,0.4)",
-                  color: "#c4b5fd",
-                }}
-                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                كشف الكل 👁
-              </motion.button>
-            </div>
-
-            <p className="text-purple-400/40 text-xs">اضغط على أي فاكهة لتكشف اللاعب</p>
-
-            <div className="w-full max-w-4xl">
-              <div className="grid gap-4"
-                style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
-                {cards.map((card, idx) => (
-                  <motion.div key={idx}
-                    onClick={() => !card.revealed && handleReveal(idx)}
-                    className="relative rounded-2xl overflow-hidden select-none"
-                    style={{ aspectRatio: "3/4", cursor: card.revealed ? "default" : "pointer" }}
-                    whileHover={!card.revealed ? { scale: 1.06, y: -4 } : {}}
-                    whileTap={!card.revealed ? { scale: 0.96 } : {}}>
-
-                    <AnimatePresence mode="wait">
-                      {!card.revealed ? (
-                        <motion.div key="hidden"
-                          exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.16 }}
-                          className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3"
-                          style={{
-                            background: "rgba(10,4,24,0.90)",
-                            border: "2px solid rgba(34,197,94,0.22)",
-                          }}>
-                          <span style={{ fontSize: "52px", lineHeight: 1 }}>{card.emoji}</span>
-                          <p className="text-sm font-black text-white/90">{card.name}</p>
-                          <p className="text-[10px] text-purple-400/35 font-bold">اضغط للكشف</p>
-                        </motion.div>
-                      ) : (
-                        <motion.div key="revealed"
-                          initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.22, type: "spring", stiffness: 280, damping: 22 }}
-                          className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3"
-                          style={{
-                            background: `linear-gradient(135deg, ${card.player.color}18, ${card.player.color}08)`,
-                            border: `2px solid ${card.player.color}`,
-                            boxShadow: `0 0 20px ${card.player.color}35`,
-                          }}>
-                          <span style={{ fontSize: "38px", lineHeight: 1 }}>{card.emoji}</span>
-                          <p className="text-xs font-bold text-white/55">{card.name}</p>
-                          <div className="w-full h-px" style={{ background: `${card.player.color}35` }} />
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full blur-md opacity-50"
-                              style={{ background: card.player.color, transform: "scale(1.2)" }} />
-                            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2"
-                              style={{ borderColor: card.player.color, boxShadow: `0 0 12px ${card.player.color}55` }}>
-                              <img
-                                src={card.player.avatar}
-                                alt={card.player.displayName}
-                                className="w-full h-full object-cover"
-                                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${card.player.username}`; }} />
-                            </div>
-                          </div>
-                          <p className="text-xs font-black truncate w-full text-center"
-                            style={{ color: card.player.color, textShadow: `0 0 10px ${card.player.color}55` }}>
-                            {card.player.displayName}
-                          </p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                ))}
+            {/* ── Top bar ── */}
+            <div className="flex-shrink-0 px-5 pt-4 pb-2 flex items-center justify-between">
+              <h1 className="font-black text-2xl" style={{ color: "#22c55e", textShadow: "0 0 20px #22c55e60" }}>
+                حرب الفواكه 🍉
+              </h1>
+              <div className="flex items-center gap-3">
+                <span className="text-purple-300/50 text-sm font-bold">الجولة {round}</span>
+                <span className="text-purple-300/30 text-sm font-bold">•</span>
+                <span className="text-purple-300/50 text-sm font-bold">{activePlayers.length} لاعب</span>
               </div>
             </div>
 
-            <button onClick={() => navigate("/")}
-              className="mt-2 text-purple-400/25 hover:text-purple-300/45 text-xs transition-colors font-bold">
-              الرئيسية
-            </button>
+            {/* ── Timer bar ── */}
+            <div className="flex-shrink-0 px-5 mb-3">
+              <div className="flex items-center gap-3 mb-1.5">
+                <motion.span className="font-black text-3xl tabular-nums"
+                  key={timeLeft}
+                  animate={{ scale: timeLeft <= 10 ? [1, 1.2, 1] : 1 }}
+                  transition={{ duration: 0.4 }}
+                  style={{ color: timerColor, textShadow: `0 0 16px ${timerColor}80`, minWidth: "2.5rem" }}>
+                  {timeLeft}
+                </motion.span>
+                <div className="flex-1 h-3 rounded-full overflow-hidden"
+                  style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <motion.div className="h-full rounded-full"
+                    animate={{ width: `${timerPct}%` }}
+                    transition={{ duration: 0.9, ease: "linear" }}
+                    style={{ background: `linear-gradient(90deg, ${timerColor}aa, ${timerColor})` }} />
+                </div>
+                <span className="text-purple-400/40 text-xs font-bold whitespace-nowrap">
+                  {votedCount}/{totalVoters} صوتوا
+                </span>
+              </div>
+              {/* Instruction */}
+              <p className="text-center text-purple-300/40 text-xs font-bold">
+                اكتب اسم الفاكهة في الشات للتصويت عليها
+              </p>
+            </div>
+
+            {/* ── Fruit cards grid ── */}
+            <div className="flex-1 overflow-y-auto px-5 pb-6">
+              <div className="grid gap-4 justify-center"
+                style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+                {cards.map((card) => {
+                  const cardVotes = getCardVotes(card.emoji);
+                  const maxV = Math.max(...cards.map(c => getCardVotes(c.emoji)));
+                  const isLeading = cardVotes > 0 && cardVotes === maxV;
+                  return (
+                    <motion.div key={card.emoji}
+                      layout
+                      className="relative rounded-2xl overflow-hidden flex flex-col items-center gap-3 p-4"
+                      style={{
+                        background: isLeading
+                          ? "rgba(239,68,68,0.12)"
+                          : "rgba(10,4,24,0.88)",
+                        border: isLeading
+                          ? "2px solid rgba(239,68,68,0.55)"
+                          : "2px solid rgba(34,197,94,0.18)",
+                        boxShadow: isLeading ? "0 0 24px rgba(239,68,68,0.25)" : "none",
+                      }}>
+
+                      {/* Vote count badge */}
+                      {cardVotes > 0 && (
+                        <motion.div
+                          key={cardVotes}
+                          initial={{ scale: 0.5 }} animate={{ scale: 1 }}
+                          className="absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center font-black text-xs"
+                          style={{
+                            background: isLeading ? "#ef4444" : "rgba(139,92,246,0.6)",
+                            color: "white",
+                            boxShadow: isLeading ? "0 0 10px #ef444480" : "none",
+                          }}>
+                          {cardVotes}
+                        </motion.div>
+                      )}
+
+                      {/* Leading indicator */}
+                      {isLeading && (
+                        <motion.div
+                          animate={{ opacity: [0.6, 1, 0.6] }} transition={{ repeat: Infinity, duration: 0.9 }}
+                          className="absolute top-2 right-2 text-sm">🎯</motion.div>
+                      )}
+
+                      {/* Fruit emoji — main visual */}
+                      <motion.span
+                        animate={isLeading ? { scale: [1, 1.08, 1] } : {}}
+                        transition={{ repeat: Infinity, duration: 1.2 }}
+                        style={{ fontSize: "clamp(48px, 8vw, 72px)", lineHeight: 1 }}>
+                        {card.emoji}
+                      </motion.span>
+
+                      {/* Fruit name */}
+                      <p className="font-black text-base text-white/90">{card.name}</p>
+
+                      {/* Vote bar */}
+                      <div className="w-full h-1.5 rounded-full overflow-hidden"
+                        style={{ background: "rgba(255,255,255,0.08)" }}>
+                        {totalVoters > 0 && (
+                          <motion.div className="h-full rounded-full"
+                            animate={{ width: `${(cardVotes / totalVoters) * 100}%` }}
+                            transition={{ duration: 0.4 }}
+                            style={{ background: isLeading ? "#ef4444" : "#22c55e" }} />
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ══════════════════════ WINNER ═════════════════════════════════ */}
+        {phase === "winner" && winner && (
+          <motion.div key="winner"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-8 px-6 text-center">
+
+            {/* Confetti particles */}
+            {[...Array(16)].map((_, i) => (
+              <motion.div key={i} className="absolute rounded-full pointer-events-none"
+                style={{
+                  width: Math.random() * 10 + 4, height: Math.random() * 10 + 4,
+                  background: COLORS[i % COLORS.length],
+                  left: `${(i * 31 + 7) % 95}%`, top: `${(i * 47 + 5) % 90}%`,
+                  filter: "blur(0.5px)",
+                }}
+                animate={{ y: [0, -40, 0, 30, 0], opacity: [0.2, 1, 0.3, 0.9, 0.2], scale: [1, 1.5, 0.8, 1.3, 1] }}
+                transition={{ duration: 2 + (i % 4) * 0.6, repeat: Infinity, delay: i * 0.2 }} />
+            ))}
+
+            <motion.div initial={{ scale: 0, y: -50 }} animate={{ scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 220, damping: 16 }}
+              style={{ fontSize: 100, lineHeight: 1, filter: "drop-shadow(0 0 30px gold)" }}>
+              🏆
+            </motion.div>
+
+            <div className="relative flex items-center justify-center" style={{ width: 180, height: 180 }}>
+              {[1, 2, 3].map(r => (
+                <motion.div key={r}
+                  className="absolute rounded-full"
+                  style={{ width: 80 + r * 40, height: 80 + r * 40, border: `2px solid ${winner.color}` }}
+                  animate={{ scale: [1, 1.08, 1], opacity: [0.4 / r, 0.8 / r, 0.4 / r] }}
+                  transition={{ repeat: Infinity, duration: 2 + r * 0.4, delay: r * 0.2 }} />
+              ))}
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 280, damping: 18, delay: 0.3 }}
+                className="relative w-28 h-28 rounded-full overflow-hidden border-4"
+                style={{ borderColor: winner.color, boxShadow: `0 0 50px ${winner.color}90` }}>
+                <img src={winner.avatar} alt={winner.displayName} className="w-full h-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winner.username}`; }} />
+              </motion.div>
+            </div>
+
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <p className="text-purple-300/50 text-sm font-bold mb-2">الفائز النهائي</p>
+              <h1 className="font-black" style={{
+                fontSize: "clamp(2.5rem,7vw,4.5rem)",
+                color: winner.color,
+                textShadow: `0 0 40px ${winner.color}, 0 0 80px ${winner.color}50`,
+                lineHeight: 1.1,
+              }}>
+                {winner.displayName}
+              </h1>
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+                className="text-2xl font-bold text-white/50 mt-2">
+                فاز باللعبة 🎉
+              </motion.p>
+            </motion.div>
+
+            <motion.button onClick={handleNewGame}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
+              className="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-xl text-white"
+              style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)", boxShadow: "0 0 35px #22c55e55" }}>
+              <Play size={22} fill="white" /> لعبة جديدة
+            </motion.button>
           </motion.div>
         )}
 
