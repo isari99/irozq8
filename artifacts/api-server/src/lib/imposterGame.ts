@@ -338,6 +338,22 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     return;
   }
 
+  // Change avatar
+  if (type === "imposter:change_avatar") {
+    const code = ws.roomCode;
+    const pid  = ws.playerId;
+    if (!code || !pid) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    const player = room.players.get(pid);
+    if (!player) return;
+    const newAvatar = String(msg.avatar ?? "").slice(0, 300);
+    if (!newAvatar.startsWith("https://")) return;
+    player.avatar = newAvatar;
+    broadcast(room, stateMsg(room));
+    return;
+  }
+
   // Select target
   if (type === "imposter:select_target") {
     const room = rooms.get(ws.roomCode ?? "");

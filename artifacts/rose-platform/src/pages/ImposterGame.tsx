@@ -54,6 +54,32 @@ const neonPurple = "#e040fb";
 const neonCyan   = "#00e5ff";
 const font = { fontFamily: "'Cairo', sans-serif" };
 
+// ─── Avatar Pool ──────────────────────────────────────────────────────────────
+const AVATAR_POOL = [
+  // Avataaars (cartoon humans)
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=ffdfbf",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Nora&backgroundColor=c0aede",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Omar&backgroundColor=d1d4f9",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Sara&backgroundColor=ffd5dc",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmad&backgroundColor=b6e3f4",
+  // Lorelei (cute minimalist)
+  "https://api.dicebear.com/7.x/lorelei/svg?seed=Star&backgroundColor=fde68a",
+  "https://api.dicebear.com/7.x/lorelei/svg?seed=Moon&backgroundColor=ddd6fe",
+  "https://api.dicebear.com/7.x/lorelei/svg?seed=Sun&backgroundColor=fecaca",
+  "https://api.dicebear.com/7.x/lorelei/svg?seed=Wave&backgroundColor=bbf7d0",
+  // Big smile (happy faces)
+  "https://api.dicebear.com/7.x/big-smile/svg?seed=Happy&backgroundColor=fed7aa",
+  "https://api.dicebear.com/7.x/big-smile/svg?seed=Joy&backgroundColor=e9d5ff",
+  "https://api.dicebear.com/7.x/big-smile/svg?seed=Cheer&backgroundColor=bfdbfe",
+  "https://api.dicebear.com/7.x/big-smile/svg?seed=Fun&backgroundColor=fde68a",
+  // Notionists (clean vector)
+  "https://api.dicebear.com/7.x/notionists/svg?seed=Hero&backgroundColor=f0abfc",
+  "https://api.dicebear.com/7.x/notionists/svg?seed=Ace&backgroundColor=7dd3fc",
+  "https://api.dicebear.com/7.x/notionists/svg?seed=Rex&backgroundColor=86efac",
+  "https://api.dicebear.com/7.x/notionists/svg?seed=Zara&backgroundColor=fca5a5",
+];
+
 // ─── Draggable Streamer Box ────────────────────────────────────────────────────
 function DraggableStreamerBox({ onClose }: { onClose: () => void }) {
   const [pos, setPos] = useState({ x: 40, y: 120 });
@@ -177,11 +203,12 @@ export default function ImposterGame() {
   const [roomCode, setRoomCode]     = useState<string>(roomParam);
 
   // ── Player state ───────────────────────────────────────────────────────────
-  const [playerName, setPlayerName] = useState("");
-  const [playerId, setPlayerId]     = useState<string | null>(null);
-  const [myRole, setMyRole]         = useState<Role | null>(null);
-  const [isMyTurn, setIsMyTurn]     = useState(false);
-  const [needAnswer, setNeedAnswer] = useState(false);
+  const [playerName, setPlayerName]       = useState("");
+  const [playerId, setPlayerId]           = useState<string | null>(null);
+  const [myRole, setMyRole]               = useState<Role | null>(null);
+  const [isMyTurn, setIsMyTurn]           = useState(false);
+  const [needAnswer, setNeedAnswer]       = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   // ── Timers ─────────────────────────────────────────────────────────────────
   const [gameRemaining, setGameRemaining] = useState(0);
@@ -275,6 +302,10 @@ export default function ImposterGame() {
 
   const handleStart        = ()             => wsSend({ type: "imposter:start" });
   const handleForceVote    = ()             => wsSend({ type: "imposter:force_vote" });
+  const handleChangeAvatar = (avatar: string) => {
+    wsSend({ type: "imposter:change_avatar", avatar });
+    setShowAvatarPicker(false);
+  };
   const handleNewRound     = ()             => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); wsSend({ type: "imposter:new_round" }); };
   const handleSelectTarget = (t: string)   => { wsSend({ type: "imposter:select_target", targetId: t }); setIsMyTurn(false); };
   const handleAnswer       = (a: "yes"|"no") => { wsSend({ type: "imposter:answer", answer: a }); setNeedAnswer(false); };
@@ -822,22 +853,140 @@ export default function ImposterGame() {
             </motion.div>
           )}
 
-          {/* ── WAITING ── */}
+          {/* ── PLAYER LOBBY ── */}
           {playerId && phase === "lobby" && (
-            <motion.div key="p-lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-6 text-center">
-              <motion.div style={{ fontSize: 72 }}
-                animate={{ scale: [1,1.08,1], rotate: [0,5,-5,0] }}
-                transition={{ repeat: Infinity, duration: 2 }}>🕵️</motion.div>
-              <div>
-                <p className="text-2xl font-black" style={{ color: neonPurple }}>
-                  مرحباً {myPlayer?.name ?? playerName}!
-                </p>
-                <p className="text-purple-400/40 text-sm mt-1">في انتظار المضيف لبدء اللعبة...</p>
+            <motion.div key="p-lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="flex flex-col gap-5 w-full">
+
+              {/* Header */}
+              <div className="text-center">
+                <h2 className="text-2xl font-black" style={{ color: neonPurple, textShadow: `0 0 20px ${neonPurple}80` }}>
+                  🕵️ برا السالفة
+                </h2>
+                <div className="inline-flex items-center gap-2 mt-1.5 px-3 py-1 rounded-full text-xs font-black"
+                  style={{ background: `${neonPurple}18`, border: `1px solid ${neonPurple}35`, color: neonPurple }}>
+                  الغرفة: {roomCode}
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-purple-400/35">
-                <Users size={14}/> <span>{players.length} لاعب في الغرفة</span>
+
+              {/* Players grid */}
+              <div className="rounded-2xl p-4" style={{ background: "rgba(10,4,24,0.85)", border: `1px solid ${neonPurple}25` }}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-black" style={{ color: neonPurple }}>اللاعبون في الغرفة</p>
+                  <span className="text-xs font-black px-2 py-0.5 rounded-full"
+                    style={{ background: `${neonPurple}20`, color: neonPurple }}>
+                    {players.length} / 10
+                  </span>
+                </div>
+
+                {players.length === 0 ? (
+                  <p className="text-center text-purple-400/30 text-sm py-4">لا يوجد لاعبون بعد...</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {players.map((p, i) => {
+                      const isMe = p.id === playerId;
+                      const color = playerColor(i);
+                      return (
+                        <div key={p.id} className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl relative"
+                          style={{
+                            background: isMe ? `${neonPurple}18` : "rgba(255,255,255,0.04)",
+                            border: `2px solid ${isMe ? neonPurple : color + "40"}`,
+                            boxShadow: isMe ? `0 0 14px ${neonPurple}35` : "none",
+                          }}>
+
+                          {/* Avatar — mine is clickable */}
+                          <div className="relative">
+                            <div className="w-14 h-14 rounded-xl overflow-hidden"
+                              style={{ border: `2px solid ${isMe ? neonPurple : color + "50"}` }}>
+                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                            </div>
+                            {isMe && (
+                              <motion.button onClick={() => setShowAvatarPicker(true)}
+                                whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
+                                className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center text-[9px]"
+                                style={{ background: neonPurple, boxShadow: `0 0 8px ${neonPurple}80` }}
+                                title="غيّر صورتك">
+                                ✏️
+                              </motion.button>
+                            )}
+                          </div>
+
+                          <p className="text-[10px] font-black truncate w-full text-center"
+                            style={{ color: isMe ? neonPurple : color }}>
+                            {p.name}
+                          </p>
+                          {isMe && (
+                            <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full"
+                              style={{ background: `${neonPurple}25`, color: neonPurple }}>أنت</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
+              {/* Waiting status */}
+              <div className="flex flex-col items-center gap-2 py-3 rounded-2xl"
+                style={{ background: "rgba(10,4,24,0.6)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.8 }}
+                  className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: "#22c55e" }}/>
+                  <p className="text-sm font-bold text-white/60">في انتظار المضيف لبدء اللعبة...</p>
+                </motion.div>
+                {players.length < 3 && (
+                  <p className="text-[11px] font-black" style={{ color: "#fbbf24" }}>
+                    يلزم {3 - players.length} لاعب إضافي على الأقل
+                  </p>
+                )}
+              </div>
+
+              {/* Avatar Picker Modal */}
+              <AnimatePresence>
+                {showAvatarPicker && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-end justify-center pb-4 px-4"
+                    style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+                    onClick={() => setShowAvatarPicker(false)}>
+
+                    <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+                      className="w-full max-w-sm rounded-3xl p-5"
+                      style={{ background: "rgba(13,6,28,0.98)", border: `2px solid ${neonPurple}50`,
+                        boxShadow: `0 0 40px ${neonPurple}30` }}
+                      onClick={e => e.stopPropagation()}>
+
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="font-black text-white text-base">اختر صورتك</p>
+                        <button onClick={() => setShowAvatarPicker(false)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                          style={{ background: "rgba(255,255,255,0.08)" }}>✕</button>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2.5 max-h-64 overflow-y-auto">
+                        {AVATAR_POOL.map((url, idx) => {
+                          const isCurrent = myPlayer?.avatar === url;
+                          return (
+                            <motion.button key={idx} onClick={() => handleChangeAvatar(url)}
+                              whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.92 }}
+                              className="w-full aspect-square rounded-xl overflow-hidden relative"
+                              style={{ border: `2px solid ${isCurrent ? neonPurple : "rgba(255,255,255,0.12)"}`,
+                                boxShadow: isCurrent ? `0 0 12px ${neonPurple}60` : "none" }}>
+                              <img src={url} alt="" className="w-full h-full object-cover"/>
+                              {isCurrent && (
+                                <div className="absolute inset-0 flex items-center justify-center"
+                                  style={{ background: `${neonPurple}30` }}>
+                                  <span className="text-lg">✓</span>
+                                </div>
+                              )}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
             </motion.div>
           )}
 
