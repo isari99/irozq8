@@ -135,6 +135,53 @@ export default function Home() {
       <div className="absolute bottom-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full opacity-10"
         style={{ background: "radial-gradient(circle, #00e5ff, transparent)" }} />
 
+      {/* ── Animated face — fixed left side ── */}
+      <div className="fixed left-0 top-0 h-full hidden xl:flex items-center justify-center pointer-events-none"
+        style={{ width: 220, zIndex: 5 }}>
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1.2, ease: "easeOut", delay: 0.5 }}
+          className="relative flex items-center justify-center">
+
+          {/* Soft ambient glow */}
+          <div className="absolute rounded-full blur-3xl opacity-25"
+            style={{ width: 200, height: 200, background: "radial-gradient(circle, #e040fb, #00e5ff)" }} />
+
+          {/* Rotating accent ring */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 16, repeat: Infinity, ease: "linear" }}
+            className="absolute rounded-full"
+            style={{ width: 192, height: 192 }}>
+            <div className="w-full h-full rounded-full"
+              style={{ background: "linear-gradient(135deg, #e040fb60, transparent, #00e5ff60)", mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), white calc(100% - 2px))", WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), white calc(100% - 2px))" }} />
+          </motion.div>
+
+          {/* Pulsing glow */}
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.55, 0.3] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute rounded-full"
+            style={{ width: 176, height: 176, background: "radial-gradient(circle, #e040fb35, transparent)" }} />
+
+          {/* Face video circle */}
+          <div className="relative rounded-full overflow-hidden"
+            style={{
+              width: 160, height: 160,
+              border: "2px solid rgba(224,64,251,0.5)",
+              boxShadow: "0 0 30px rgba(224,64,251,0.4), 0 0 60px rgba(224,64,251,0.15)",
+            }}>
+            <video
+              src="/rose-face.mp4"
+              autoPlay loop muted playsInline
+              className="w-full h-full object-cover"
+              style={{ objectPosition: "center top" }}
+            />
+          </div>
+        </motion.div>
+      </div>
+
       <div className="relative z-10 flex flex-col items-center min-h-screen px-4 py-12">
         {/* User bar */}
         {user && (

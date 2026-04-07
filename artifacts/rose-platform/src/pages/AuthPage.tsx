@@ -55,11 +55,69 @@ export default function AuthPage() {
         ))}
       </div>
 
+      {/* ── Animated face — left side decoration ── */}
+      <div className="absolute left-0 top-0 h-full hidden lg:flex items-center justify-center"
+        style={{ width: "38%" }}>
+        <motion.div
+          initial={{ opacity: 0, x: -60 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="relative flex items-center justify-center">
+
+          {/* Outer glow ring */}
+          <div className="absolute inset-0 rounded-full blur-3xl opacity-30"
+            style={{ background: "radial-gradient(circle, #e040fb 0%, #00e5ff 50%, transparent 70%)", transform: "scale(1.4)" }} />
+
+          {/* Rotating ring */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+            className="absolute rounded-full"
+            style={{
+              width: 320, height: 320,
+              border: "2px solid transparent",
+              borderImage: "linear-gradient(135deg, #e040fb, #00e5ff, #e040fb) 1",
+              borderRadius: "50%",
+              background: "transparent",
+            }}>
+            <div className="w-full h-full rounded-full" style={{
+              border: "2px solid transparent",
+              background: "linear-gradient(#0a0418, #0a0418) padding-box, linear-gradient(135deg, #e040fb55, #00e5ff55, transparent) border-box",
+              borderRadius: "50%",
+            }} />
+          </motion.div>
+
+          {/* Pulsing glow */}
+          <motion.div
+            animate={{ scale: [1, 1.08, 1], opacity: [0.4, 0.7, 0.4] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute rounded-full"
+            style={{ width: 295, height: 295, background: "radial-gradient(circle, #e040fb30, transparent)" }} />
+
+          {/* Face video — circular */}
+          <div className="relative rounded-full overflow-hidden border-2"
+            style={{
+              width: 280, height: 280,
+              borderColor: "#e040fb80",
+              boxShadow: "0 0 40px #e040fb50, 0 0 80px #e040fb25, inset 0 0 20px #e040fb10",
+            }}>
+            <video
+              src="/rose-face.mp4"
+              autoPlay loop muted playsInline
+              className="w-full h-full object-cover"
+              style={{ objectPosition: "center top" }}
+            />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ── Login form ── */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="relative z-10 w-full max-w-sm mx-4"
+        style={{ marginRight: "auto", marginLeft: "auto" }}
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
