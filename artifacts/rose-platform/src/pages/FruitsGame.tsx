@@ -91,8 +91,9 @@ export default function FruitsGame() {
   const activeRef        = useRef<Player[]>([]);
   const cardsRef         = useRef<VotingCard[]>([]);
   const votesRef         = useRef<Record<string, string>>({});
-  const connectedRef     = useRef(false);
-  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectedRef       = useRef(false);
+  const timerRef           = useRef<ReturnType<typeof setInterval> | null>(null);
+  const endRoundCalledRef  = useRef(false); // guard against double-call
 
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { allPlayersRef.current = allPlayers; }, [allPlayers]);
@@ -178,6 +179,10 @@ export default function FruitsGame() {
         if (prev[username]) return prev;
         const next = { ...prev, [username]: card.emoji };
         votesRef.current = next;
+        // ── Early finish: all active players voted ──────────────────────
+        if (Object.keys(next).length >= activeRef.current.length) {
+          setTimeout(() => setTimeLeft(0), 50);
+        }
         return next;
       });
     }
@@ -203,6 +208,7 @@ export default function FruitsGame() {
     cardsRef.current  = newCards;
     votesRef.current  = {};
     activeRef.current = players;
+    endRoundCalledRef.current = false; // reset guard for new round
 
     setCards(newCards);
     setVotes({});
@@ -214,6 +220,8 @@ export default function FruitsGame() {
 
   // ── End round & eliminate ──────────────────────────────────────────────────
   const endRound = () => {
+    if (endRoundCalledRef.current) return; // prevent double-call
+    endRoundCalledRef.current = true;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
     const currentVotes = { ...votesRef.current };
@@ -277,13 +285,14 @@ export default function FruitsGame() {
     }, 3200);
   };
 
-  // ── New game ───────────────────────────────────────────────────────────────
-  const handleNewGame = () => {
+  // ── Reset to lobby (players must rejoin with "join") ──────────────────────
+  const handleReplay = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     allPlayersRef.current = [];
     activeRef.current = [];
     cardsRef.current = [];
     votesRef.current = {};
+    endRoundCalledRef.current = false;
     setAllPlayers([]); setActivePlayers([]); setCards([]); setVotes({});
     setWinner(null); setElimination(null); setRound(1); setTimeLeft(ROUND_DURATION);
     phaseRef.current = "lobby";
@@ -682,13 +691,30 @@ export default function FruitsGame() {
               </motion.p>
             </motion.div>
 
-            <motion.button onClick={handleNewGame}
+            <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-xl text-white"
-              style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)", boxShadow: "0 0 35px #22c55e55" }}>
-              <Play size={22} fill="white" /> لعبة جديدة
-            </motion.button>
+              className="flex items-center gap-4 flex-wrap justify-center">
+
+              {/* إعادة جولة */}
+              <motion.button onClick={handleReplay}
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
+                className="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-xl text-white"
+                style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)", boxShadow: "0 0 35px #22c55e55" }}>
+                <Play size={22} fill="white" /> إعادة جولة
+              </motion.button>
+
+              {/* خروج */}
+              <motion.button onClick={() => navigate("/")}
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
+                className="flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-xl"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "2px solid rgba(255,255,255,0.15)",
+                  color: "rgba(255,255,255,0.55)",
+                }}>
+                <ArrowRight size={22} /> خروج
+              </motion.button>
+            </motion.div>
           </motion.div>
         )}
 
