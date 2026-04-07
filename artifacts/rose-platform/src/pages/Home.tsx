@@ -28,7 +28,6 @@ const games = [
     neonColor: "#e040fb",
     path: "/song-game",
     emoji: "🎵",
-    heroImage: "/song-hero.png",
   },
   {
     id: "xo-game",
@@ -103,6 +102,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen gradient-bg relative overflow-hidden" dir="rtl">
+
+      {/* ══ Full-page background logo video ══ */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 1 }}>
+        <video
+          src="/rose-face-portrait.mp4"
+          autoPlay loop muted playsInline
+          className="absolute w-full h-full object-cover"
+          style={{ objectPosition: "50% -15%", opacity: 0.12, filter: "blur(1px) saturate(2)" }}
+        />
+        {/* Dark vignette so it never competes with UI */}
+        <div className="absolute inset-0"
+          style={{ background: "radial-gradient(ellipse 80% 80% at 50% 30%, transparent 30%, rgba(5,0,18,0.6) 100%)" }} />
+      </div>
+
       {/* Background particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
@@ -247,18 +260,8 @@ export default function Home() {
         </motion.div>
 
         {/* Game cards */}
-        <div className="relative w-full max-w-5xl">
-
-          {/* Subtle animated background behind games */}
-          <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none" style={{ zIndex: 0 }}>
-            <video src="/rose-face-portrait.mp4" autoPlay loop muted playsInline
-              className="w-full h-full object-cover"
-              style={{ objectPosition: "center top", opacity: 0.06, filter: "blur(2px) saturate(1.8)" }} />
-            <div className="absolute inset-0"
-              style={{ background: "linear-gradient(to bottom, rgba(5,0,18,0.3), rgba(5,0,18,0.15), rgba(5,0,18,0.5))" }} />
-          </div>
-
-        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-6 w-full" style={{ zIndex: 1 }}>
+        <div className="w-full max-w-5xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
           {games.map((game, index) => {
             const heroImage = (game as any).heroImage as string | undefined;
 
@@ -328,9 +331,29 @@ export default function Home() {
                     <motion.div className="relative"
                       animate={{ y: [0, -5, 0] }}
                       transition={{ duration: 3, repeat: Infinity, delay: index * 0.5 }}>
-                      <div className="absolute inset-0 blur-xl opacity-60 rounded-full" style={{ background: game.neonColor }} />
-                      <img src="/rose-logo.png" alt="روز" className="relative w-20 h-20 rounded-full object-cover border-2"
-                        style={{ borderColor: `${game.neonColor}60`, filter: `drop-shadow(0 0 10px ${game.neonColor})` }} />
+                      {/* Outer ambient glow */}
+                      <div className="absolute inset-0 blur-2xl opacity-50 rounded-full"
+                        style={{ background: `radial-gradient(circle, ${game.neonColor}, #e040fb)`, transform: "scale(1.3)" }} />
+                      {/* Rotating ring */}
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                        className="absolute rounded-full" style={{ inset: -4 }}>
+                        <div className="w-full h-full rounded-full" style={{
+                          background: `linear-gradient(135deg, ${game.neonColor}, transparent, #00e5ff, transparent, ${game.neonColor})`,
+                          mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), white calc(100% - 2px))",
+                          WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), white calc(100% - 2px))",
+                        }} />
+                      </motion.div>
+                      {/* Animated face video */}
+                      <div className="relative rounded-full overflow-hidden border-2"
+                        style={{
+                          width: 80, height: 80,
+                          borderColor: `${game.neonColor}70`,
+                          boxShadow: `0 0 20px ${game.neonColor}60, 0 0 40px ${game.neonColor}25`,
+                        }}>
+                        <video src="/rose-face.mp4" autoPlay loop muted playsInline
+                          className="w-full h-full object-cover"
+                          style={{ objectPosition: "center top" }} />
+                      </div>
                       <div className="absolute -top-1 -right-1 text-2xl">{game.emoji}</div>
                     </motion.div>
                     <div className="text-center z-10">
