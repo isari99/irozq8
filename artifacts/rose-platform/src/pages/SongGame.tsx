@@ -605,24 +605,43 @@ export default function SongGame() {
                   animate={{ y: [0, -7, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                   className="relative">
-                  <motion.img
-                    src="/song-logo.jpg"
-                    alt="🎵"
-                    className="w-36 h-36 sm:w-44 sm:h-44 rounded-full object-cover"
+
+                  {/* Outer ambient glow */}
+                  <div className="absolute rounded-full blur-3xl opacity-40"
+                    style={{ inset: -24, background: `radial-gradient(circle, ${teamColor(currentTurn)}, #e040fb)` }} />
+
+                  {/* Rotating neon ring (team color) */}
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                    className="absolute rounded-full" style={{ inset: -6 }}>
+                    <div className="w-full h-full rounded-full" style={{
+                      background: `linear-gradient(135deg, ${teamColor(currentTurn)}, transparent, #e040fb, transparent, ${teamColor(currentTurn)})`,
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), white calc(100% - 3px))",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), white calc(100% - 3px))",
+                    }} />
+                  </motion.div>
+
+                  {/* Face video with pulse when playing */}
+                  <motion.div
+                    className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden"
                     style={{
-                      border: `4px solid ${teamColor(currentTurn)}50`,
-                      boxShadow: `0 0 60px ${teamColor(currentTurn)}40, 0 0 120px ${teamColor(currentTurn)}18`,
+                      border: `4px solid ${teamColor(currentTurn)}55`,
+                      boxShadow: `0 0 50px ${teamColor(currentTurn)}45, 0 0 100px ${teamColor(currentTurn)}18`,
                     }}
-                    animate={audioState === "playing" ? { scale: [1, 1.07, 1] } : {}}
-                    transition={{ repeat: Infinity, duration: 1.2 }}
-                  />
-                  {/* Ring pulse */}
+                    animate={audioState === "playing" ? { scale: [1, 1.06, 1] } : {}}
+                    transition={{ repeat: Infinity, duration: 1.2 }}>
+                    <video src="/rose-face.mp4" autoPlay loop muted playsInline
+                      className="w-full h-full object-cover"
+                      style={{ objectPosition: "center top" }} />
+                  </motion.div>
+
+                  {/* Ring pulse on playing */}
                   {audioState === "playing" && (
                     <motion.div className="absolute inset-0 rounded-full"
-                      animate={{ scale: [1, 1.3, 1.3], opacity: [0.6, 0, 0] }}
+                      animate={{ scale: [1, 1.35, 1.35], opacity: [0.55, 0, 0] }}
                       transition={{ repeat: Infinity, duration: 1.8 }}
                       style={{ border: `2px solid ${teamColor(currentTurn)}`, borderRadius: "50%" }} />
                   )}
+
                   {/* Floating notes around logo */}
                   <div className="absolute inset-0 overflow-visible pointer-events-none">
                     <Note delay={0}    x={-28} color="#e040fb" s={24} />
