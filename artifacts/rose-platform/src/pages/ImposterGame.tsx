@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Copy, Check, Users, Clock, SkipForward, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Copy, Check, Users, Clock, SkipForward, Lock, Unlock } from "lucide-react";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
@@ -28,28 +28,19 @@ interface PublicPlayer {
   connected: boolean; voted: boolean; disconnected: boolean;
 }
 interface GameState {
-  code: string;
-  roomName: string;
-  category: Category;
-  durationMs: number;
+  code: string; roomName: string; category: Category; durationMs: number;
   phase: "lobby" | "playing" | "voting" | "result";
-  players: PublicPlayer[];
-  playerOrder: string[];
-  currentTurnIdx: number;
-  currentTurnId: string | null;
+  players: PublicPlayer[]; playerOrder: string[];
+  currentTurnIdx: number; currentTurnId: string | null;
   currentTargetId: string | null;
   lastAnswer: { targetId: string; answer: string } | null;
-  gameRemaining: number;
-  turnRemaining: number;
+  gameRemaining: number; turnRemaining: number;
 }
 interface Role { role: "imposter" | "player"; word?: string }
 interface Result {
-  imposterName: string;
-  imposterId: string;
-  word: string;
+  imposterName: string; imposterId: string; word: string;
   winner: "players" | "imposter";
-  votes: Record<string, string>;
-  counts: Record<string, number>;
+  votes: Record<string, string>; counts: Record<string, number>;
 }
 
 const COLORS = [
@@ -59,73 +50,142 @@ const COLORS = [
 ];
 function playerColor(idx: number) { return COLORS[idx % COLORS.length]; }
 
-const CATEGORIES: { id: Category; emoji: string; color: string }[] = [
-  { id: "دول",      emoji: "🌍", color: "#3b82f6" },
-  { id: "حيوانات", emoji: "🦁", color: "#f97316" },
-  { id: "أكلات",   emoji: "🍕", color: "#ef4444" },
-  { id: "أشياء",   emoji: "📦", color: "#a78bfa" },
-  { id: "عام",     emoji: "🎲", color: "#22c55e" },
-];
-
-const DURATIONS = [5, 10, 15, 20];
-
 const neonPurple = "#e040fb";
-const neonCyan = "#00e5ff";
+const neonCyan   = "#00e5ff";
 const font = { fontFamily: "'Cairo', sans-serif" };
-const base = "min-h-screen gradient-bg relative overflow-hidden";
 
-// ─── Streamer Overlay ─────────────────────────────────────────────────────────
-function StreamerShield({ active, label = "محمي للبث 🔴" }: { active: boolean; label?: string }) {
-  if (!active) return null;
+// ─── Draggable Streamer Box ────────────────────────────────────────────────────
+function DraggableStreamerBox({ onClose }: { onClose: () => void }) {
+  const [pos, setPos] = useState({ x: 40, y: 120 });
+  const [locked, setLocked] = useState(false);
+  const dragging = useRef(false);
+  const origin   = useRef({ mx: 0, my: 0, bx: 0, by: 0 });
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (locked) return;
+    dragging.current = true;
+    origin.current = { mx: e.clientX, my: e.clientY, bx: pos.x, by: pos.y };
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      setPos({
+        x: origin.current.bx + e.clientX - origin.current.mx,
+        y: origin.current.by + e.clientY - origin.current.my,
+      });
+    };
+    const up = () => { dragging.current = false; };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+  }, []);
+
+  // Touch support
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (locked) return;
+    dragging.current = true;
+    origin.current = { mx: e.touches[0].clientX, my: e.touches[0].clientY, bx: pos.x, by: pos.y };
+  };
+  useEffect(() => {
+    const move = (e: TouchEvent) => {
+      if (!dragging.current) return;
+      setPos({
+        x: origin.current.bx + e.touches[0].clientX - origin.current.mx,
+        y: origin.current.by + e.touches[0].clientY - origin.current.my,
+      });
+    };
+    const up = () => { dragging.current = false; };
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
+    return () => { window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); };
+  }, []);
+
   return (
-    <div className="absolute inset-0 rounded-3xl z-20 flex flex-col items-center justify-center gap-2"
-      style={{ background: "#000", border: "2px solid #333" }}>
-      <span style={{ fontSize: 36 }}>🎥</span>
-      <p className="text-white/50 text-sm font-black">{label}</p>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.85 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.85 }}
+      style={{
+        position: "fixed", left: pos.x, top: pos.y, zIndex: 9999,
+        width: 260, height: 160,
+        background: "#000",
+        border: "2px solid #333",
+        borderRadius: 16,
+        cursor: locked ? "default" : "grab",
+        userSelect: "none",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
+      }}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+    >
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: "1px solid #222" }}>
+        <span className="text-white/40 text-xs font-bold">🎥 وضع الستريمر</span>
+        <div className="flex items-center gap-2">
+          {/* Lock toggle */}
+          <button
+            onClick={e => { e.stopPropagation(); setLocked(v => !v); }}
+            className="text-white/40 hover:text-white/80 transition-colors p-1"
+            title={locked ? "فتح التحريك" : "قفل المربع"}>
+            {locked ? <Lock size={13} /> : <Unlock size={13} />}
+          </button>
+          {/* Close */}
+          <button
+            onClick={e => { e.stopPropagation(); onClose(); }}
+            className="text-white/30 hover:text-red-400 transition-colors p-1 font-black text-sm">
+            ✕
+          </button>
+        </div>
+      </div>
+      {/* Body */}
+      <div className="flex flex-col items-center justify-center h-[calc(100%-40px)] gap-1">
+        <span style={{ fontSize: 28 }}>🔒</span>
+        <p className="text-white/25 text-xs font-bold">محتوى مخفي للبث</p>
+        {!locked && (
+          <p className="text-white/15 text-[10px] mt-1">اسحب للتحريك</p>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ImposterGame() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const roomParam = params.get("room")?.toUpperCase() ?? "";
-
   const mode: Mode = roomParam ? "player" : "host";
 
-  // ── Host setup state (before room creation) ────────────────────────────────
+  // ── Host state ─────────────────────────────────────────────────────────────
   const [setupDone, setSetupDone] = useState(false);
-  const [roomNameInput, setRoomNameInput] = useState("برا السالفة");
-  const [selectedCategory, setSelectedCategory] = useState<Category>("عام");
-  const [selectedDuration, setSelectedDuration] = useState(10);
-  const pendingSetup = useRef<{ roomName: string; category: Category; duration: number } | null>(null);
+  const [streamerBoxVisible, setStreamerBoxVisible] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  // ── Core state ─────────────────────────────────────────────────────────────
-  const wsRef = useRef<WebSocket | null>(null);
+  // ── Core WS state ──────────────────────────────────────────────────────────
+  const wsRef    = useRef<WebSocket | null>(null);
   const [wsReady, setWsReady] = useState(false);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [result, setResult] = useState<Result | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [streamerMode, setStreamerMode] = useState(false);
-
-  // ── Room state ─────────────────────────────────────────────────────────────
-  const [roomCode, setRoomCode] = useState<string>(roomParam);
+  const [gameState, setGameState]   = useState<GameState | null>(null);
+  const [result, setResult]         = useState<Result | null>(null);
+  const [error, setError]           = useState<string | null>(null);
+  const [copied, setCopied]         = useState(false);
+  const [roomCode, setRoomCode]     = useState<string>(roomParam);
 
   // ── Player state ───────────────────────────────────────────────────────────
   const [playerName, setPlayerName] = useState("");
-  const [playerId, setPlayerId] = useState<string | null>(null);
-  const [myRole, setMyRole] = useState<Role | null>(null);
-  const [isMyTurn, setIsMyTurn] = useState(false);
+  const [playerId, setPlayerId]     = useState<string | null>(null);
+  const [myRole, setMyRole]         = useState<Role | null>(null);
+  const [isMyTurn, setIsMyTurn]     = useState(false);
   const [needAnswer, setNeedAnswer] = useState(false);
 
   // ── Timers ─────────────────────────────────────────────────────────────────
   const [gameRemaining, setGameRemaining] = useState(0);
   const [turnRemaining, setTurnRemaining] = useState(0);
 
-  const playerIdRef = useRef<string | null>(null);
+  const playerIdRef  = useRef<string | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
   useEffect(() => { playerIdRef.current = playerId; }, [playerId]);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -136,33 +196,33 @@ export default function ImposterGame() {
       wsRef.current.send(JSON.stringify(msg));
   }, []);
 
-  // ── Connect WS ─────────────────────────────────────────────────────────────
-  const connectWs = useCallback((setup?: { roomName: string; category: Category; duration: number }) => {
+  // ── Connect & message handler ──────────────────────────────────────────────
+  const connectWs = useCallback((isHost: boolean, opts?: { category: Category; duration: number }) => {
     const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {
       setWsReady(true);
-      if (mode === "host") {
-        const s = setup ?? pendingSetup.current;
+      if (isHost) {
         ws.send(JSON.stringify({
           type: "imposter:create",
-          roomName: s?.roomName ?? "برا السالفة",
-          category: s?.category ?? "عام",
-          duration: s?.duration ?? 10,
+          roomName: "برا السالفة",
+          category: opts?.category ?? "عام",
+          duration: opts?.duration ?? 10,
         }));
       }
     };
 
-    ws.onclose = () => setWsReady(false);
+    ws.onclose  = () => setWsReady(false);
+    ws.onerror  = () => setCreating(false);
 
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data as string);
-
         if (msg.type === "imposter:created") {
           setRoomCode(msg.code);
           setSetupDone(true);
+          setCreating(false);
         }
         if (msg.type === "imposter:joined") {
           setPlayerId(msg.playerId);
@@ -178,50 +238,31 @@ export default function ImposterGame() {
           setGameRemaining(msg.gameRemaining);
           setTurnRemaining(msg.turnRemaining);
         }
-        if (msg.type === "imposter:role") {
-          setMyRole({ role: msg.role, word: msg.word ?? undefined });
-        }
-        if (msg.type === "imposter:your_turn") {
-          setIsMyTurn(true);
-          setNeedAnswer(false);
-        }
-        if (msg.type === "imposter:answer_now") {
-          setNeedAnswer(true);
-          setIsMyTurn(false);
-        }
-        if (msg.type === "imposter:answered") {
-          setNeedAnswer(false);
-        }
-        if (msg.type === "imposter:result") {
-          setResult(msg as Result);
-        }
-        if (msg.type === "imposter:removed") {
-          setError("تم إزالتك من الغرفة");
-        }
-        if (msg.type === "imposter:host_left") {
-          setError("المضيف غادر الغرفة");
-        }
-        if (msg.type === "imposter:error") {
-          setError(msg.message);
-        }
+        if (msg.type === "imposter:role")    setMyRole({ role: msg.role, word: msg.word ?? undefined });
+        if (msg.type === "imposter:your_turn") { setIsMyTurn(true); setNeedAnswer(false); }
+        if (msg.type === "imposter:answer_now") { setNeedAnswer(true); setIsMyTurn(false); }
+        if (msg.type === "imposter:answered")  setNeedAnswer(false);
+        if (msg.type === "imposter:result")    setResult(msg as Result);
+        if (msg.type === "imposter:removed")   setError("تم إزالتك من الغرفة");
+        if (msg.type === "imposter:host_left") setError("المضيف غادر الغرفة");
+        if (msg.type === "imposter:error")     setError(msg.message);
       } catch { /* ignore */ }
     };
-  }, [mode]);
+  }, []);
 
-  // Player auto-connects on page load
+  // Player auto-connects
   useEffect(() => {
     if (mode === "player") {
-      connectWs();
+      connectWs(false);
       return () => { wsRef.current?.close(); };
     }
   }, [connectWs, mode]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleCreateRoom = () => {
-    const setup = { roomName: roomNameInput.trim() || "برا السالفة", category: selectedCategory, duration: selectedDuration };
-    pendingSetup.current = setup;
-    connectWs(setup);
-    return () => { wsRef.current?.close(); };
+    if (creating) return;
+    setCreating(true);
+    connectWs(true, { category: "عام", duration: 10 });
   };
 
   const handleJoin = () => {
@@ -230,73 +271,43 @@ export default function ImposterGame() {
     wsSend({ type: "imposter:join", room: roomParam, name, avatar: dicebear(name) });
   };
 
-  const handleStart = () => wsSend({ type: "imposter:start" });
-  const handleForceVote = () => wsSend({ type: "imposter:force_vote" });
-  const handleNewRound = () => {
-    setResult(null); setMyRole(null);
-    setIsMyTurn(false); setNeedAnswer(false);
-    wsSend({ type: "imposter:new_round" });
-  };
-  const handleSelectTarget = (targetId: string) => {
-    wsSend({ type: "imposter:select_target", targetId });
-    setIsMyTurn(false);
-  };
-  const handleAnswer = (ans: "yes" | "no") => {
-    wsSend({ type: "imposter:answer", answer: ans });
-    setNeedAnswer(false);
-  };
-  const handleVote = (targetId: string) => {
-    wsSend({ type: "imposter:vote", voterId: playerIdRef.current, targetId });
-  };
-  const handleRemovePlayer = (pid: string) => {
-    wsSend({ type: "imposter:remove_player", playerId: pid });
-  };
+  const handleStart        = ()             => wsSend({ type: "imposter:start" });
+  const handleForceVote    = ()             => wsSend({ type: "imposter:force_vote" });
+  const handleNewRound     = ()             => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); wsSend({ type: "imposter:new_round" }); };
+  const handleSelectTarget = (t: string)   => { wsSend({ type: "imposter:select_target", targetId: t }); setIsMyTurn(false); };
+  const handleAnswer       = (a: "yes"|"no") => { wsSend({ type: "imposter:answer", answer: a }); setNeedAnswer(false); };
+  const handleVote         = (t: string)   => wsSend({ type: "imposter:vote", voterId: playerIdRef.current, targetId: t });
+  const handleRemove       = (pid: string) => wsSend({ type: "imposter:remove_player", playerId: pid });
 
   const copyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomCode}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const phase = gameState?.phase ?? "lobby";
-  const players = gameState?.players ?? [];
-  const currentTurnId = gameState?.currentTurnId;
+  const phase           = gameState?.phase ?? "lobby";
+  const players         = gameState?.players ?? [];
+  const currentTurnId   = gameState?.currentTurnId;
   const currentTargetId = gameState?.currentTargetId;
-  const myPlayer = players.find(p => p.id === playerId);
-  const currentTurnPlayer = players.find(p => p.id === currentTurnId);
-  const targetPlayer = currentTargetId ? players.find(p => p.id === currentTargetId) : null;
+  const myPlayer        = players.find(p => p.id === playerId);
+  const currentTurnPlayer  = players.find(p => p.id === currentTurnId);
+  const targetPlayer       = currentTargetId ? players.find(p => p.id === currentTargetId) : null;
+  const inviteUrl       = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
 
-  // ── Error screen ───────────────────────────────────────────────────────────
-  if (error) {
-    return (
-      <div className={`${base} flex items-center justify-center`} dir="rtl" style={font}>
-        <div className="text-center flex flex-col items-center gap-6">
-          <span style={{ fontSize: 64 }}>⚠️</span>
-          <p className="text-xl font-black text-red-400">{error}</p>
-          <button onClick={() => navigate("/")}
-            className="px-8 py-3 rounded-2xl font-black text-white"
-            style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)" }}>
-            العودة للرئيسية
-          </button>
-        </div>
+  // ── Error ──────────────────────────────────────────────────────────────────
+  if (error) return (
+    <div className="min-h-screen gradient-bg flex items-center justify-center" dir="rtl" style={font}>
+      <div className="text-center flex flex-col items-center gap-6">
+        <span style={{ fontSize: 60 }}>⚠️</span>
+        <p className="text-xl font-black text-red-400">{error}</p>
+        <button onClick={() => navigate("/")}
+          className="px-8 py-3 rounded-2xl font-black text-white"
+          style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)" }}>
+          العودة للرئيسية
+        </button>
       </div>
-    );
-  }
-
-  // ── Streamer Mode Button ───────────────────────────────────────────────────
-  const StreamerToggle = () => (
-    <button onClick={() => setStreamerMode(v => !v)}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all"
-      style={{
-        background: streamerMode ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.06)",
-        border: `1px solid ${streamerMode ? "#ef444450" : "rgba(255,255,255,0.1)"}`,
-        color: streamerMode ? "#ef4444" : "rgba(255,255,255,0.4)",
-      }}>
-      {streamerMode ? <EyeOff size={13}/> : <Eye size={13}/>}
-      {streamerMode ? "البث محمي" : "وضع الستريمر"}
-    </button>
+    </div>
   );
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -304,202 +315,218 @@ export default function ImposterGame() {
   // ══════════════════════════════════════════════════════════════════════════
   if (mode === "host") {
     return (
-      <div className={base} dir="rtl" style={font}>
-        {/* Ambient particles */}
+      <div className="min-h-screen gradient-bg relative overflow-hidden" dir="rtl" style={font}>
+
+        {/* Ambient dots */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(14)].map((_, i) => (
+          {[...Array(18)].map((_, i) => (
             <motion.div key={i} className="absolute rounded-full"
-              style={{ width: 2, height: 2, background: i % 2 === 0 ? neonPurple : neonCyan,
+              style={{ width: 2, height: 2,
+                background: i % 3 === 0 ? neonPurple : i % 3 === 1 ? neonCyan : "#ffd600",
                 left: `${Math.random()*100}%`, top: `${Math.random()*100}%` }}
-              animate={{ opacity: [0.1, 0.5, 0.1] }}
-              transition={{ duration: 3+Math.random()*2, repeat: Infinity, delay: Math.random()*2 }} />
+              animate={{ opacity: [0.08, 0.45, 0.08] }}
+              transition={{ duration: 3+Math.random()*3, repeat: Infinity, delay: Math.random()*3 }} />
           ))}
         </div>
 
-        <div className="relative z-10 flex flex-col min-h-screen px-4 py-5" style={{ gap: 14 }}>
+        {/* Glow blobs */}
+        <div className="absolute top-[-180px] right-[-180px] w-[420px] h-[420px] rounded-full pointer-events-none opacity-10"
+          style={{ background: `radial-gradient(circle, ${neonPurple}, transparent)` }} />
+        <div className="absolute bottom-[-180px] left-[-180px] w-[420px] h-[420px] rounded-full pointer-events-none opacity-8"
+          style={{ background: `radial-gradient(circle, ${neonCyan}, transparent)` }} />
 
-          {/* Top bar */}
-          <div className="flex items-center justify-between">
+        {/* Draggable streamer box */}
+        <AnimatePresence>
+          {streamerBoxVisible && (
+            <DraggableStreamerBox onClose={() => setStreamerBoxVisible(false)} />
+          )}
+        </AnimatePresence>
+
+        {/* ── Page content ── */}
+        <div className="relative z-10 flex flex-col min-h-screen">
+
+          {/* Nav */}
+          <div className="flex items-center justify-between px-5 py-4">
             <button onClick={() => navigate("/")}
-              className="flex items-center gap-1.5 text-purple-400/50 hover:text-purple-300 text-sm font-bold transition-colors">
-              <ArrowRight size={14} /> الرئيسية
+              className="flex items-center gap-1.5 text-purple-400/40 hover:text-purple-300 text-sm font-bold transition-colors">
+              <ArrowRight size={14}/> الرئيسية
             </button>
-            <h1 className="text-lg font-black" style={{ color: neonPurple, textShadow: `0 0 18px ${neonPurple}60` }}>
+            <span className="text-sm font-black" style={{ color: neonPurple, textShadow: `0 0 14px ${neonPurple}60` }}>
               🕵️ برا السالفة
-            </h1>
-            {setupDone && phase === "playing" ? (
-              <div className="flex items-center gap-2">
-                <Clock size={13} className="text-purple-400/60" />
-                <span className="text-sm font-black" style={{ color: gameRemaining < 60_000 ? "#ef4444" : neonCyan }}>
-                  {fmt(gameRemaining)}
-                </span>
-              </div>
-            ) : (
-              <StreamerToggle />
-            )}
+            </span>
+            <div style={{ width: 80 }} />
           </div>
 
           <AnimatePresence mode="wait">
 
-            {/* ── SETUP SCREEN (before room creation) ── */}
+            {/* ─────────── SCREEN 1: Create Room ─────────── */}
             {!setupDone && (
-              <motion.div key="setup" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-5 flex-1">
+              <motion.div key="create"
+                initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
+                className="flex flex-col items-center justify-center flex-1 px-5 gap-10">
 
                 {/* Hero */}
-                <div className="text-center mt-2">
-                  <motion.div style={{ fontSize: 60 }} animate={{ rotate: [0,-8,8,0] }} transition={{ repeat: Infinity, duration: 3 }}>
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <motion.div
+                    animate={{ rotate: [0, -8, 8, -4, 4, 0], y: [0, -6, 0] }}
+                    transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                    style={{ fontSize: 80, filter: `drop-shadow(0 0 20px ${neonPurple}70)` }}>
                     🕵️
                   </motion.div>
-                  <p className="text-3xl font-black mt-3" style={{ color: neonPurple, textShadow: `0 0 24px ${neonPurple}70` }}>
-                    برا السالفة
-                  </p>
-                  <p className="text-purple-400/50 text-sm mt-1">اكتشف من هو خارج الموضوع</p>
+                  <div>
+                    <h1 className="text-5xl font-black leading-tight"
+                      style={{ color: "#fff", textShadow: `0 0 30px ${neonPurple}80` }}>
+                      برا السالفة
+                    </h1>
+                    <p className="text-purple-400/50 text-base mt-2 font-bold">اكتشف من هو خارج الموضوع</p>
+                  </div>
                 </div>
 
-                {/* Form card */}
-                <div className="w-full max-w-sm flex flex-col gap-5 p-5 rounded-3xl"
-                  style={{ background: "rgba(10,4,24,0.92)", border: `1px solid ${neonPurple}30` }}>
+                {/* Buttons */}
+                <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                  {/* Streamer mode toggle */}
+                  <motion.button
+                    onClick={() => setStreamerBoxVisible(v => !v)}
+                    className="w-full py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all"
+                    style={{
+                      background: streamerBoxVisible ? "rgba(239,68,68,0.18)" : "rgba(255,255,255,0.06)",
+                      border: `2px solid ${streamerBoxVisible ? "#ef444460" : "rgba(255,255,255,0.12)"}`,
+                      color: streamerBoxVisible ? "#ef4444" : "rgba(255,255,255,0.55)",
+                    }}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                    🎥 {streamerBoxVisible ? "إخفاء مربع الستريمر" : "وضع الستريمر"}
+                  </motion.button>
 
-                  {/* Room name */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-purple-300/70">اسم الغرفة</label>
-                    <input value={roomNameInput}
-                      onChange={e => setRoomNameInput(e.target.value)}
-                      placeholder="برا السالفة"
-                      className="w-full bg-transparent border rounded-xl px-4 py-2.5 text-white text-sm text-right focus:outline-none transition-colors"
-                      style={{ borderColor: `${neonPurple}40`, fontFamily: "'Cairo', sans-serif" }}
-                      onFocus={e => (e.target.style.borderColor = neonPurple)}
-                      onBlur={e => (e.target.style.borderColor = `${neonPurple}40`)} />
-                  </div>
-
-                  {/* Category */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-purple-300/70">التصنيف</label>
-                    <div className="grid grid-cols-5 gap-2">
-                      {CATEGORIES.map(cat => (
-                        <button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
-                          className="flex flex-col items-center gap-1 py-2 rounded-xl font-black text-xs transition-all"
-                          style={{
-                            background: selectedCategory === cat.id ? cat.color + "30" : "rgba(255,255,255,0.04)",
-                            border: `2px solid ${selectedCategory === cat.id ? cat.color : "rgba(255,255,255,0.08)"}`,
-                            color: selectedCategory === cat.id ? cat.color : "rgba(255,255,255,0.4)",
-                            boxShadow: selectedCategory === cat.id ? `0 0 14px ${cat.color}50` : "none",
-                          }}>
-                          <span style={{ fontSize: 18 }}>{cat.emoji}</span>
-                          <span style={{ fontSize: 10 }}>{cat.id}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Duration */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-black text-purple-300/70">وقت الجولة</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {DURATIONS.map(d => (
-                        <button key={d} onClick={() => setSelectedDuration(d)}
-                          className="py-2.5 rounded-xl font-black text-sm transition-all"
-                          style={{
-                            background: selectedDuration === d ? `${neonCyan}20` : "rgba(255,255,255,0.04)",
-                            border: `2px solid ${selectedDuration === d ? neonCyan : "rgba(255,255,255,0.08)"}`,
-                            color: selectedDuration === d ? neonCyan : "rgba(255,255,255,0.4)",
-                            boxShadow: selectedDuration === d ? `0 0 12px ${neonCyan}40` : "none",
-                          }}>
-                          {d}<span style={{ fontSize: 10 }}>د</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Create button */}
-                  <motion.button onClick={handleCreateRoom}
-                    className="w-full py-4 rounded-2xl font-black text-white text-lg btn-shimmer"
-                    style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)", boxShadow: `0 6px 30px ${neonPurple}50` }}
-                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    إنشاء الغرفة 🚀
+                  {/* Create room */}
+                  <motion.button
+                    onClick={handleCreateRoom}
+                    disabled={creating}
+                    className="w-full py-4 rounded-2xl font-black text-white text-xl btn-shimmer disabled:opacity-60 relative overflow-hidden"
+                    style={{
+                      background: "linear-gradient(135deg,#7c3aed,#e040fb,#7c3aed)",
+                      backgroundSize: "200% 100%",
+                      boxShadow: `0 8px 40px ${neonPurple}60`,
+                    }}
+                    animate={creating ? {} : { backgroundPosition: ["0% 0%", "100% 0%", "0% 0%"] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    whileHover={creating ? {} : { scale: 1.04 }}
+                    whileTap={creating ? {} : { scale: 0.97 }}>
+                    {creating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        جاري الإنشاء...
+                      </span>
+                    ) : "إنشاء غرفة 🚀"}
                   </motion.button>
                 </div>
               </motion.div>
             )}
 
-            {/* ── HOST LOBBY ── */}
+            {/* ─────────── SCREEN 2: Lobby ─────────── */}
             {setupDone && phase === "lobby" && (
-              <motion.div key="host-lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-4 flex-1 w-full">
+              <motion.div key="lobby"
+                initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+                className="flex flex-col flex-1 px-4 pb-6 gap-4 max-w-2xl mx-auto w-full">
 
-                {/* Room info card */}
-                <motion.div className="flex flex-col gap-4 p-5 rounded-3xl w-full max-w-lg"
-                  style={{ background: "rgba(10,4,24,0.92)", border: `2px solid ${neonPurple}40` }}
-                  initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                {/* ── Start button — TOP, prominent ── */}
+                <div className="mt-2">
+                  <motion.button
+                    onClick={handleStart}
+                    disabled={players.length < 3}
+                    className="w-full py-4 rounded-2xl font-black text-white text-lg btn-shimmer disabled:opacity-30 disabled:cursor-not-allowed relative overflow-hidden"
+                    style={{
+                      background: players.length >= 3
+                        ? "linear-gradient(135deg,#16a34a,#22c55e,#16a34a)"
+                        : "rgba(255,255,255,0.06)",
+                      border: players.length >= 3 ? "none" : "2px solid rgba(255,255,255,0.1)",
+                      boxShadow: players.length >= 3 ? "0 6px 32px rgba(34,197,94,0.50)" : "none",
+                      color: players.length >= 3 ? "#fff" : "rgba(255,255,255,0.3)",
+                    }}
+                    whileHover={players.length >= 3 ? { scale: 1.03 } : {}}
+                    whileTap={players.length >= 3 ? { scale: 0.97 } : {}}>
+                    {players.length >= 3
+                      ? `▶ ابدأ اللعبة  (${players.length} لاعبين)`
+                      : `يلزم ${3 - players.length} لاعبين إضافيين للبدء`}
+                  </motion.button>
+                </div>
 
-                  {/* Header row: name + meta */}
+                {/* ── Invite section ── */}
+                <div className="rounded-2xl p-4 flex flex-col gap-3"
+                  style={{ background: "rgba(10,4,24,0.90)", border: `1px solid ${neonPurple}30` }}>
+
+                  {/* Room meta */}
                   <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-0.5">
-                      <p className="text-[10px] text-purple-400/40 font-bold">اسم الغرفة</p>
-                      <p className="text-lg font-black" style={{ color: neonPurple }}>
-                        🎭 {gameState?.roomName ?? roomNameInput}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-purple-400/50 font-bold">
-                      <span className="flex items-center gap-1">
-                        {CATEGORIES.find(c => c.id === (gameState?.category ?? selectedCategory))?.emoji ?? "🎲"}
-                        {gameState?.category ?? selectedCategory}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock size={10}/>
-                        {(gameState?.durationMs ?? selectedDuration * 60_000) / 60_000}د
-                      </span>
-                      <span className="text-3xl font-black tracking-widest" style={{ color: neonPurple, textShadow: `0 0 18px ${neonPurple}80` }}>
-                        {roomCode}
-                      </span>
-                    </div>
+                    <p className="text-xs text-purple-400/50 font-bold">رمز الغرفة</p>
+                    <p className="text-2xl font-black tracking-widest"
+                      style={{ color: neonPurple, textShadow: `0 0 18px ${neonPurple}80` }}>
+                      {roomCode}
+                    </p>
                   </div>
 
-                  {/* Invite link field + copy button */}
+                  {/* Link row */}
                   <div className="flex gap-2 items-center">
                     <input
                       readOnly
-                      value={`${window.location.origin}${window.location.pathname}?room=${roomCode}`}
-                      className="flex-1 text-xs px-3 py-2.5 rounded-xl font-mono text-purple-300/70 bg-transparent border select-all cursor-text focus:outline-none"
-                      style={{ borderColor: `${neonPurple}30`, fontFamily: "monospace", direction: "ltr" }}
+                      value={inviteUrl}
                       onClick={e => (e.target as HTMLInputElement).select()}
+                      className="flex-1 text-xs px-3 py-2.5 rounded-xl text-purple-300/60 bg-transparent border cursor-text focus:outline-none"
+                      style={{ borderColor: `${neonPurple}25`, direction: "ltr", fontFamily: "monospace" }}
                     />
-                    <motion.button onClick={copyLink}
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all"
-                      style={{ background: copied ? "#22c55e20" : `${neonPurple}20`, border: `1px solid ${copied ? "#22c55e60" : `${neonPurple}50`}`, color: copied ? "#22c55e" : neonPurple }}
-                      whileTap={{ scale: 0.95 }}>
+                    <motion.button
+                      onClick={copyLink}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all shrink-0"
+                      style={{
+                        background: copied ? "rgba(34,197,94,0.2)" : `${neonPurple}20`,
+                        border: `1px solid ${copied ? "rgba(34,197,94,0.5)" : `${neonPurple}45`}`,
+                        color: copied ? "#22c55e" : neonPurple,
+                      }}
+                      whileTap={{ scale: 0.94 }}>
                       {copied ? <Check size={14}/> : <Copy size={14}/>}
                       {copied ? "تم!" : "نسخ"}
                     </motion.button>
                   </div>
-                </motion.div>
+                </div>
 
-                {/* Players */}
-                <div className="w-full max-w-2xl flex-1">
+                {/* ── Players ── */}
+                <div className="flex flex-col gap-3 flex-1">
+                  <div className="flex items-center gap-2 text-purple-400/40 text-xs font-bold">
+                    <Users size={13}/>
+                    <span>اللاعبون ({players.length})</span>
+                  </div>
+
                   {players.length === 0 ? (
-                    <motion.p animate={{ opacity: [0.3, 0.65, 0.3] }} transition={{ repeat: Infinity, duration: 2 }}
-                      className="text-center text-purple-400/35 text-sm py-10">
-                      في انتظار اللاعبين... 👀
-                    </motion.p>
+                    <motion.div
+                      className="flex flex-col items-center justify-center py-12 rounded-2xl"
+                      style={{ border: "1px dashed rgba(224,64,251,0.2)" }}>
+                      <motion.p
+                        animate={{ opacity: [0.3, 0.7, 0.3] }}
+                        transition={{ repeat: Infinity, duration: 2 }}
+                        className="text-purple-400/35 text-sm font-bold">
+                        في انتظار اللاعبين... 👀
+                      </motion.p>
+                      <p className="text-purple-400/20 text-xs mt-2">شارك رابط الدعوة أعلاه</p>
+                    </motion.div>
                   ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       <AnimatePresence>
                         {players.map((p, i) => (
                           <motion.div key={p.id}
-                            initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}
-                            transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                            initial={{ opacity: 0, scale: 0.65 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                            transition={{ type: "spring", stiffness: 280, damping: 22 }}
                             className="relative flex flex-col items-center gap-2 p-3 rounded-2xl group"
-                            style={{ border: `2px solid ${playerColor(i)}35`, background: playerColor(i) + "0d" }}>
-                            <button onClick={() => handleRemovePlayer(p.id)}
+                            style={{ background: playerColor(i) + "0d", border: `2px solid ${playerColor(i)}35` }}>
+                            <button onClick={() => handleRemove(p.id)}
                               className="absolute top-1 left-1 w-5 h-5 rounded-full hidden group-hover:flex items-center justify-center bg-red-500/20 hover:bg-red-500/50 text-red-400 text-xs font-black">
                               ✕
                             </button>
                             <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
                               style={{ borderColor: playerColor(i), boxShadow: `0 0 10px ${playerColor(i)}40` }}>
-                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                             </div>
-                            <p className="text-xs font-black truncate w-full text-center" style={{ color: playerColor(i) }}>
+                            <p className="text-xs font-black truncate w-full text-center"
+                              style={{ color: playerColor(i) }}>
                               {p.name}
                             </p>
                           </motion.div>
@@ -508,71 +535,59 @@ export default function ImposterGame() {
                     </div>
                   )}
                 </div>
-
-                {/* Player count hint */}
-                {players.length > 0 && players.length < 3 && (
-                  <p className="text-xs text-yellow-400/60 font-bold">
-                    يلزم ٣ لاعبين على الأقل ({3 - players.length} باقين)
-                  </p>
-                )}
-
-                {/* Start button */}
-                <motion.button onClick={handleStart}
-                  disabled={players.length < 3}
-                  className="px-14 py-4 rounded-2xl text-white font-black text-xl btn-shimmer disabled:opacity-25 disabled:cursor-not-allowed"
-                  style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)", boxShadow: players.length >= 3 ? `0 6px 32px ${neonPurple}55` : "none" }}
-                  whileHover={players.length >= 3 ? { scale: 1.05 } : {}}
-                  whileTap={players.length >= 3 ? { scale: 0.97 } : {}}>
-                  ابدأ اللعب ({players.length}) ▶
-                </motion.button>
               </motion.div>
             )}
 
-            {/* ── HOST PLAYING ── */}
+            {/* ─────────── SCREEN 3: Playing (host view) ─────────── */}
             {setupDone && phase === "playing" && (
               <motion.div key="host-playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col gap-4 flex-1">
+                className="flex flex-col gap-4 flex-1 px-4 pb-4">
 
-                {/* Turn info */}
+                {/* Timer bar */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs text-purple-400/50 font-bold">وقت المتبقي</span>
+                  <span className="text-lg font-black" style={{ color: gameRemaining < 60_000 ? "#ef4444" : neonCyan }}>
+                    {fmt(gameRemaining)}
+                  </span>
+                </div>
+
+                {/* Turn card */}
                 <div className="rounded-2xl p-4 flex flex-col items-center gap-3"
                   style={{ background: "rgba(10,4,24,0.90)", border: `1px solid ${neonPurple}30` }}>
-                  {currentTurnPlayer && (
+                  {currentTurnPlayer ? (
                     <>
-                      <p className="text-xs text-purple-400/50 font-bold">يسأل الآن</p>
+                      <p className="text-[10px] text-purple-400/50 font-bold">يسأل الآن</p>
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
-                          style={{ borderColor: neonPurple, boxShadow: `0 0 16px ${neonPurple}60` }}>
-                          <img src={currentTurnPlayer.avatar} alt={currentTurnPlayer.name} className="w-full h-full object-cover" />
+                        <div className="w-11 h-11 rounded-xl overflow-hidden border-2"
+                          style={{ borderColor: neonPurple, boxShadow: `0 0 14px ${neonPurple}60` }}>
+                          <img src={currentTurnPlayer.avatar} alt={currentTurnPlayer.name} className="w-full h-full object-cover"/>
                         </div>
-                        <p className="text-xl font-black" style={{ color: neonPurple }}>{currentTurnPlayer.name}</p>
+                        <p className="text-lg font-black" style={{ color: neonPurple }}>{currentTurnPlayer.name}</p>
                       </div>
                       {targetPlayer && (
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl"
+                        <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl"
                           style={{ background: `${neonCyan}15`, border: `1px solid ${neonCyan}40` }}>
-                          <p className="text-xs text-purple-400/60">يسأل</p>
-                          <img src={targetPlayer.avatar} alt={targetPlayer.name} className="w-6 h-6 rounded-lg" />
+                          <img src={targetPlayer.avatar} alt={targetPlayer.name} className="w-5 h-5 rounded-lg"/>
                           <p className="text-sm font-black" style={{ color: neonCyan }}>{targetPlayer.name}</p>
                         </div>
                       )}
+                      <div className="w-full flex items-center gap-2 mt-1">
+                        <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                          <motion.div className="h-full rounded-full"
+                            style={{ background: turnRemaining < 15_000 ? "#ef4444" : neonCyan }}
+                            animate={{ width: `${(turnRemaining / 60_000) * 100}%` }}
+                            transition={{ duration: 0.5 }} />
+                        </div>
+                        <span className="text-xs font-black w-10 text-left"
+                          style={{ color: turnRemaining < 15_000 ? "#ef4444" : neonCyan }}>
+                          {fmt(turnRemaining)}
+                        </span>
+                      </div>
                     </>
-                  )}
-                  {!currentTurnPlayer && <p className="text-purple-400/50 text-sm">في انتظار الدور...</p>}
-
-                  {/* Timer bar */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", width: 180 }}>
-                      <motion.div className="h-full rounded-full"
-                        style={{ background: turnRemaining < 15_000 ? "#ef4444" : neonCyan }}
-                        animate={{ width: `${(turnRemaining / 60_000) * 100}%` }}
-                        transition={{ duration: 0.5 }} />
-                    </div>
-                    <span className="text-xs font-black" style={{ color: turnRemaining < 15_000 ? "#ef4444" : neonCyan }}>
-                      {fmt(turnRemaining)}
-                    </span>
-                  </div>
+                  ) : <p className="text-purple-400/40 text-sm">في انتظار الدور...</p>}
                 </div>
 
-                {/* Players grid */}
+                {/* Players mini grid */}
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 flex-1">
                   {players.map((p, i) => {
                     const isCur = p.id === currentTurnId;
@@ -580,13 +595,12 @@ export default function ImposterGame() {
                     return (
                       <div key={p.id} className="flex flex-col items-center gap-1.5 p-2 rounded-xl"
                         style={{
-                          background: isCur ? `${neonPurple}15` : isTgt ? `${neonCyan}12` : "rgba(10,4,24,0.70)",
-                          border: `2px solid ${isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "25"}`,
-                          boxShadow: isCur ? `0 0 16px ${neonPurple}40` : isTgt ? `0 0 14px ${neonCyan}35` : "none",
+                          background: isCur ? `${neonPurple}15` : isTgt ? `${neonCyan}10` : "rgba(10,4,24,0.70)",
+                          border: `2px solid ${isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "20"}`,
                         }}>
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border"
+                        <div className="w-9 h-9 rounded-lg overflow-hidden border"
                           style={{ borderColor: isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "50" }}>
-                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                         </div>
                         <p className="text-[10px] font-black truncate w-full text-center"
                           style={{ color: isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) }}>
@@ -597,38 +611,33 @@ export default function ImposterGame() {
                   })}
                 </div>
 
-                {/* Controls */}
-                <div className="flex gap-2">
-                  <StreamerToggle />
-                  <button onClick={handleForceVote}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-purple-400/30 hover:text-red-400 border border-purple-500/10 hover:border-red-400/30 transition-all">
-                    <SkipForward size={12} /> التخطي للتصويت
-                  </button>
-                </div>
+                <button onClick={handleForceVote}
+                  className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-purple-400/30 hover:text-red-400 border border-purple-500/10 hover:border-red-400/30 transition-all">
+                  <SkipForward size={12}/> التخطي للتصويت
+                </button>
               </motion.div>
             )}
 
-            {/* ── HOST VOTING ── */}
+            {/* ─────────── VOTING (host) ─────────── */}
             {setupDone && phase === "voting" && (
               <motion.div key="host-voting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-5 flex-1">
-                <div className="text-center">
-                  <p className="text-2xl font-black" style={{ color: "#ffd600", textShadow: "0 0 20px #ffd60080" }}>🗳️ وقت التصويت!</p>
-                  <p className="text-sm text-purple-400/50 mt-1">اللاعبون يختارون من هو برا السالفة</p>
+                className="flex flex-col items-center gap-5 flex-1 px-4">
+                <div className="text-center mt-4">
+                  <p className="text-2xl font-black" style={{ color: "#ffd600" }}>🗳️ وقت التصويت!</p>
+                  <p className="text-sm text-purple-400/40 mt-1">اللاعبون يختارون من هو برا السالفة</p>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 w-full max-w-2xl">
                   {players.map((p, i) => (
                     <div key={p.id} className="flex flex-col items-center gap-2 p-3 rounded-2xl"
-                      style={{ background: "rgba(10,4,24,0.85)", border: `2px solid ${p.voted ? "#22c55e50" : playerColor(i) + "30"}`,
-                        opacity: p.disconnected ? 0.4 : 1 }}>
+                      style={{ background: "rgba(10,4,24,0.85)", border: `2px solid ${p.voted ? "#22c55e50" : playerColor(i) + "30"}` }}>
                       <div className="w-11 h-11 rounded-xl overflow-hidden border-2"
                         style={{ borderColor: p.voted ? "#22c55e" : playerColor(i) + "60" }}>
-                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                       </div>
                       <p className="text-[10px] font-black truncate w-full text-center" style={{ color: p.voted ? "#22c55e" : playerColor(i) }}>
                         {p.name}
                       </p>
-                      <span className="text-[9px]" style={{ color: p.voted ? "#22c55e80" : "rgba(139,92,246,0.35)" }}>
+                      <span className="text-[9px]" style={{ color: p.voted ? "#22c55e80" : "rgba(139,92,246,0.3)" }}>
                         {p.voted ? "✓ صوّت" : "ينتظر..."}
                       </span>
                     </div>
@@ -637,10 +646,10 @@ export default function ImposterGame() {
               </motion.div>
             )}
 
-            {/* ── HOST RESULT ── */}
+            {/* ─────────── RESULT (host) ─────────── */}
             {setupDone && phase === "result" && result && (
               <ResultScreen result={result} players={players}
-                onNewRound={handleNewRound} onHome={() => navigate("/")} isHost streamerMode={streamerMode} />
+                onNewRound={handleNewRound} onHome={() => navigate("/")} isHost />
             )}
 
           </AnimatePresence>
@@ -653,40 +662,37 @@ export default function ImposterGame() {
   // PLAYER VIEW
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className={`${base} flex flex-col items-center justify-center px-4`} dir="rtl" style={font}>
-      {/* Particles */}
+    <div className="min-h-screen gradient-bg relative overflow-hidden flex flex-col items-center justify-center px-4"
+      dir="rtl" style={font}>
+
+      {/* Ambient dots */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(10)].map((_, i) => (
+        {[...Array(12)].map((_, i) => (
           <motion.div key={i} className="absolute rounded-full"
             style={{ width: 2, height: 2, background: i%2===0 ? neonPurple : neonCyan,
               left: `${Math.random()*100}%`, top: `${Math.random()*100}%` }}
-            animate={{ opacity: [0.1, 0.5, 0.1] }}
-            transition={{ duration: 3+Math.random()*2, repeat: Infinity, delay: Math.random()*2 }} />
+            animate={{ opacity: [0.1, 0.45, 0.1] }}
+            transition={{ duration: 3+Math.random()*2, repeat: Infinity, delay: Math.random()*2 }}/>
         ))}
       </div>
 
-      {/* Streamer toggle — top right corner */}
-      {playerId && (
-        <div className="absolute top-4 left-4 z-20">
-          <StreamerToggle />
-        </div>
-      )}
-
-      <div className="relative z-10 flex flex-col items-center w-full max-w-sm gap-5">
+      <div className="relative z-10 w-full max-w-sm">
         <AnimatePresence mode="wait">
 
           {/* ── JOIN ── */}
           {!playerId && (
             <motion.div key="join" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center gap-6">
+              className="flex flex-col items-center gap-6">
               <div className="text-center">
-                <motion.div style={{ fontSize: 60 }} animate={{ rotate: [0,-8,8,0] }} transition={{ repeat: Infinity, duration: 3 }}>
+                <motion.div style={{ fontSize: 64 }}
+                  animate={{ rotate: [0,-8,8,0] }} transition={{ repeat: Infinity, duration: 3 }}>
                   🕵️
                 </motion.div>
-                <p className="text-3xl font-black mt-3" style={{ color: neonPurple, textShadow: `0 0 24px ${neonPurple}80` }}>
+                <h1 className="text-3xl font-black mt-3"
+                  style={{ color: neonPurple, textShadow: `0 0 24px ${neonPurple}80` }}>
                   برا السالفة
-                </p>
-                <div className="px-4 py-1.5 rounded-full inline-block mt-2"
+                </h1>
+                <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full mt-2"
                   style={{ background: `${neonPurple}18`, border: `1px solid ${neonPurple}40` }}>
                   <span className="text-sm font-black" style={{ color: neonPurple }}>الغرفة: {roomParam}</span>
                 </div>
@@ -694,11 +700,11 @@ export default function ImposterGame() {
 
               <div className="w-full flex flex-col gap-3 p-6 rounded-3xl"
                 style={{ background: "rgba(10,4,24,0.92)", border: `1px solid ${neonPurple}30` }}>
-                <label className="text-xs font-bold text-purple-300/70">اسمك في اللعبة</label>
+                <label className="text-xs font-bold text-purple-300/60">اسمك في اللعبة</label>
                 <input value={playerName} onChange={e => setPlayerName(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleJoin()}
                   placeholder="أدخل اسمك..."
-                  className="w-full bg-transparent border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 text-sm text-right" />
+                  className="w-full bg-transparent border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 text-sm text-right"/>
                 <motion.button onClick={handleJoin} disabled={!playerName.trim()}
                   className="w-full py-3.5 rounded-2xl font-black text-white text-base btn-shimmer disabled:opacity-30"
                   style={{ background: `linear-gradient(135deg,#7c3aed,${neonPurple})`, boxShadow: `0 4px 24px ${neonPurple}40` }}
@@ -709,21 +715,21 @@ export default function ImposterGame() {
             </motion.div>
           )}
 
-          {/* ── WAITING IN LOBBY ── */}
+          {/* ── WAITING ── */}
           {playerId && phase === "lobby" && (
             <motion.div key="p-lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex flex-col items-center gap-6 text-center">
-              <motion.div animate={{ scale: [1, 1.08, 1], rotate: [0, 5, -5, 0] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                style={{ fontSize: 72 }}>🕵️</motion.div>
+              <motion.div style={{ fontSize: 72 }}
+                animate={{ scale: [1,1.08,1], rotate: [0,5,-5,0] }}
+                transition={{ repeat: Infinity, duration: 2 }}>🕵️</motion.div>
               <div>
                 <p className="text-2xl font-black" style={{ color: neonPurple }}>
                   مرحباً {myPlayer?.name ?? playerName}!
                 </p>
-                <p className="text-purple-400/50 text-sm mt-1">في انتظار المضيف لبدء اللعبة...</p>
+                <p className="text-purple-400/40 text-sm mt-1">في انتظار المضيف لبدء اللعبة...</p>
               </div>
-              <div className="flex items-center gap-2 text-sm text-purple-400/40">
-                <Users size={14} /> <span>{players.length} لاعب في الغرفة</span>
+              <div className="flex items-center gap-2 text-sm text-purple-400/35">
+                <Users size={14}/> <span>{players.length} لاعب في الغرفة</span>
               </div>
             </motion.div>
           )}
@@ -732,74 +738,67 @@ export default function ImposterGame() {
           {playerId && phase === "playing" && myRole && !isMyTurn && !needAnswer && (() => {
             const isImposter = myRole.role === "imposter";
             return (
-              <motion.div key="p-role" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
+              <motion.div key="p-role"
+                initial={{ opacity: 0, scale: 0.75 }} animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 18 }}
-                className="relative w-full flex flex-col items-center gap-5 p-6 rounded-3xl text-center"
+                className="w-full flex flex-col items-center gap-5 p-6 rounded-3xl text-center"
                 style={{
                   background: isImposter ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)",
                   border: `2px solid ${isImposter ? "#ef4444" : "#22c55e"}`,
-                  boxShadow: `0 0 40px ${isImposter ? "#ef444430" : "#22c55e30"}`,
                 }}>
-
-                <StreamerShield active={streamerMode} />
-
-                <motion.span animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 2 }}
-                  style={{ fontSize: 68 }}>
+                <motion.span style={{ fontSize: 68 }}
+                  animate={{ rotate: [0,-10,10,0] }} transition={{ repeat: Infinity, duration: 2 }}>
                   {isImposter ? "🕵️" : "😎"}
                 </motion.span>
-
-                <div>
-                  {isImposter ? (
-                    <>
-                      <p className="text-3xl font-black text-red-400">برا السالفة! 🤫</p>
-                      <p className="text-sm text-red-300/60 mt-2">أجب بذكاء بدون أن يكشفوك</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xl font-black text-green-400 mb-3">جوا السالفة ✅</p>
-                      <div className="px-6 py-3 rounded-2xl"
-                        style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)" }}>
-                        <p className="text-xs text-green-400/60 mb-1">الكلمة السرية</p>
-                        <p className="text-3xl font-black text-white">{myRole.word}</p>
-                      </div>
-                      <p className="text-xs text-green-300/50 mt-3">اكشف من هو برا السالفة!</p>
-                    </>
-                  )}
-                </div>
-                <p className="text-xs text-purple-400/35 mt-1">انتظر دورك...</p>
+                {isImposter ? (
+                  <div>
+                    <p className="text-3xl font-black text-red-400">برا السالفة! 🤫</p>
+                    <p className="text-sm text-red-300/60 mt-2">أجب بذكاء دون أن يكشفوك</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xl font-black text-green-400 mb-3">جوا السالفة ✅</p>
+                    <div className="px-6 py-3 rounded-2xl"
+                      style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)" }}>
+                      <p className="text-xs text-green-400/60 mb-1">الكلمة السرية</p>
+                      <p className="text-3xl font-black text-white">{myRole.word}</p>
+                    </div>
+                    <p className="text-xs text-green-300/50 mt-3">اكشف من هو برا السالفة!</p>
+                  </div>
+                )}
+                <p className="text-xs text-purple-400/30">انتظر دورك...</p>
               </motion.div>
             );
           })()}
 
-          {/* ── MY TURN: SELECT TARGET ── */}
+          {/* ── MY TURN ── */}
           {playerId && phase === "playing" && isMyTurn && (
             <motion.div key="p-ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="w-full flex flex-col items-center gap-4">
-              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }}
-                className="text-center">
+              <motion.div className="text-center"
+                animate={{ scale: [1,1.08,1] }} transition={{ repeat: Infinity, duration: 1 }}>
                 <p className="text-2xl font-black" style={{ color: neonPurple }}>دورك الآن! 🎯</p>
-                <p className="text-sm text-purple-400/50 mt-1">اختر لاعباً تسأله</p>
+                <p className="text-sm text-purple-400/40 mt-1">اختر لاعباً تسأله</p>
               </motion.div>
               <div className="grid grid-cols-2 gap-3 w-full">
                 {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
                   <motion.button key={p.id} onClick={() => handleSelectTarget(p.id)}
                     className="flex flex-col items-center gap-2 p-4 rounded-2xl"
                     style={{ background: "rgba(10,4,24,0.90)", border: `2px solid ${playerColor(i)}40` }}
-                    whileHover={{ scale: 1.05, borderColor: playerColor(i) }}
+                    whileHover={{ scale: 1.04, borderColor: playerColor(i) }}
                     whileTap={{ scale: 0.95 }}>
                     <div className="w-14 h-14 rounded-2xl overflow-hidden border-2" style={{ borderColor: playerColor(i) }}>
-                      <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                      <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                     </div>
                     <p className="text-sm font-black" style={{ color: playerColor(i) }}>{p.name}</p>
                   </motion.button>
                 ))}
               </div>
-              {/* Turn timer */}
               <div className="w-full flex items-center gap-2">
-                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <div className="flex-1 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
                   <motion.div className="h-full rounded-full"
                     style={{ background: turnRemaining < 15_000 ? "#ef4444" : neonPurple }}
-                    animate={{ width: `${(turnRemaining/60_000)*100}%` }} transition={{ duration: 0.5 }} />
+                    animate={{ width: `${(turnRemaining/60_000)*100}%` }} transition={{ duration: 0.5 }}/>
                 </div>
                 <span className="text-xs font-black" style={{ color: turnRemaining < 15_000 ? "#ef4444" : neonPurple }}>
                   {fmt(turnRemaining)}
@@ -808,27 +807,27 @@ export default function ImposterGame() {
             </motion.div>
           )}
 
-          {/* ── ANSWER YES/NO ── */}
+          {/* ── ANSWER ── */}
           {playerId && phase === "playing" && needAnswer && (
-            <motion.div key="p-answer" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+            <motion.div key="p-answer" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 220, damping: 20 }}
               className="w-full flex flex-col items-center gap-6 text-center">
-              <motion.p animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 0.8 }}
-                className="text-2xl font-black" style={{ color: "#ffd600" }}>
+              <motion.p className="text-2xl font-black" style={{ color: "#ffd600" }}
+                animate={{ scale: [1,1.05,1] }} transition={{ repeat: Infinity, duration: 0.8 }}>
                 وُجّه لك سؤال! 👈
               </motion.p>
-              <p className="text-purple-400/60 text-sm">أجب بـ نعم أو لا فقط</p>
+              <p className="text-purple-400/50 text-sm">أجب بـ نعم أو لا فقط</p>
               <div className="flex gap-4 w-full">
                 <motion.button onClick={() => handleAnswer("yes")}
                   className="flex-1 py-6 rounded-3xl text-3xl font-black text-white"
-                  style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", boxShadow: "0 6px 30px #22c55e50" }}
-                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}>
+                  style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", boxShadow: "0 6px 28px #22c55e50" }}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}>
                   ✅ نعم
                 </motion.button>
                 <motion.button onClick={() => handleAnswer("no")}
                   className="flex-1 py-6 rounded-3xl text-3xl font-black text-white"
-                  style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 30px #ef444450" }}
-                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}>
+                  style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 28px #ef444450" }}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}>
                   ❌ لا
                 </motion.button>
               </div>
@@ -840,17 +839,14 @@ export default function ImposterGame() {
             <motion.div key="p-vote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="w-full flex flex-col items-center gap-5">
               <div className="text-center">
-                <p className="text-2xl font-black" style={{ color: "#ffd600", textShadow: "0 0 20px #ffd60080" }}>
-                  🗳️ من هو برا السالفة؟
-                </p>
-                <p className="text-sm text-purple-400/50 mt-1">اختر اللاعب الذي تظن أنه برا السالفة</p>
+                <p className="text-2xl font-black" style={{ color: "#ffd600" }}>🗳️ من هو برا السالفة؟</p>
+                <p className="text-sm text-purple-400/40 mt-1">اختر اللاعب الذي تظن أنه برا السالفة</p>
               </div>
-
               {myPlayer?.voted ? (
                 <div className="text-center p-6">
                   <p className="text-4xl mb-3">✅</p>
                   <p className="text-green-400 font-black">تم تسجيل صوتك!</p>
-                  <p className="text-purple-400/40 text-sm mt-1">في انتظار بقية اللاعبين...</p>
+                  <p className="text-purple-400/35 text-sm mt-1">في انتظار بقية اللاعبين...</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 w-full">
@@ -858,18 +854,17 @@ export default function ImposterGame() {
                     <motion.button key={p.id} onClick={() => handleVote(p.id)}
                       className="flex flex-col items-center gap-2 p-4 rounded-2xl"
                       style={{ background: "rgba(10,4,24,0.88)", border: `2px solid ${playerColor(i)}40` }}
-                      whileHover={{ scale: 1.05, borderColor: playerColor(i) }}
-                      whileTap={{ scale: 0.92 }}>
-                      <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
-                        style={{ borderColor: playerColor(i) + "70" }}>
-                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                      whileHover={{ scale: 1.04, borderColor: playerColor(i) }}
+                      whileTap={{ scale: 0.93 }}>
+                      <div className="w-12 h-12 rounded-xl overflow-hidden border-2" style={{ borderColor: playerColor(i) + "70" }}>
+                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                       </div>
                       <p className="text-xs font-black" style={{ color: playerColor(i) }}>{p.name}</p>
                     </motion.button>
                   ))}
                   <motion.button onClick={() => handleVote("skip")}
-                    className="col-span-2 py-3 rounded-2xl font-bold text-sm text-purple-400/50 border border-purple-500/20 hover:text-purple-300 hover:border-purple-400/30 transition-all"
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                    className="col-span-2 py-3 rounded-2xl font-bold text-sm text-purple-400/40 border border-purple-500/15 hover:text-purple-300 hover:border-purple-400/25 transition-all"
+                    whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}>
                     تخطي ↩
                   </motion.button>
                 </div>
@@ -877,11 +872,11 @@ export default function ImposterGame() {
             </motion.div>
           )}
 
-          {/* ── RESULT (player) ── */}
+          {/* ── RESULT ── */}
           {phase === "result" && result && (
             <ResultScreen result={result} players={players}
               onNewRound={() => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); }}
-              onHome={() => navigate("/")} isHost={false} streamerMode={streamerMode} />
+              onHome={() => navigate("/")} isHost={false} />
           )}
 
         </AnimatePresence>
@@ -890,10 +885,10 @@ export default function ImposterGame() {
   );
 }
 
-// ─── Shared Result Screen ──────────────────────────────────────────────────────
-function ResultScreen({ result, players, onNewRound, onHome, isHost, streamerMode }:
-  { result: Result; players: PublicPlayer[]; onNewRound: () => void; onHome: () => void; isHost: boolean; streamerMode?: boolean }) {
-  const playersWon = result.winner === "players";
+// ─── Result Screen ─────────────────────────────────────────────────────────────
+function ResultScreen({ result, players, onNewRound, onHome, isHost }:
+  { result: Result; players: PublicPlayer[]; onNewRound: () => void; onHome: () => void; isHost: boolean }) {
+  const playersWon    = result.winner === "players";
   const imposterPlayer = players.find(p => p.id === result.imposterId);
 
   return (
@@ -902,45 +897,40 @@ function ResultScreen({ result, players, onNewRound, onHome, isHost, streamerMod
       style={{ background: "rgba(5,0,18,0.97)" }} dir="rtl">
 
       {[...Array(16)].map((_, i) => (
-        <motion.div key={i} className="absolute text-2xl pointer-events-none"
-          style={{ left: `${Math.random() * 100}%`, top: "-10%" }}
-          animate={{ y: "110vh", rotate: [0, 360], opacity: [1, 0] }}
-          transition={{ duration: 2 + Math.random() * 2, delay: Math.random() * 1.5, repeat: Infinity }}>
+        <motion.div key={i} className="absolute text-xl pointer-events-none"
+          style={{ left: `${Math.random()*100}%`, top: "-10%" }}
+          animate={{ y: "110vh", rotate: [0,360], opacity: [1,0] }}
+          transition={{ duration: 2+Math.random()*2, delay: Math.random()*1.5, repeat: Infinity }}>
           {["🎉","⭐","🕵️","💫","🎊","✨","🏆","🎈"][i % 8]}
         </motion.div>
       ))}
 
       <div className="relative z-10 flex flex-col items-center gap-6 max-w-sm w-full">
-        <motion.div animate={{ rotate: [0, -10, 10, 0], y: [0, -10, 0] }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          style={{ fontSize: 72 }}>
+        <motion.div style={{ fontSize: 72 }}
+          animate={{ rotate: [0,-10,10,0], y: [0,-10,0] }}
+          transition={{ duration: 0.8, delay: 0.2 }}>
           {playersWon ? "🏆" : "🕵️"}
         </motion.div>
 
-        <div>
-          <p className="text-3xl font-black mb-1"
-            style={{ color: playersWon ? "#22c55e" : "#ef4444", textShadow: `0 0 24px ${playersWon ? "#22c55e" : "#ef4444"}80` }}>
-            {playersWon ? "اللاعبون فازوا! 🎉" : "برا السالفة فاز! 🕵️"}
-          </p>
-        </div>
+        <p className="text-3xl font-black"
+          style={{ color: playersWon ? "#22c55e" : "#ef4444", textShadow: `0 0 24px ${playersWon ? "#22c55e" : "#ef4444"}80` }}>
+          {playersWon ? "اللاعبون فازوا! 🎉" : "برا السالفة فاز! 🕵️"}
+        </p>
 
-        {/* Reveal card */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-          className="relative w-full p-5 rounded-3xl flex flex-col items-center gap-3"
-          style={{ background: "rgba(10,4,24,0.92)", border: "2px solid rgba(239,68,68,0.5)" }}>
-
-          <StreamerShield active={!!streamerMode} label="أخفى للبث 🔴 — اضغط لإيقاف" />
-
-          <p className="text-xs font-bold text-red-400/70">برا السالفة كان...</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          className="w-full p-5 rounded-3xl flex flex-col items-center gap-3"
+          style={{ background: "rgba(10,4,24,0.92)", border: "2px solid rgba(239,68,68,0.45)" }}>
+          <p className="text-xs font-bold text-red-400/60">برا السالفة كان...</p>
           {imposterPlayer && (
             <div className="w-16 h-16 rounded-2xl overflow-hidden border-2"
-              style={{ borderColor: "#ef4444", boxShadow: "0 0 24px rgba(239,68,68,0.5)" }}>
-              <img src={imposterPlayer.avatar} alt={imposterPlayer.name} className="w-full h-full object-cover" />
+              style={{ borderColor: "#ef4444", boxShadow: "0 0 22px rgba(239,68,68,0.5)" }}>
+              <img src={imposterPlayer.avatar} alt={imposterPlayer.name} className="w-full h-full object-cover"/>
             </div>
           )}
           <p className="text-2xl font-black text-red-400">{result.imposterName}</p>
-          <div className="px-5 py-2 rounded-xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <p className="text-xs text-purple-400/50 mb-0.5">الكلمة كانت</p>
+          <div className="px-5 py-2 rounded-xl"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <p className="text-xs text-purple-400/45 mb-0.5">الكلمة كانت</p>
             <p className="text-xl font-black text-white">{result.word}</p>
           </div>
         </motion.div>
@@ -956,7 +946,7 @@ function ResultScreen({ result, players, onNewRound, onHome, isHost, streamerMod
           )}
           <motion.button onClick={onHome}
             className="flex-1 py-3 rounded-2xl font-black text-purple-300 text-sm"
-            style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)" }}
+            style={{ background: "rgba(139,92,246,0.14)", border: "1px solid rgba(139,92,246,0.28)" }}
             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
             الرئيسية
           </motion.button>
