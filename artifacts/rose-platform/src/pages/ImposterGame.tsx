@@ -486,108 +486,154 @@ export default function ImposterGame() {
             {/* ─────────── SCREEN 2: Lobby ─────────── */}
             {setupDone && phase === "lobby" && (
               <motion.div key="lobby"
-                initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
-                className="flex flex-col flex-1 px-4 pb-6 gap-4 max-w-2xl mx-auto w-full">
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="flex flex-col flex-1 px-4 pb-6 gap-5 max-w-2xl mx-auto w-full pt-2">
 
-                {/* ── Start button — TOP, prominent ── */}
-                <div className="mt-2">
-                  <motion.button
-                    onClick={handleStart}
-                    disabled={players.length < 3}
-                    className="w-full py-4 rounded-2xl font-black text-white text-lg btn-shimmer disabled:opacity-30 disabled:cursor-not-allowed relative overflow-hidden"
-                    style={{
-                      background: players.length >= 3
-                        ? "linear-gradient(135deg,#16a34a,#22c55e,#16a34a)"
-                        : "rgba(255,255,255,0.06)",
-                      border: players.length >= 3 ? "none" : "2px solid rgba(255,255,255,0.1)",
-                      boxShadow: players.length >= 3 ? "0 6px 32px rgba(34,197,94,0.50)" : "none",
-                      color: players.length >= 3 ? "#fff" : "rgba(255,255,255,0.3)",
-                    }}
-                    whileHover={players.length >= 3 ? { scale: 1.03 } : {}}
-                    whileTap={players.length >= 3 ? { scale: 0.97 } : {}}>
-                    {players.length >= 3
-                      ? `▶ ابدأ اللعبة  (${players.length} لاعبين)`
-                      : `يلزم ${3 - players.length} لاعبين إضافيين للبدء`}
-                  </motion.button>
+                {/* ══ GAME NAME ══ */}
+                <div className="text-center">
+                  <p className="text-xs font-bold text-white/40 mb-0.5">الغرفة جاهزة</p>
+                  <h2 className="text-2xl font-black" style={{ color: "#fff", textShadow: `0 0 20px ${neonPurple}90` }}>
+                    🕵️ برا السالفة
+                  </h2>
                 </div>
 
-                {/* ── Invite section ── */}
-                <div className="rounded-2xl p-4 flex flex-col gap-3"
-                  style={{ background: "rgba(10,4,24,0.90)", border: `1px solid ${neonPurple}30` }}>
+                {/* ══ START BUTTON ══ */}
+                <motion.button
+                  onClick={handleStart}
+                  disabled={players.length < 3}
+                  className="w-full py-5 rounded-2xl font-black text-white text-xl relative overflow-hidden"
+                  style={players.length >= 3 ? {
+                    background: "linear-gradient(135deg, #15803d, #22c55e, #16a34a)",
+                    boxShadow: "0 0 0 1px #22c55e60, 0 8px 40px rgba(34,197,94,0.55)",
+                  } : {
+                    background: "rgba(255,255,255,0.05)",
+                    border: "2px solid rgba(255,255,255,0.12)",
+                    color: "rgba(255,255,255,0.35)",
+                    cursor: "not-allowed",
+                  }}
+                  whileHover={players.length >= 3 ? { scale: 1.02, boxShadow: "0 0 0 1px #22c55e80, 0 12px 50px rgba(34,197,94,0.65)" } : {}}
+                  whileTap={players.length >= 3 ? { scale: 0.97 } : {}}>
+                  {players.length >= 3 ? (
+                    <span className="flex items-center justify-center gap-3">
+                      <span className="text-2xl">▶</span>
+                      <span>ابدأ اللعبة</span>
+                      <span className="text-sm font-bold opacity-80">({players.length} لاعبين)</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2 text-base">
+                      <Users size={16} />
+                      يلزم {Math.max(0, 3 - players.length)} لاعبين إضافيين للبدء
+                    </span>
+                  )}
+                  {players.length >= 3 && (
+                    <motion.div className="absolute inset-0 pointer-events-none"
+                      style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
+                      animate={{ x: ["-100%", "200%"] }}
+                      transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }} />
+                  )}
+                </motion.button>
 
-                  {/* Room meta */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-purple-400/50 font-bold">رمز الغرفة</p>
-                    <p className="text-2xl font-black tracking-widest"
-                      style={{ color: neonPurple, textShadow: `0 0 18px ${neonPurple}80` }}>
-                      {roomCode}
-                    </p>
+                {/* ══ INVITE CARD ══ */}
+                <div className="rounded-2xl overflow-hidden"
+                  style={{ border: `1.5px solid ${neonPurple}55`, background: "rgba(14,6,30,0.95)" }}>
+
+                  {/* Room code header */}
+                  <div className="flex items-center justify-between px-4 py-3"
+                    style={{ borderBottom: `1px solid ${neonPurple}25`, background: `${neonPurple}0e` }}>
+                    <span className="text-xs font-bold text-white/50">رابط الدعوة</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white/40">رمز الغرفة:</span>
+                      <span className="text-lg font-black tracking-widest"
+                        style={{ color: neonPurple, textShadow: `0 0 14px ${neonPurple}` }}>
+                        {roomCode}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Link row */}
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center px-3 py-3">
                     <input
                       readOnly
                       value={inviteUrl}
                       onClick={e => (e.target as HTMLInputElement).select()}
-                      className="flex-1 text-xs px-3 py-2.5 rounded-xl text-purple-300/60 bg-transparent border cursor-text focus:outline-none"
-                      style={{ borderColor: `${neonPurple}25`, direction: "ltr", fontFamily: "monospace" }}
-                    />
-                    <motion.button
-                      onClick={copyLink}
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all shrink-0"
+                      className="flex-1 text-xs px-3 py-2 rounded-xl focus:outline-none cursor-text font-mono"
                       style={{
-                        background: copied ? "rgba(34,197,94,0.2)" : `${neonPurple}20`,
-                        border: `1px solid ${copied ? "rgba(34,197,94,0.5)" : `${neonPurple}45`}`,
-                        color: copied ? "#22c55e" : neonPurple,
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        color: "rgba(255,255,255,0.75)",
+                        direction: "ltr",
                       }}
-                      whileTap={{ scale: 0.94 }}>
+                    />
+                    <motion.button onClick={copyLink}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-sm whitespace-nowrap shrink-0"
+                      style={copied ? {
+                        background: "rgba(34,197,94,0.25)",
+                        border: "1px solid #22c55e80",
+                        color: "#4ade80",
+                      } : {
+                        background: `${neonPurple}25`,
+                        border: `1px solid ${neonPurple}70`,
+                        color: neonPurple,
+                      }}
+                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }}>
                       {copied ? <Check size={14}/> : <Copy size={14}/>}
-                      {copied ? "تم!" : "نسخ"}
+                      {copied ? "تم النسخ!" : "نسخ"}
                     </motion.button>
                   </div>
                 </div>
 
-                {/* ── Players ── */}
+                {/* ══ PLAYERS ══ */}
                 <div className="flex flex-col gap-3 flex-1">
-                  <div className="flex items-center gap-2 text-purple-400/40 text-xs font-bold">
-                    <Users size={13}/>
-                    <span>اللاعبون ({players.length})</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users size={14} color="#a78bfa"/>
+                      <span className="text-sm font-black text-white/70">اللاعبون</span>
+                    </div>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: `${neonPurple}20`, color: neonPurple, border: `1px solid ${neonPurple}40` }}>
+                      {players.length} / ∞
+                    </span>
                   </div>
 
                   {players.length === 0 ? (
-                    <motion.div
-                      className="flex flex-col items-center justify-center py-12 rounded-2xl"
-                      style={{ border: "1px dashed rgba(224,64,251,0.2)" }}>
-                      <motion.p
-                        animate={{ opacity: [0.3, 0.7, 0.3] }}
-                        transition={{ repeat: Infinity, duration: 2 }}
-                        className="text-purple-400/35 text-sm font-bold">
-                        في انتظار اللاعبين... 👀
+                    <div className="flex flex-col items-center justify-center py-10 rounded-2xl gap-2"
+                      style={{ border: `1px dashed ${neonPurple}30`, background: "rgba(224,64,251,0.04)" }}>
+                      <motion.span style={{ fontSize: 36 }}
+                        animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 1.8 }}>
+                        👀
+                      </motion.span>
+                      <motion.p className="text-sm font-black text-white/50"
+                        animate={{ opacity: [0.4, 0.9, 0.4] }} transition={{ repeat: Infinity, duration: 2 }}>
+                        في انتظار اللاعبين...
                       </motion.p>
-                      <p className="text-purple-400/20 text-xs mt-2">شارك رابط الدعوة أعلاه</p>
-                    </motion.div>
+                      <p className="text-xs text-white/25">شارك رابط الدعوة أعلاه</p>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       <AnimatePresence>
                         {players.map((p, i) => (
                           <motion.div key={p.id}
-                            initial={{ opacity: 0, scale: 0.65 }}
+                            initial={{ opacity: 0, scale: 0.6 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.5 }}
-                            transition={{ type: "spring", stiffness: 280, damping: 22 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 22 }}
                             className="relative flex flex-col items-center gap-2 p-3 rounded-2xl group"
-                            style={{ background: playerColor(i) + "0d", border: `2px solid ${playerColor(i)}35` }}>
+                            style={{
+                              background: playerColor(i) + "18",
+                              border: `2px solid ${playerColor(i)}60`,
+                              boxShadow: `0 2px 16px ${playerColor(i)}20`,
+                            }}>
                             <button onClick={() => handleRemove(p.id)}
-                              className="absolute top-1 left-1 w-5 h-5 rounded-full hidden group-hover:flex items-center justify-center bg-red-500/20 hover:bg-red-500/50 text-red-400 text-xs font-black">
+                              className="absolute top-1 left-1 w-5 h-5 rounded-full hidden group-hover:flex items-center justify-center font-black text-xs"
+                              style={{ background: "rgba(239,68,68,0.3)", color: "#f87171", border: "1px solid rgba(239,68,68,0.5)" }}>
                               ✕
                             </button>
                             <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
-                              style={{ borderColor: playerColor(i), boxShadow: `0 0 10px ${playerColor(i)}40` }}>
+                              style={{ borderColor: playerColor(i), boxShadow: `0 0 12px ${playerColor(i)}55` }}>
                               <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                             </div>
                             <p className="text-xs font-black truncate w-full text-center"
-                              style={{ color: playerColor(i) }}>
+                              style={{ color: "#fff", textShadow: `0 0 8px ${playerColor(i)}` }}>
                               {p.name}
                             </p>
                           </motion.div>
