@@ -162,7 +162,6 @@ export default function ImposterGame() {
 
   // ── Host state ─────────────────────────────────────────────────────────────
   const [setupDone, setSetupDone] = useState(false);
-  const [showSetupModal, setShowSetupModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category>("عام");
   const [selectedDuration, setSelectedDuration] = useState(10);
   const [streamerBoxVisible, setStreamerBoxVisible] = useState(false);
@@ -262,14 +261,9 @@ export default function ImposterGame() {
   }, [connectWs, mode]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleCreateRoom = () => {
-    setShowSetupModal(true);
-  };
-
   const handleConfirmCreate = () => {
     if (creating) return;
     setCreating(true);
-    setShowSetupModal(false);
     connectWs(true, { category: selectedCategory, duration: selectedDuration });
   };
 
@@ -350,100 +344,6 @@ export default function ImposterGame() {
           )}
         </AnimatePresence>
 
-        {/* ── Setup Modal (category + duration) ── */}
-        <AnimatePresence>
-          {showSetupModal && (
-            <motion.div
-              key="setup-modal"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0"
-              style={{ background: "rgba(5,0,18,0.85)" }}
-              onClick={e => { if (e.target === e.currentTarget) setShowSetupModal(false); }}>
-              <motion.div
-                initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 60, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 24 }}
-                className="w-full max-w-sm flex flex-col gap-5 p-6 rounded-3xl"
-                style={{ background: "rgba(10,4,24,0.98)", border: `2px solid ${neonPurple}40` }}>
-
-                {/* Modal header */}
-                <div className="flex items-center justify-between">
-                  <p className="font-black text-white text-lg">⚙️ إعدادات الغرفة</p>
-                  <button onClick={() => setShowSetupModal(false)}
-                    className="text-purple-400/40 hover:text-purple-300 transition-colors text-xl font-black">✕</button>
-                </div>
-
-                {/* Category */}
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs font-bold text-purple-400/50">الفئة</p>
-                  <div className="grid grid-cols-5 gap-2">
-                    {([
-                      { id: "عام" as Category,     emoji: "🎲", color: "#22c55e" },
-                      { id: "دول" as Category,     emoji: "🌍", color: "#3b82f6" },
-                      { id: "حيوانات" as Category, emoji: "🦁", color: "#f97316" },
-                      { id: "أكلات" as Category,   emoji: "🍕", color: "#ef4444" },
-                      { id: "أشياء" as Category,   emoji: "📦", color: "#a78bfa" },
-                    ]).map(cat => {
-                      const active = selectedCategory === cat.id;
-                      return (
-                        <motion.button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
-                          className="flex flex-col items-center gap-1 py-3 rounded-2xl transition-all"
-                          style={{
-                            background: active ? cat.color + "20" : "rgba(255,255,255,0.04)",
-                            border: `2px solid ${active ? cat.color : "rgba(255,255,255,0.08)"}`,
-                            boxShadow: active ? `0 0 14px ${cat.color}40` : "none",
-                          }}
-                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <span style={{ fontSize: 20 }}>{cat.emoji}</span>
-                          <span className="text-[9px] font-black" style={{ color: active ? cat.color : "rgba(255,255,255,0.35)" }}>
-                            {cat.id}
-                          </span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Duration */}
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs font-bold text-purple-400/50">⏱ مدة الجلسة</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[5, 10, 15, 20].map(d => {
-                      const active = selectedDuration === d;
-                      return (
-                        <motion.button key={d} onClick={() => setSelectedDuration(d)}
-                          className="py-3 rounded-2xl font-black text-sm transition-all flex flex-col items-center gap-0.5"
-                          style={{
-                            background: active ? `${neonCyan}18` : "rgba(255,255,255,0.04)",
-                            border: `2px solid ${active ? neonCyan : "rgba(255,255,255,0.08)"}`,
-                            color: active ? neonCyan : "rgba(255,255,255,0.40)",
-                            boxShadow: active ? `0 0 12px ${neonCyan}35` : "none",
-                          }}
-                          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}>
-                          <span className="text-base">{d}</span>
-                          <span style={{ fontSize: 10 }}>دقيقة</span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Confirm button */}
-                <motion.button onClick={handleConfirmCreate} disabled={creating}
-                  className="w-full py-4 rounded-2xl font-black text-white text-base btn-shimmer disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)", boxShadow: `0 6px 28px ${neonPurple}50` }}
-                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                  {creating ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
-                      جاري الإنشاء...
-                    </span>
-                  ) : "إنشاء الغرفة 🚀"}
-                </motion.button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* ── Page content ── */}
         <div className="relative z-10 flex flex-col min-h-screen">
 
@@ -461,64 +361,123 @@ export default function ImposterGame() {
 
           <AnimatePresence mode="wait">
 
-            {/* ─────────── SCREEN 1: Create Room ─────────── */}
+            {/* ─────────── SCREEN 1: Settings Card (shown immediately) ─────────── */}
             {!setupDone && (
               <motion.div key="create"
-                initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-                className="flex flex-col items-center justify-center flex-1 px-5 gap-10">
+                initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className="flex flex-col items-center justify-center flex-1 px-4 py-4">
 
-                {/* Hero */}
-                <div className="flex flex-col items-center gap-4 text-center">
-                  <motion.div
-                    animate={{ rotate: [0, -8, 8, -4, 4, 0], y: [0, -6, 0] }}
-                    transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                    style={{ fontSize: 80, filter: `drop-shadow(0 0 20px ${neonPurple}70)` }}>
-                    🕵️
-                  </motion.div>
-                  <div>
-                    <h1 className="text-5xl font-black leading-tight"
-                      style={{ color: "#fff", textShadow: `0 0 30px ${neonPurple}80` }}>
+                <div className="w-full max-w-sm flex flex-col gap-5 p-6 rounded-3xl"
+                  style={{ background: "rgba(10,4,24,0.95)", border: `2px solid ${neonPurple}45`,
+                    boxShadow: `0 12px 60px rgba(0,0,0,0.7), 0 0 40px ${neonPurple}15` }}>
+
+                  {/* Card header */}
+                  <div className="flex flex-col items-center gap-2 text-center pb-2"
+                    style={{ borderBottom: `1px solid ${neonPurple}20` }}>
+                    <motion.span style={{ fontSize: 48, filter: `drop-shadow(0 0 16px ${neonPurple}80)` }}
+                      animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}>
+                      🕵️
+                    </motion.span>
+                    <h1 className="text-2xl font-black" style={{ color: neonPurple, textShadow: `0 0 20px ${neonPurple}60` }}>
                       برا السالفة
                     </h1>
-                    <p className="text-purple-400/50 text-base mt-2 font-bold">اكتشف من هو خارج الموضوع</p>
+                    <p className="text-[11px] text-purple-400/40 font-bold">إعدادات الغرفة</p>
                   </div>
-                </div>
 
-                {/* Buttons */}
-                <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                  {/* Category */}
+                  <div className="flex flex-col gap-2.5">
+                    <p className="text-xs font-black text-purple-300/60">الفئة</p>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {([
+                        { id: "عام"     as Category, emoji: "🎲", color: "#22c55e" },
+                        { id: "دول"     as Category, emoji: "🌍", color: "#3b82f6" },
+                        { id: "حيوانات"as Category, emoji: "🦁", color: "#f97316" },
+                        { id: "أكلات"  as Category, emoji: "🍕", color: "#ef4444" },
+                        { id: "أشياء"  as Category, emoji: "📦", color: "#a78bfa" },
+                      ]).map(cat => {
+                        const active = selectedCategory === cat.id;
+                        return (
+                          <motion.button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
+                            className="flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all"
+                            style={{
+                              background: active ? cat.color + "22" : "rgba(255,255,255,0.04)",
+                              border: `2px solid ${active ? cat.color : "rgba(255,255,255,0.07)"}`,
+                              boxShadow: active ? `0 0 12px ${cat.color}40` : "none",
+                            }}
+                            whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
+                            <span style={{ fontSize: 18 }}>{cat.emoji}</span>
+                            <span className="text-[9px] font-black leading-none"
+                              style={{ color: active ? cat.color : "rgba(255,255,255,0.30)" }}>
+                              {cat.id}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Duration */}
+                  <div className="flex flex-col gap-2.5">
+                    <p className="text-xs font-black text-purple-300/60">⏱ مدة الجلسة</p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[5, 10, 15, 20].map(d => {
+                        const active = selectedDuration === d;
+                        return (
+                          <motion.button key={d} onClick={() => setSelectedDuration(d)}
+                            className="py-3 rounded-xl font-black text-sm flex flex-col items-center gap-0.5 transition-all"
+                            style={{
+                              background: active ? `${neonCyan}18` : "rgba(255,255,255,0.04)",
+                              border: `2px solid ${active ? neonCyan : "rgba(255,255,255,0.07)"}`,
+                              color: active ? neonCyan : "rgba(255,255,255,0.35)",
+                              boxShadow: active ? `0 0 12px ${neonCyan}35` : "none",
+                            }}
+                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}>
+                            <span className="text-base leading-none">{d}</span>
+                            <span style={{ fontSize: 9 }}>دقيقة</span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Streamer mode toggle */}
-                  <motion.button
-                    onClick={() => setStreamerBoxVisible(v => !v)}
-                    className="w-full py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all"
-                    style={{
-                      background: streamerBoxVisible ? "rgba(239,68,68,0.18)" : "rgba(255,255,255,0.06)",
-                      border: `2px solid ${streamerBoxVisible ? "#ef444460" : "rgba(255,255,255,0.12)"}`,
-                      color: streamerBoxVisible ? "#ef4444" : "rgba(255,255,255,0.55)",
-                    }}
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
-                    🎥 {streamerBoxVisible ? "إخفاء مربع الستريمر" : "وضع الستريمر"}
-                  </motion.button>
+                  <div className="flex items-center justify-between px-1 py-1"
+                    style={{ borderTop: `1px solid ${neonPurple}15` }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🎥</span>
+                      <div>
+                        <p className="text-xs font-black text-white/60">وضع الستريمر</p>
+                        <p className="text-[10px] text-purple-400/30">مربع أسود قابل للسحب</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setStreamerBoxVisible(v => !v)}
+                      className="relative w-11 h-6 rounded-full transition-all"
+                      style={{
+                        background: streamerBoxVisible
+                          ? "linear-gradient(135deg,#7c3aed,#e040fb)"
+                          : "rgba(255,255,255,0.10)",
+                      }}>
+                      <motion.span
+                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
+                        animate={{ right: streamerBoxVisible ? 2 : undefined, left: streamerBoxVisible ? undefined : 2 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }}
+                      />
+                    </button>
+                  </div>
 
-                  {/* Create room */}
-                  <motion.button
-                    onClick={handleCreateRoom}
-                    disabled={creating}
-                    className="w-full py-4 rounded-2xl font-black text-white text-xl btn-shimmer disabled:opacity-60 relative overflow-hidden"
-                    style={{
-                      background: "linear-gradient(135deg,#7c3aed,#e040fb,#7c3aed)",
-                      backgroundSize: "200% 100%",
-                      boxShadow: `0 8px 40px ${neonPurple}60`,
-                    }}
-                    animate={creating ? {} : { backgroundPosition: ["0% 0%", "100% 0%", "0% 0%"] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                    whileHover={creating ? {} : { scale: 1.04 }}
-                    whileTap={creating ? {} : { scale: 0.97 }}>
+                  {/* Create button */}
+                  <motion.button onClick={handleConfirmCreate} disabled={creating}
+                    className="w-full py-4 rounded-2xl font-black text-white text-base btn-shimmer disabled:opacity-50"
+                    style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)", boxShadow: `0 6px 32px ${neonPurple}55` }}
+                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                     {creating ? (
                       <span className="flex items-center justify-center gap-2">
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                         جاري الإنشاء...
                       </span>
-                    ) : "إنشاء غرفة 🚀"}
+                    ) : "إنشاء الغرفة 🚀"}
                   </motion.button>
                 </div>
               </motion.div>
