@@ -1,13 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Wifi, WifiOff, X, RotateCcw, Play, Edit2, Check } from "lucide-react";
+import { ArrowRight, Wifi, WifiOff, X, RotateCcw, Play } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Player {
   username: string;
   displayName: string;
-  avatarUrl: string | null;
+  avatar: string;
   color: string;
 }
 interface FruitCard {
@@ -17,7 +18,6 @@ interface FruitCard {
   revealed: boolean;
 }
 type Phase = "lobby" | "playing";
-type ConnStatus = "disconnected" | "connecting" | "connected" | "error";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS = [
@@ -55,154 +55,109 @@ function shuffle<T>(a: T[]): T[] {
   return arr;
 }
 
-function dicebear(username: string) {
-  return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(username)}`;
-}
-
 interface Toast { id: number; name: string }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function FruitsGame() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
 
-  const [phase, setPhase]             = useState<Phase>("lobby");
-  const [connStatus, setConnStatus]   = useState<ConnStatus>("disconnected");
-  const [channel, setChannel]         = useState("rose_stream");
-  const [channelInput, setChannelInput] = useState("rose_stream");
-  const [editingChannel, setEditingChannel] = useState(false);
-  const [players, setPlayers]         = useState<Player[]>([]);
-  const [cards, setCards]             = useState<FruitCard[]>([]);
-  const [toasts, setToasts]           = useState<Toast[]>([]);
+  const [phase, setPhase]               = useState<Phase>("lobby");
+  const [twitchConnected, setTwitchConnected] = useState(false);
+  const [players, setPlayers]           = useState<Player[]>([]);
+  const [cards, setCards]               = useState<FruitCard[]>([]);
+  const [toasts, setToasts]             = useState<Toast[]>([]);
+  const [joinMsg, setJoinMsg]           = useState("");
 
-  const wsRef         = useRef<WebSocket | null>(null);
-  const phaseRef      = useRef<Phase>("lobby");
-  const playersRef    = useRef<Player[]>([]);
-  const toastCounter  = useRef(0);
-  const retryRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const channelRef    = useRef(channel);
+  // ── Refs (same pattern as XO) ─────────────────────────────────────────────
+  const wsRef        = useRef<WebSocket | null>(null);
+  const phaseRef     = useRef<Phase>("lobby");
+  const playersRef   = useRef<Player[]>([]);
+  const connectedRef = useRef(false);
+  const toastCounter = useRef(0);
 
-  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  useEffect(() => { phaseRef.current = phase; },    [phase]);
   useEffect(() => { playersRef.current = players; }, [players]);
-  useEffect(() => { channelRef.current = channel; }, [channel]);
 
   // ── Toast ─────────────────────────────────────────────────────────────────
-  const showToast = useCallback((name: string) => {
+  const showToast = (name: string) => {
     const id = ++toastCounter.current;
     setToasts(prev => [...prev, { id, name }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-  }, []);
-
-  // ── Twitch avatar fetch ────────────────────────────────────────────────────
-  const fetchTwitchUser = async (username: string): Promise<{ avatarUrl: string | null; displayName: string }> => {
-    try {
-      const res = await fetch(`/api/twitch/user/${encodeURIComponent(username)}`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
-    return { avatarUrl: null, displayName: username };
   };
 
-  // ── Add player (shared logic) ─────────────────────────────────────────────
-  const addPlayer = useCallback(async (username: string) => {
-    if (playersRef.current.some(p => p.username.toLowerCase() === username.toLowerCase())) return;
-    if (phaseRef.current !== "lobby") return;
-
-    const { avatarUrl, displayName } = await fetchTwitchUser(username);
-    setPlayers(prev => {
-      if (prev.some(p => p.username.toLowerCase() === username.toLowerCase())) return prev;
-      const newPlayer: Player = {
-        username,
-        displayName,
-        avatarUrl,
-        color: COLORS[prev.length % COLORS.length],
-      };
-      showToast(displayName);
-      return [...prev, newPlayer];
-    });
-  }, [showToast]);
-
-  // ── Twitch IRC WebSocket ───────────────────────────────────────────────────
-  const connect = useCallback((ch: string) => {
-    if (retryRef.current) clearTimeout(retryRef.current);
-    wsRef.current?.close();
-    wsRef.current = null;
-
-    const cleanCh = ch.toLowerCase().replace(/^#/, "").trim();
-    if (!cleanCh) return;
-
-    setConnStatus("connecting");
+  // ── Twitch IRC — exact same pattern as XO ────────────────────────────────
+  const connectTwitch = useCallback((channel: string) => {
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    const ch = channel.toLowerCase().replace(/^#/, "");
     const ws = new WebSocket("wss://irc-ws.chat.twitch.tv");
     wsRef.current = ws;
 
     ws.onopen = () => {
       ws.send("PASS SCHMOOPIIE");
-      ws.send(`NICK justinfan${Math.floor(100000 + Math.random() * 900000)}`);
-      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
-      ws.send(`JOIN #${cleanCh}`);
+      ws.send(`NICK justinfan${Math.floor(Math.random() * 89999) + 10000}`);
+      ws.send(`JOIN #${ch}`);
     };
 
-    ws.onmessage = async (ev: MessageEvent) => {
-      const raw: string = ev.data;
-
-      // Handle PING
-      if (raw.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); return; }
-
-      // Confirm join
-      if (raw.includes("366") || raw.includes("ROOMSTATE") || raw.includes("JOIN")) {
-        setConnStatus("connected");
-      }
-
-      // Handle RECONNECT
-      if (raw.includes("RECONNECT")) {
-        ws.close();
-        retryRef.current = setTimeout(() => connect(channelRef.current), 2000);
-        return;
-      }
-
-      // Parse PRIVMSG — supports both tag-prefixed and plain formats
-      const lines = raw.split("\r\n").filter(Boolean);
+    ws.onmessage = e => {
+      const lines = (e.data as string).split("\r\n").filter(Boolean);
       for (const line of lines) {
-        const m = line.match(/^(?:@[^ ]+ )?:(\w+)![\w.@]+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
-        if (!m) continue;
-        const [, username, msg] = m;
-        const text = msg.trim().toLowerCase();
-
-        if ((text === "join" || text === "انضم") && phaseRef.current === "lobby") {
-          await addPlayer(username);
+        if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); continue; }
+        if (line.includes("366") || line.includes("ROOMSTATE")) {
+          setTwitchConnected(true);
+          continue;
         }
+        // ← same regex as XOGame exactly
+        const m = line.match(/^(?:@[^ ]+ )?:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
+        if (m) handleChatMsg(m[1], m[2].trim());
       }
     };
 
-    ws.onclose = (e) => {
-      setConnStatus("disconnected");
-      // Auto-retry unless intentionally closed
-      if (e.code !== 1000) {
-        retryRef.current = setTimeout(() => connect(channelRef.current), 4000);
-      }
-    };
+    ws.onclose = () => setTwitchConnected(false);
+  }, []);
 
-    ws.onerror = () => {
-      setConnStatus("error");
-      ws.close();
-    };
-  }, [addPlayer]);
+  // Connect when user is ready — same pattern as XO
+  if (!connectedRef.current && user?.username) {
+    connectedRef.current = true;
+    setTimeout(() => connectTwitch(user.username), 80);
+  }
 
-  // Connect on mount & on channel change
+  // Cleanup on unmount
   useEffect(() => {
-    connect(channel);
-    return () => {
-      if (retryRef.current) clearTimeout(retryRef.current);
-      wsRef.current?.close();
-    };
-  }, [channel, connect]);
+    return () => { wsRef.current?.close(); };
+  }, []);
 
-  // ── Channel save ──────────────────────────────────────────────────────────
-  const saveChannel = () => {
-    const cleaned = channelInput.toLowerCase().replace(/^#/, "").trim();
-    if (!cleaned) return;
-    setChannelInput(cleaned);
-    setChannel(cleaned);
-    setEditingChannel(false);
-  };
+  // ── Chat handler — mirrors XO logic ──────────────────────────────────────
+  const handleChatMsg = useCallback((username: string, text: string) => {
+    const msg = text.trim().toLowerCase();
+    const ph  = phaseRef.current;
+
+    if (msg === "join" && ph === "lobby") {
+      // No duplicates
+      if (playersRef.current.some(p => p.username === username)) return;
+
+      const color = COLORS[playersRef.current.length % COLORS.length];
+      const newPlayer: Player = {
+        username,
+        displayName: username,
+        // Same avatar source as XO
+        avatar: `https://unavatar.io/twitch/${username}`,
+        color,
+      };
+
+      setPlayers(prev => {
+        if (prev.some(p => p.username === username)) return prev;
+        const next = [...prev, newPlayer];
+        playersRef.current = next;
+        return next;
+      });
+
+      setJoinMsg(`${username} انضم! 🍉`);
+      setTimeout(() => setJoinMsg(""), 2500);
+
+      showToast(username);
+    }
+  }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleStartGame = () => {
@@ -224,38 +179,6 @@ export default function FruitsGame() {
     playersRef.current = updated;
     setPlayers(updated);
   };
-
-  // ── Status colors ─────────────────────────────────────────────────────────
-  const statusColor = {
-    connected:    "#22c55e",
-    connecting:   "#ffd600",
-    disconnected: "#6b7280",
-    error:        "#ef4444",
-  }[connStatus];
-
-  const statusLabel = {
-    connected:    `#${channel}`,
-    connecting:   "جارٍ الاتصال...",
-    disconnected: "غير متصل",
-    error:        "خطأ في الاتصال",
-  }[connStatus];
-
-  // ── Avatar ────────────────────────────────────────────────────────────────
-  const Avatar = ({ player, size = 56 }: { player: Player; size?: number }) => (
-    <div className="overflow-hidden border-2 flex-shrink-0 rounded-full"
-      style={{
-        width: size, height: size,
-        borderColor: player.color,
-        boxShadow: `0 0 14px ${player.color}55`,
-      }}>
-      <img
-        src={player.avatarUrl ?? dicebear(player.username)}
-        alt={player.displayName}
-        className="w-full h-full object-cover"
-        onError={(e) => { (e.target as HTMLImageElement).src = dicebear(player.username); }}
-      />
-    </div>
-  );
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -313,42 +236,14 @@ export default function FruitsGame() {
                 <ArrowRight size={16} /> الرئيسية
               </button>
 
-              {/* Channel selector + status */}
-              <div className="flex items-center gap-2">
-                {editingChannel ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-purple-400/50 text-sm font-bold">#</span>
-                    <input
-                      autoFocus
-                      value={channelInput}
-                      onChange={e => setChannelInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") saveChannel(); if (e.key === "Escape") setEditingChannel(false); }}
-                      className="bg-transparent border-b border-purple-400/40 text-white text-sm font-bold w-32 outline-none text-center"
-                      placeholder="اسم القناة"
-                    />
-                    <button onClick={saveChannel}
-                      className="text-green-400 hover:text-green-300 transition-colors">
-                      <Check size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => { setChannelInput(channel); setEditingChannel(true); }}
-                    className="flex items-center gap-1.5 text-xs font-bold transition-colors hover:text-purple-300"
-                    style={{ color: statusColor }}>
-                    <motion.div
-                      animate={connStatus === "connected" ? { scale: [1, 1.5, 1] } : {}}
-                      transition={{ repeat: Infinity, duration: 2 }}
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ background: statusColor }} />
-                    {connStatus === "connected"
-                      ? <Wifi size={12} />
-                      : connStatus === "connecting"
-                      ? <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }}><Wifi size={12} /></motion.div>
-                      : <WifiOff size={12} />}
-                    <span>{statusLabel}</span>
-                    <Edit2 size={10} className="opacity-40" />
-                  </button>
-                )}
+              {/* Connection status — same style as XO */}
+              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${
+                twitchConnected
+                  ? "border-purple-500/40 bg-purple-500/10 text-purple-300"
+                  : "border-gray-700/50 text-gray-600"
+              }`}>
+                {twitchConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
+                {twitchConnected ? `#${user?.username}` : "جارٍ الاتصال..."}
               </div>
             </div>
 
@@ -369,8 +264,20 @@ export default function FruitsGame() {
                   حرب الفواكه 🍉
                 </motion.h1>
 
+                {/* Connection status badge — same as XO joining screen */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+                  className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border text-sm font-bold ${
+                    twitchConnected
+                      ? "border-green-500/40 bg-green-500/10 text-green-300"
+                      : "border-gray-700/40 text-gray-500"
+                  }`}>
+                  {twitchConnected
+                    ? <><Wifi size={13} />#{user?.username} متصل</>
+                    : <><WifiOff size={13} />جارٍ الاتصال...</>}
+                </motion.div>
+
                 <motion.div
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
                   className="flex items-center justify-center gap-2 flex-wrap">
                   <span className="text-white/40 text-lg font-bold">اكتب</span>
                   <span className="px-4 py-1.5 rounded-xl text-xl font-black"
@@ -384,20 +291,18 @@ export default function FruitsGame() {
                   </span>
                   <span className="text-white/40 text-lg font-bold">في الشات للانضمام</span>
                 </motion.div>
-
-                {/* Connection status pill */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-                  className="flex items-center justify-center gap-1.5 text-xs font-bold"
-                  style={{ color: statusColor }}>
-                  {connStatus === "connected"
-                    ? `✅ متصل بشات #${channel}`
-                    : connStatus === "connecting"
-                    ? "⏳ جارٍ الاتصال بالشات..."
-                    : connStatus === "error"
-                    ? "❌ فشل الاتصال — جارٍ إعادة المحاولة"
-                    : "○ غير متصل"}
-                </motion.div>
               </div>
+
+              {/* Join flash — same as XO */}
+              <AnimatePresence>
+                {joinMsg && (
+                  <motion.div key={joinMsg}
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className="px-6 py-2.5 rounded-xl text-center font-bold text-green-400 border border-green-500/30 bg-green-500/10">
+                    ✅ {joinMsg}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Players grid */}
               <div className="w-full max-w-3xl">
@@ -421,19 +326,26 @@ export default function FruitsGame() {
                           transition={{ type: "spring", stiffness: 300, damping: 24, delay: i * 0.03 }}
                           className="relative flex flex-col items-center gap-2 p-3 rounded-2xl group"
                           style={{
-                            border: `1.5px solid ${p.color}30`,
+                            border: `1.5px solid ${p.color}35`,
                             background: `linear-gradient(135deg, ${p.color}12, ${p.color}06)`,
                           }}>
 
+                          {/* Remove button */}
                           <button onClick={() => handleRemovePlayer(p.username)}
                             className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full items-center justify-center hidden group-hover:flex bg-red-500/20 hover:bg-red-500/60 text-red-400 transition-all z-10">
                             <X size={10} />
                           </button>
 
+                          {/* Circular avatar */}
                           <div className="relative">
-                            <div className="absolute inset-0 rounded-full blur-md opacity-60"
+                            <div className="absolute inset-0 rounded-full blur-md opacity-50"
                               style={{ background: p.color, transform: "scale(1.1)" }} />
-                            <Avatar player={p} size={64} />
+                            <div className="relative w-16 h-16 rounded-full overflow-hidden border-2"
+                              style={{ borderColor: p.color, boxShadow: `0 0 14px ${p.color}55` }}>
+                              <img src={p.avatar} alt={p.displayName}
+                                className="w-full h-full object-cover"
+                                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                            </div>
                           </div>
 
                           <p className="text-xs font-black truncate w-full text-center"
@@ -454,7 +366,7 @@ export default function FruitsGame() {
                 </motion.p>
               )}
 
-              {/* Start button */}
+              {/* Start button — only when 2+ players */}
               <AnimatePresence>
                 {players.length >= 2 && (
                   <motion.div
@@ -463,7 +375,7 @@ export default function FruitsGame() {
                     exit={{ opacity: 0, scale: 0.8, y: 20 }}
                     transition={{ type: "spring", stiffness: 260, damping: 22 }}>
                     <motion.button onClick={handleStartGame}
-                      animate={{ scale: [1, 1.03, 1], boxShadow: ["0 0 30px #22c55e55", "0 0 60px #22c55e88", "0 0 30px #22c55e55"] }}
+                      animate={{ scale: [1, 1.03, 1], boxShadow: ["0 0 30px #22c55e55","0 0 60px #22c55e88","0 0 30px #22c55e55"] }}
                       transition={{ repeat: Infinity, duration: 2 }}
                       whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.96 }}
                       className="flex items-center gap-3 px-14 py-5 rounded-3xl font-black text-2xl text-white"
@@ -522,8 +434,7 @@ export default function FruitsGame() {
                     <AnimatePresence mode="wait">
                       {!card.revealed ? (
                         <motion.div key="hidden"
-                          exit={{ opacity: 0, scale: 0.85 }}
-                          transition={{ duration: 0.16 }}
+                          exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.16 }}
                           className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3"
                           style={{
                             background: "rgba(10,4,24,0.90)",
@@ -549,17 +460,13 @@ export default function FruitsGame() {
                           <div className="relative">
                             <div className="absolute inset-0 rounded-full blur-md opacity-50"
                               style={{ background: card.player.color, transform: "scale(1.2)" }} />
-                            <div className="overflow-hidden border-2 flex-shrink-0 rounded-full relative"
-                              style={{
-                                width: 48, height: 48,
-                                borderColor: card.player.color,
-                                boxShadow: `0 0 12px ${card.player.color}55`,
-                              }}>
+                            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2"
+                              style={{ borderColor: card.player.color, boxShadow: `0 0 12px ${card.player.color}55` }}>
                               <img
-                                src={card.player.avatarUrl ?? dicebear(card.player.username)}
+                                src={card.player.avatar}
                                 alt={card.player.displayName}
                                 className="w-full h-full object-cover"
-                                onError={e => { (e.target as HTMLImageElement).src = dicebear(card.player.username); }} />
+                                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${card.player.username}`; }} />
                             </div>
                           </div>
                           <p className="text-xs font-black truncate w-full text-center"
