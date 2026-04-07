@@ -426,32 +426,53 @@ export default function ImposterGame() {
             {/* ── HOST LOBBY ── */}
             {setupDone && phase === "lobby" && (
               <motion.div key="host-lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-4 flex-1">
+                className="flex flex-col items-center gap-4 flex-1 w-full">
 
                 {/* Room info card */}
-                <motion.div className="flex flex-col items-center gap-3 p-5 rounded-3xl w-full max-w-sm"
+                <motion.div className="flex flex-col gap-4 p-5 rounded-3xl w-full max-w-lg"
                   style={{ background: "rgba(10,4,24,0.92)", border: `2px solid ${neonPurple}40` }}
                   initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
 
-                  <div className="flex items-center gap-2 text-xs text-purple-400/50 font-bold">
-                    <span>{CATEGORIES.find(c => c.id === gameState?.category)?.emoji ?? "🎲"}</span>
-                    <span>{gameState?.category ?? selectedCategory}</span>
-                    <span>·</span>
-                    <Clock size={11}/>
-                    <span>{(gameState?.durationMs ?? selectedDuration * 60_000) / 60_000} دقيقة</span>
+                  {/* Header row: name + meta */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-[10px] text-purple-400/40 font-bold">اسم الغرفة</p>
+                      <p className="text-lg font-black" style={{ color: neonPurple }}>
+                        🎭 {gameState?.roomName ?? roomNameInput}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-purple-400/50 font-bold">
+                      <span className="flex items-center gap-1">
+                        {CATEGORIES.find(c => c.id === (gameState?.category ?? selectedCategory))?.emoji ?? "🎲"}
+                        {gameState?.category ?? selectedCategory}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={10}/>
+                        {(gameState?.durationMs ?? selectedDuration * 60_000) / 60_000}د
+                      </span>
+                      <span className="text-3xl font-black tracking-widest" style={{ color: neonPurple, textShadow: `0 0 18px ${neonPurple}80` }}>
+                        {roomCode}
+                      </span>
+                    </div>
                   </div>
 
-                  <p className="text-xs text-purple-400/50 font-bold">رمز الغرفة</p>
-                  <p className="text-5xl font-black tracking-widest" style={{ color: neonPurple, textShadow: `0 0 28px ${neonPurple}80` }}>
-                    {roomCode}
-                  </p>
-
-                  <button onClick={copyLink}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all"
-                    style={{ background: copied ? "#22c55e20" : `${neonCyan}15`, border: `1px solid ${copied ? "#22c55e50" : `${neonCyan}40`}`, color: copied ? "#22c55e" : neonCyan }}>
-                    {copied ? <Check size={14}/> : <Copy size={14}/>}
-                    {copied ? "تم النسخ!" : "نسخ رابط الدعوة"}
-                  </button>
+                  {/* Invite link field + copy button */}
+                  <div className="flex gap-2 items-center">
+                    <input
+                      readOnly
+                      value={`${window.location.origin}${window.location.pathname}?room=${roomCode}`}
+                      className="flex-1 text-xs px-3 py-2.5 rounded-xl font-mono text-purple-300/70 bg-transparent border select-all cursor-text focus:outline-none"
+                      style={{ borderColor: `${neonPurple}30`, fontFamily: "monospace", direction: "ltr" }}
+                      onClick={e => (e.target as HTMLInputElement).select()}
+                    />
+                    <motion.button onClick={copyLink}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all"
+                      style={{ background: copied ? "#22c55e20" : `${neonPurple}20`, border: `1px solid ${copied ? "#22c55e60" : `${neonPurple}50`}`, color: copied ? "#22c55e" : neonPurple }}
+                      whileTap={{ scale: 0.95 }}>
+                      {copied ? <Check size={14}/> : <Copy size={14}/>}
+                      {copied ? "تم!" : "نسخ"}
+                    </motion.button>
+                  </div>
                 </motion.div>
 
                 {/* Players */}
