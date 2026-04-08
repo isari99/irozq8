@@ -31,11 +31,13 @@ interface QAEntry {
 interface PublicPlayer {
   id: string; name: string; avatar: string;
   connected: boolean; voted: boolean; disconnected: boolean;
+  role: "host" | "player";
 }
 interface GameState {
   code: string; roomName: string; category: Category; durationMs: number;
   phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "result";
   word: string;
+  hostPlayerId: string;
   players: PublicPlayer[]; playerOrder: string[];
   currentTurnIdx: number; currentTurnId: string | null;
   currentTargetId: string | null; currentQuestion: string | null;
@@ -199,6 +201,8 @@ export default function ImposterGame() {
   const [selectedDuration, setSelectedDuration] = useState(10);
   const [streamerBoxVisible, setStreamerBoxVisible] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [hostName, setHostName] = useState("");
+  const [hostAvatar, setHostAvatar] = useState(AVATAR_POOL[0]);
 
   // ── Core WS state ──────────────────────────────────────────────────────────
   const wsRef    = useRef<WebSocket | null>(null);
@@ -261,7 +265,7 @@ export default function ImposterGame() {
   }, []);
 
   // ── Connect & message handler ──────────────────────────────────────────────
-  const connectWs = useCallback((isHost: boolean, opts?: { category: Category; duration: number }) => {
+  const connectWs = useCallback((isHost: boolean, opts?: { category: Category; duration: number; hostName: string; hostAvatar: string }) => {
     const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
@@ -273,6 +277,8 @@ export default function ImposterGame() {
           roomName: "برا السالفة",
           category: opts?.category ?? "عام",
           duration: opts?.duration ?? 10,
+          hostName: opts?.hostName ?? "المضيف",
+          hostAvatar: opts?.hostAvatar ?? AVATAR_POOL[0],
         }));
       }
     };
@@ -287,6 +293,11 @@ export default function ImposterGame() {
           setRoomCode(msg.code);
           setSetupDone(true);
           setCreating(false);
+          // Host is now a player — set their player ID
+          if (msg.hostPlayerId) {
+            setPlayerId(msg.hostPlayerId);
+            playerIdRef.current = msg.hostPlayerId;
+          }
         }
         if (msg.type === "imposter:joined") {
           setPlayerId(msg.playerId);
@@ -325,8 +336,9 @@ export default function ImposterGame() {
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleConfirmCreate = () => {
     if (creating) return;
+    const name = hostName.trim() || "المضيف";
     setCreating(true);
-    connectWs(true, { category: selectedCategory, duration: selectedDuration });
+    connectWs(true, { category: selectedCategory, duration: selectedDuration, hostName: name, hostAvatar });
   };
 
   const handleJoin = () => {
@@ -344,6 +356,7 @@ export default function ImposterGame() {
   const handleNewRound     = ()             => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); wsSend({ type: "imposter:new_round" }); };
   const handleVote         = (t: string)   => wsSend({ type: "imposter:vote", voterId: playerIdRef.current, targetId: t });
   const handleRemove       = (pid: string) => wsSend({ type: "imposter:remove_player", playerId: pid });
+  const handleKick         = (pid: string) => wsSend({ type: "imposter:kick", playerId: pid });
 
   const handleSendQuestion = () => {
     if (!selectedTarget || !questionText.trim()) return;
@@ -363,14 +376,16 @@ export default function ImposterGame() {
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const phase           = gameState?.phase ?? "lobby";
-  const players         = gameState?.players ?? [];
-  const currentTurnId   = gameState?.currentTurnId;
-  const currentTargetId = gameState?.currentTargetId;
-  const myPlayer        = players.find(p => p.id === playerId);
+  const phase              = gameState?.phase ?? "lobby";
+  const players            = gameState?.players ?? [];
+  const currentTurnId      = gameState?.currentTurnId;
+  const currentTargetId    = gameState?.currentTargetId;
+  const hostPlayerId       = gameState?.hostPlayerId ?? "";
+  const myPlayer           = players.find(p => p.id === playerId);
   const currentTurnPlayer  = players.find(p => p.id === currentTurnId);
   const targetPlayer       = currentTargetId ? players.find(p => p.id === currentTargetId) : null;
-  const inviteUrl       = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+  const inviteUrl          = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+  const amIHost            = playerId === hostPlayerId;
 
   // ── Error ──────────────────────────────────────────────────────────────────
   if (error) return (
@@ -457,6 +472,32 @@ export default function ImposterGame() {
                       برا السالفة
                     </h1>
                     <p className="text-[11px] text-purple-400/40 font-bold">إعدادات الغرفة</p>
+                  </div>
+
+                  {/* Host identity */}
+                  <div className="flex flex-col gap-2.5">
+                    <p className="text-xs font-black text-purple-300/60">اسمك في اللعبة</p>
+                    <input
+                      value={hostName}
+                      onChange={e => setHostName(e.target.value)}
+                      placeholder="المضيف"
+                      maxLength={20}
+                      className="w-full bg-transparent border rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none text-right"
+                      style={{ borderColor: `${neonPurple}40` }}
+                    />
+                    {/* Avatar mini picker */}
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {AVATAR_POOL.map((av, i) => (
+                        <button key={i} onClick={() => setHostAvatar(av)}
+                          className="rounded-lg overflow-hidden transition-all"
+                          style={{
+                            border: `2px solid ${hostAvatar === av ? neonPurple : "rgba(255,255,255,0.1)"}`,
+                            boxShadow: hostAvatar === av ? `0 0 10px ${neonPurple}60` : "none",
+                          }}>
+                          <img src={av} alt="" className="w-full aspect-square object-cover"/>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Category */}
@@ -686,33 +727,49 @@ export default function ImposterGame() {
                   ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                       <AnimatePresence>
-                        {players.map((p, i) => (
-                          <motion.div key={p.id}
-                            initial={{ opacity: 0, scale: 0.6 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                            className="relative flex flex-col items-center gap-2 p-3 rounded-2xl group"
-                            style={{
-                              background: playerColor(i) + "18",
-                              border: `2px solid ${playerColor(i)}60`,
-                              boxShadow: `0 2px 16px ${playerColor(i)}20`,
-                            }}>
-                            <button onClick={() => handleRemove(p.id)}
-                              className="absolute top-1 left-1 w-5 h-5 rounded-full hidden group-hover:flex items-center justify-center font-black text-xs"
-                              style={{ background: "rgba(239,68,68,0.3)", color: "#f87171", border: "1px solid rgba(239,68,68,0.5)" }}>
-                              ✕
-                            </button>
-                            <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
-                              style={{ borderColor: playerColor(i), boxShadow: `0 0 12px ${playerColor(i)}55` }}>
-                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
-                            </div>
-                            <p className="text-xs font-black truncate w-full text-center"
-                              style={{ color: "#fff", textShadow: `0 0 8px ${playerColor(i)}` }}>
-                              {p.name}
-                            </p>
-                          </motion.div>
-                        ))}
+                        {players.map((p, i) => {
+                          const isHost = p.role === "host";
+                          const isMe   = p.id === playerId;
+                          return (
+                            <motion.div key={p.id}
+                              initial={{ opacity: 0, scale: 0.6 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.5 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                              className="relative flex flex-col items-center gap-2 p-3 rounded-2xl group"
+                              style={{
+                                background: isHost ? `${neonPurple}20` : playerColor(i) + "18",
+                                border: `2px solid ${isHost ? neonPurple : playerColor(i)}60`,
+                                boxShadow: `0 2px 16px ${isHost ? neonPurple : playerColor(i)}20`,
+                              }}>
+                              {/* Host badge */}
+                              {isHost && (
+                                <span className="absolute -top-2 right-1 text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                                  style={{ background: neonPurple, color: "#fff" }}>
+                                  هوست
+                                </span>
+                              )}
+                              {/* Kick button — visible on hover, shown for all except if it's the host kicking themselves (shown as "مغادرة") */}
+                              <button onClick={() => handleKick(p.id)}
+                                className="absolute top-1 left-1 w-5 h-5 rounded-full hidden group-hover:flex items-center justify-center font-black text-xs"
+                                style={{ background: isMe ? "rgba(251,113,133,0.3)" : "rgba(239,68,68,0.3)", color: isMe ? "#fda4af" : "#f87171", border: `1px solid ${isMe ? "rgba(251,113,133,0.5)" : "rgba(239,68,68,0.5)"}` }}
+                                title={isMe ? "مغادرة الغرفة" : `طرد ${p.name}`}>
+                                {isMe ? "🚪" : "✕"}
+                              </button>
+                              <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
+                                style={{ borderColor: isHost ? neonPurple : playerColor(i), boxShadow: `0 0 12px ${isHost ? neonPurple : playerColor(i)}55` }}>
+                                <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                              </div>
+                              <p className="text-xs font-black truncate w-full text-center"
+                                style={{ color: "#fff", textShadow: `0 0 8px ${isHost ? neonPurple : playerColor(i)}` }}>
+                                {p.name}
+                              </p>
+                              {isMe && !isHost && (
+                                <span className="text-[8px] font-black text-yellow-400/70">أنت</span>
+                              )}
+                            </motion.div>
+                          );
+                        })}
                       </AnimatePresence>
                     </div>
                   )}
@@ -880,6 +937,75 @@ export default function ImposterGame() {
                     )}
                   </div>
 
+                  {/* ── HOST PERSONAL INTERACTION ── */}
+                  {/* When host is the one asking this turn */}
+                  {isMyTurn && (
+                    <div className="mx-4 mb-3 rounded-xl p-3 flex flex-col gap-3"
+                      style={{ background: `${neonPurple}12`, border: `2px solid ${neonPurple}50` }}>
+                      <p className="text-xs font-black text-center" style={{ color: neonPurple }}>
+                        🎯 دورك — اختر لاعباً تسأله
+                      </p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
+                          <button key={p.id} onClick={() => setSelectedTarget(selectedTarget === p.id ? "" : p.id)}
+                            className="flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all"
+                            style={{
+                              background: selectedTarget === p.id ? `${playerColor(i)}20` : "rgba(255,255,255,0.04)",
+                              border: `2px solid ${selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.08)"}`,
+                            }}>
+                            <div className="w-7 h-7 rounded-md overflow-hidden border" style={{ borderColor: playerColor(i) + "60" }}>
+                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                            </div>
+                            <p className="text-[9px] font-black truncate w-full text-center"
+                              style={{ color: selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.4)" }}>
+                              {p.name}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input value={questionText} onChange={e => setQuestionText(e.target.value)}
+                          placeholder="اكتب سؤالك..."
+                          className="flex-1 bg-transparent border rounded-lg px-2 py-1.5 text-white text-xs placeholder-white/25 focus:outline-none text-right"
+                          style={{ borderColor: "rgba(255,255,255,0.15)" }}
+                          onKeyDown={e => e.key === "Enter" && handleSendQuestion()}
+                        />
+                        <button onClick={handleSendQuestion} disabled={!selectedTarget || !questionText.trim()}
+                          className="px-3 rounded-lg font-black text-xs disabled:opacity-30 shrink-0"
+                          style={{ background: `linear-gradient(135deg,#7c3aed,${neonPurple})`, color: "#fff" }}>
+                          إرسال ✈️
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* When host is the target and must answer */}
+                  {needAnswer && (
+                    <div className="mx-4 mb-3 rounded-xl p-3 flex flex-col gap-3"
+                      style={{ background: "rgba(0,229,255,0.07)", border: `2px solid ${neonCyan}50` }}>
+                      <p className="text-xs font-black text-center" style={{ color: neonCyan }}>
+                        👈 وُجّه إليك سؤال!
+                      </p>
+                      {gameState?.currentQuestion && (
+                        <p className="text-sm font-bold text-white text-center">❓ {gameState.currentQuestion}</p>
+                      )}
+                      <div className="grid grid-cols-2 gap-2">
+                        <motion.button onClick={() => handleSendAnswer("yes")}
+                          className="py-3 rounded-xl font-black text-white text-sm"
+                          style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)" }}
+                          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.92 }}>
+                          ✅ نعم
+                        </motion.button>
+                        <motion.button onClick={() => handleSendAnswer("no")}
+                          className="py-3 rounded-xl font-black text-white text-sm"
+                          style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)" }}
+                          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.92 }}>
+                          ❌ لا
+                        </motion.button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Host controls */}
                   <div className="px-4 pb-4">
                     <button onClick={handleForceVote}
@@ -898,27 +1024,41 @@ export default function ImposterGame() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
                     {players.map((p, i) => {
-                      const isCur = p.id === currentTurnId;
-                      const isTgt = p.id === currentTargetId;
+                      const isCur  = p.id === currentTurnId;
+                      const isTgt  = p.id === currentTargetId;
+                      const isHost = p.role === "host";
+                      const isMe   = p.id === playerId;
                       return (
-                        <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl"
+                        <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl group relative"
                           style={{
                             background: isCur ? `${neonPurple}18` : isTgt ? `${neonCyan}12` : "rgba(255,255,255,0.03)",
-                            border: `1.5px solid ${isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "30"}`,
+                            border: `1.5px solid ${isCur ? neonPurple : isTgt ? neonCyan : isHost ? neonPurple + "40" : playerColor(i) + "30"}`,
                           }}>
                           <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 border"
-                            style={{ borderColor: isCur ? neonPurple : playerColor(i) + "50" }}>
+                            style={{ borderColor: isCur ? neonPurple : isHost ? neonPurple + "60" : playerColor(i) + "50" }}>
                             <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-black truncate"
-                              style={{ color: isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) }}>
-                              {p.name}
-                            </p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-[11px] font-black truncate"
+                                style={{ color: isCur ? neonPurple : isTgt ? neonCyan : isHost ? neonPurple : playerColor(i) }}>
+                                {p.name}
+                              </p>
+                              {isHost && <span className="text-[8px] px-1 rounded font-black shrink-0" style={{ background: `${neonPurple}30`, color: neonPurple }}>هوست</span>}
+                            </div>
                             <p className="text-[9px] font-bold text-white/25">
                               {isCur ? "✏️ يسأل" : isTgt ? "💬 يجاوب" : p.disconnected ? "❌ غير متصل" : "🟢 متصل"}
                             </p>
                           </div>
+                          {/* Kick button (host only, show for non-host players) */}
+                          {!isHost && (
+                            <button onClick={() => handleKick(p.id)}
+                              className="w-5 h-5 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[9px] font-black shrink-0 transition-opacity"
+                              style={{ background: "rgba(239,68,68,0.25)", color: "#f87171", border: "1px solid rgba(239,68,68,0.4)" }}
+                              title={`طرد ${p.name}`}>
+                              ✕
+                            </button>
+                          )}
                         </div>
                       );
                     })}

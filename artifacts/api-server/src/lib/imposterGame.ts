@@ -15,6 +15,7 @@ interface RoomPlayer {
   ws: ImposterWS | null;
   voted: boolean;
   disconnected: boolean;
+  role: "host" | "player";
 }
 
 interface QAEntry {
@@ -34,6 +35,7 @@ interface GameRoom {
   durationMs: number;
   phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "result";
   hostWs: ImposterWS;
+  hostPlayerId: string;
   players: Map<string, RoomPlayer>;
   playerOrder: string[];
   word: string;
@@ -115,8 +117,6 @@ function send(ws: ImposterWS | null | undefined, msg: object): void {
 
 function broadcast(room: GameRoom, msg: object, skip?: ImposterWS): void {
   const payload = JSON.stringify(msg);
-  if (room.hostWs !== skip && room.hostWs.readyState === WebSocket.OPEN)
-    room.hostWs.send(payload);
   room.players.forEach(p => {
     if (p.ws && p.ws !== skip && p.ws.readyState === WebSocket.OPEN)
       p.ws.send(payload);
@@ -128,6 +128,7 @@ function publicPlayers(room: GameRoom) {
     id: p.id, name: p.name, avatar: p.avatar,
     connected: !!(p.ws && p.ws.readyState === WebSocket.OPEN),
     voted: p.voted, disconnected: p.disconnected,
+    role: p.role,
   }));
 }
 
@@ -140,6 +141,7 @@ function stateMsg(room: GameRoom) {
     durationMs: room.durationMs,
     phase: room.phase,
     word: room.word,
+    hostPlayerId: room.hostPlayerId,
     players: publicPlayers(room),
     playerOrder: room.playerOrder,
     currentTurnIdx: room.currentTurnIdx,
@@ -273,11 +275,20 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     const durationMs = durationMins * 60_000;
 
     const roomName = String(msg.roomName ?? "برا السالفة").slice(0, 30);
+    const hostName = String(msg.hostName ?? "المضيف").trim().slice(0, 20) || "المضيف";
+    const hostAvatar = String(msg.hostAvatar ?? `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(hostName)}`);
+    const hostPlayerId = `host_${Date.now().toString(36)}`;
+
+    const hostPlayer: RoomPlayer = {
+      id: hostPlayerId, name: hostName, avatar: hostAvatar,
+      ws, voted: false, disconnected: false, role: "host",
+    };
 
     const room: GameRoom = {
       code, roomName, category, durationMs,
-      phase: "lobby", hostWs: ws,
-      players: new Map(), playerOrder: [],
+      phase: "lobby", hostWs: ws, hostPlayerId,
+      players: new Map([[hostPlayerId, hostPlayer]]),
+      playerOrder: [hostPlayerId],
       word: "", imposterId: "",
       currentTurnIdx: 0, currentTargetId: null, currentQuestion: null,
       qaHistory: [],
@@ -287,8 +298,9 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     };
     rooms.set(code, room);
     ws.roomCode = code;
-    send(ws, { type: "imposter:created", code, roomName, category, durationMs });
-    logger.info({ code, category, durationMins }, "برا السالفة room created");
+    ws.playerId = hostPlayerId;
+    send(ws, { type: "imposter:created", code, roomName, category, durationMs, hostPlayerId });
+    logger.info({ code, category, durationMins, hostName }, "برا السالفة room created");
     return;
   }
 
@@ -303,7 +315,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     if (room.phase !== "lobby") { send(ws, { type: "imposter:error", message: "اللعبة بدأت بالفعل" }); return; }
 
     const playerId = `${name.toLowerCase().replace(/\s+/g,"_")}_${Date.now().toString(36)}`;
-    const player: RoomPlayer = { id: playerId, name, avatar, ws, voted: false, disconnected: false };
+    const player: RoomPlayer = { id: playerId, name, avatar, ws, voted: false, disconnected: false, role: "player" };
     room.players.set(playerId, player);
     room.playerOrder.push(playerId);
     ws.roomCode = code;
@@ -326,7 +338,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
   // Start game (host only)
   if (type === "imposter:start") {
     const room = rooms.get(ws.roomCode ?? "");
-    if (!room || room.hostWs !== ws) return;
+    if (!room || ws.playerId !== room.hostPlayerId) return;
     if (room.players.size < 3) { send(ws, { type: "imposter:error", message: "يلزم ٣ لاعبين على الأقل" }); return; }
 
     // Pick word + imposter immediately
@@ -482,7 +494,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
   // Force voting (host)
   if (type === "imposter:force_vote") {
     const room = rooms.get(ws.roomCode ?? "");
-    if (!room || room.hostWs !== ws) return;
+    if (!room || ws.playerId !== room.hostPlayerId) return;
     startVoting(room);
     return;
   }
@@ -490,7 +502,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
   // New round (host)
   if (type === "imposter:new_round") {
     const room = rooms.get(ws.roomCode ?? "");
-    if (!room || room.hostWs !== ws) return;
+    if (!room || ws.playerId !== room.hostPlayerId) return;
     if (room.gameTimer)   clearTimeout(room.gameTimer);
     if (room.turnTimer)   clearTimeout(room.turnTimer);
     if (room.answerTimer) clearTimeout(room.answerTimer);
@@ -511,13 +523,46 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     return;
   }
 
-  // Remove player (host)
+  // Kick player (host only — works in lobby or during game)
+  if (type === "imposter:kick") {
+    const room = rooms.get(ws.roomCode ?? "");
+    if (!room || ws.playerId !== room.hostPlayerId) return;
+    const pid = String(msg.playerId ?? "");
+    const target = room.players.get(pid);
+    if (!target) return;
+
+    if (pid === room.hostPlayerId) {
+      // Host kicking themselves → close the room
+      broadcast(room, { type: "imposter:host_left" });
+      if (room.gameTimer)     clearTimeout(room.gameTimer);
+      if (room.turnTimer)     clearTimeout(room.turnTimer);
+      if (room.answerTimer)   clearTimeout(room.answerTimer);
+      if (room.timerInterval) clearInterval(room.timerInterval);
+      rooms.delete(room.code);
+      logger.info({ code: room.code }, "برا السالفة room closed (host left via kick self)");
+      return;
+    }
+
+    send(target.ws, { type: "imposter:removed" });
+    if (target.ws) target.ws.close();
+    room.players.delete(pid);
+    room.playerOrder = room.playerOrder.filter(id => id !== pid);
+    broadcast(room, stateMsg(room));
+    logger.info({ code: room.code, pid, name: target.name }, "player kicked");
+    return;
+  }
+
+  // Legacy: remove_player (kept for compatibility, delegates to kick)
   if (type === "imposter:remove_player") {
     const room = rooms.get(ws.roomCode ?? "");
-    if (!room || room.hostWs !== ws || room.phase !== "lobby") return;
+    if (!room || ws.playerId !== room.hostPlayerId || room.phase !== "lobby") return;
     const pid = String(msg.playerId ?? "");
     const p = room.players.get(pid);
-    if (p) { send(p.ws, { type: "imposter:removed" }); room.players.delete(pid); }
+    if (p && pid !== room.hostPlayerId) {
+      send(p.ws, { type: "imposter:removed" });
+      if (p.ws) p.ws.close();
+      room.players.delete(pid);
+    }
     room.playerOrder = room.playerOrder.filter(id => id !== pid);
     broadcast(room, stateMsg(room));
     return;
@@ -531,14 +576,18 @@ export function handleImposterDisconnect(ws: ImposterWS): void {
   const room = rooms.get(code);
   if (!room) return;
 
-  if (room.hostWs === ws) {
+  if (ws.playerId === room.hostPlayerId) {
+    // Host disconnected → close room for everyone
+    // Mark host as disconnected first so broadcast skips them
+    const hostPlayer = room.players.get(room.hostPlayerId);
+    if (hostPlayer) { hostPlayer.ws = null; hostPlayer.disconnected = true; }
     broadcast(room, { type: "imposter:host_left" });
     if (room.gameTimer)     clearTimeout(room.gameTimer);
     if (room.turnTimer)     clearTimeout(room.turnTimer);
     if (room.answerTimer)   clearTimeout(room.answerTimer);
     if (room.timerInterval) clearInterval(room.timerInterval);
     rooms.delete(code);
-    logger.info({ code }, "برا السالفة room closed (host left)");
+    logger.info({ code }, "برا السالفة room closed (host disconnected)");
   } else {
     room.players.forEach(p => {
       if (p.ws === ws) { p.disconnected = true; p.ws = null; }
