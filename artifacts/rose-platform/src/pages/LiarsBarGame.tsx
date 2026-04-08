@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Copy, Check, Users, ArrowRight } from "lucide-react";
-import barBg from "@assets/بار2_1775630997287.jpg";
+import barBg    from "@assets/بار2_1775630997287.jpg";
+import barHero  from "@assets/بار_1775632749164.png";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
@@ -396,57 +397,111 @@ export default function LiarsBarGame() {
   // ════════════════════════════════════════════════════════════════════════════
   if (!myId) {
     return (
-      <div className="min-h-screen gradient-bg flex flex-col items-center justify-center" dir="rtl"
-        style={{ background: "linear-gradient(135deg, #0a0015, #1a0030, #0a000a)" }}>
-        <div className="absolute inset-0 overflow-hidden">
-          <img src={barBg} alt="" className="w-full h-full object-cover opacity-15" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,0,15,0.7), rgba(5,0,15,0.95))" }} />
-        </div>
-        <motion.div
-          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 w-full max-w-sm mx-5 flex flex-col gap-5">
-          <div className="text-center mb-4">
-            <img src={barBg} alt="Liar's Bar" className="w-full h-40 object-cover rounded-2xl opacity-60 mb-4"
-              style={{ objectPosition: "center top" }} />
-            <h1 className="text-4xl font-black mb-1"
-              style={{ color: "#e040fb", textShadow: "0 0 30px #e040fb, 0 0 60px #e040fb80", fontFamily: "serif" }}>
-              LIAR'S BAR
-            </h1>
-            <p className="text-purple-400/60 text-sm">لعبة الكذب والبلوف على الطاولة</p>
-          </div>
+      <div className="min-h-screen flex flex-col items-center" dir="rtl"
+        style={{ background: "#050010", overflowY: "auto" }}>
 
-          <div className="flex flex-col gap-3 bg-white/5 border border-purple-500/20 rounded-2xl p-5 backdrop-blur-sm">
+        {/* ── Hero Image Block ── */}
+        <div className="w-full flex justify-center" style={{ background: "#05000e" }}>
+          <div className="relative w-full" style={{ maxWidth: 520 }}>
+            {/* Square container — aspect-square */}
+            <div className="relative w-full" style={{ paddingBottom: "100%" }}>
+              <img
+                src={barHero}
+                alt="Liar's Bar"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ display: "block" }}
+              />
+              {/* Bottom gradient fade into page bg */}
+              <div className="absolute bottom-0 inset-x-0 h-28 pointer-events-none"
+                style={{ background: "linear-gradient(to bottom, transparent, #050010)" }} />
+              {/* Top subtle vignette */}
+              <div className="absolute top-0 inset-x-0 h-16 pointer-events-none"
+                style={{ background: "linear-gradient(to bottom, rgba(5,0,16,0.6), transparent)" }} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Title ── */}
+        <div className="relative z-10 flex flex-col items-center -mt-10 px-5 w-full" style={{ maxWidth: 480 }}>
+          <motion.h1
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="text-5xl font-black tracking-widest mb-1 text-center"
+            style={{
+              fontFamily: "serif",
+              color: "#e040fb",
+              textShadow: "0 0 40px #e040fb, 0 0 80px #e040fb60, 0 2px 0 #9c27b0",
+              letterSpacing: "0.12em",
+            }}>
+            LIAR'S BAR
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
+            className="text-sm font-bold mb-8 text-center"
+            style={{ color: "rgba(200,150,255,0.55)", letterSpacing: "0.04em" }}>
+            لعبة الكذب والبلوف على الطاولة
+          </motion.p>
+
+          {/* ── Form Card ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="w-full flex flex-col gap-3 rounded-2xl p-5 mb-8"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(224,64,251,0.18)",
+              backdropFilter: "blur(10px)",
+              boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+            }}>
+            {/* Name */}
             <input
               value={name} onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === "Enter" && joinOrCreate()}
               placeholder="اسمك في اللعبة"
-              className="w-full px-4 py-3 rounded-xl text-white text-center font-bold outline-none"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(224,64,251,0.3)", fontSize: 16 }}
+              className="w-full px-4 py-3.5 rounded-xl text-white text-center font-bold outline-none"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(224,64,251,0.28)",
+                fontSize: 16,
+                caretColor: "#e040fb",
+              }}
             />
-            <div className="flex gap-2">
-              <input
-                value={roomCode} onChange={e => setRoomCode(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === "Enter" && joinOrCreate()}
-                placeholder="كود الغرفة (اختياري)"
-                maxLength={4}
-                className="flex-1 px-4 py-3 rounded-xl text-white text-center font-bold outline-none uppercase tracking-widest"
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(224,64,251,0.2)", fontSize: 16 }}
-              />
-            </div>
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {/* Room code */}
+            <input
+              value={roomCode} onChange={e => setRoomCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && joinOrCreate()}
+              placeholder="كود الغرفة (للانضمام — اختياري)"
+              maxLength={4}
+              className="w-full px-4 py-3.5 rounded-xl text-white text-center font-bold outline-none uppercase tracking-widest"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(224,64,251,0.15)",
+                fontSize: 16,
+                letterSpacing: "0.25em",
+                caretColor: "#e040fb",
+              }}
+            />
+            {error && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-red-400 text-sm text-center font-bold">{error}</motion.p>
+            )}
+            {/* CTA Button */}
             <motion.button
               onClick={joinOrCreate}
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              className="w-full py-3.5 rounded-xl font-black text-white text-lg"
-              style={{ background: "linear-gradient(135deg, #e040fb, #9c27b0)", boxShadow: "0 0 30px #e040fb40" }}>
-              {roomCode ? "انضم إلى الغرفة" : "أنشئ غرفة جديدة"} 🃏
+              className="w-full py-4 rounded-xl font-black text-white text-lg mt-1"
+              style={{
+                background: "linear-gradient(135deg, #e040fb 0%, #9c27b0 60%, #6a0dad 100%)",
+                boxShadow: "0 0 30px #e040fb40, 0 4px 20px rgba(0,0,0,0.5)",
+                letterSpacing: "0.03em",
+              }}>
+              {roomCode.trim() ? "🚪 انضم إلى الغرفة" : "🃏 أنشئ غرفة جديدة"}
             </motion.button>
-          </div>
+          </motion.div>
 
-          <div className="text-center text-purple-400/30 text-xs">
-            <p>A/D للتنقل • Space لاختيار الورقة • E للعب</p>
-          </div>
-        </motion.div>
+          {/* Controls hint */}
+          <p className="text-center text-purple-500/30 text-xs pb-6">
+            A/D للتنقل بين الأوراق &nbsp;•&nbsp; Space للاختيار &nbsp;•&nbsp; E للعب
+          </p>
+        </div>
       </div>
     );
   }
