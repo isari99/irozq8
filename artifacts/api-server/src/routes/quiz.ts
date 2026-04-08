@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, questionsTable, quizSessionsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+// desc is still used in GET /quiz/state for session ordering
 import { broadcast } from "../lib/wsManager";
 import { twitchClient } from "../lib/twitchClient";
 import { gameState } from "../lib/gameState";
@@ -136,16 +137,17 @@ router.post("/quiz/question", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  // Avoid recent questions
-  const recent = await db.select({ questionId: quizSessionsTable.questionId })
-    .from(quizSessionsTable)
-    .orderBy(desc(quizSessionsTable.id))
-    .limit(Math.min(allQuestions.length - 1, 10));
-  const recentIds = new Set(recent.map(r => r.questionId));
-  let candidates = allQuestions.filter(q => !recentIds.has(q.id));
-  if (candidates.length === 0) candidates = allQuestions;
+  // No-repeat shuffle: filter out questions used in this session
+  let candidates = allQuestions.filter(q => !gameState.usedInSession.has(q.id));
+  // If all questions exhausted, reset the pool and reshuffle from all
+  if (candidates.length === 0) {
+    gameState.resetUsed();
+    candidates = allQuestions;
+  }
 
+  // Pick a random question from remaining candidates
   const q = candidates[Math.floor(Math.random() * candidates.length)];
+  gameState.markUsed(q.id);
   await db.insert(quizSessionsTable).values({ questionId: q.id, active: true });
 
   const choices = q.choices as string[];

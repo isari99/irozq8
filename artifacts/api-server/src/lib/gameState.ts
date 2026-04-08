@@ -28,6 +28,8 @@ interface GameState {
   totalRounds: number;
   currentRound: number;
   questionTime: number;
+  // No-repeat shuffle tracking
+  usedInSession: Set<number>;
 }
 
 class GameStateManager {
@@ -42,6 +44,7 @@ class GameStateManager {
     totalRounds: 10,
     currentRound: 0,
     questionTime: 20,
+    usedInSession: new Set(),
   };
 
   get phase(): GamePhase { return this.state.phase; }
@@ -52,6 +55,10 @@ class GameStateManager {
   get totalRounds(): number { return this.state.totalRounds; }
   get currentRound(): number { return this.state.currentRound; }
   get questionTime(): number { return this.state.questionTime; }
+  get usedInSession(): Set<number> { return this.state.usedInSession; }
+
+  markUsed(questionId: number) { this.state.usedInSession.add(questionId); }
+  resetUsed() { this.state.usedInSession.clear(); }
 
   setPhase(phase: GamePhase) { this.state.phase = phase; }
 
@@ -152,6 +159,7 @@ class GameStateManager {
     this.state.totalAnswers = 0;
     this.state.correctAnswerOrder = [];
     this.state.currentRound = 0;
+    this.state.usedInSession.clear();
   }
 }
 
