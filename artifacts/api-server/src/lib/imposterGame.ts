@@ -219,15 +219,16 @@ function advanceTurn(room: GameRoom, timedOut?: boolean): void {
 
 // ─── Voting ───────────────────────────────────────────────────────────────────
 function startVoting(room: GameRoom): void {
-  if (room.gameTimer) clearTimeout(room.gameTimer);
-  if (room.turnTimer) clearTimeout(room.turnTimer);
+  if (room.gameTimer)    clearTimeout(room.gameTimer);
+  if (room.turnTimer)    clearTimeout(room.turnTimer);
+  if (room.answerTimer)  clearTimeout(room.answerTimer);   // ← also clear answer timer
   if (room.timerInterval) clearInterval(room.timerInterval);
-  room.gameTimer = null; room.turnTimer = null; room.timerInterval = null;
+  room.gameTimer = null; room.turnTimer = null; room.answerTimer = null; room.timerInterval = null;
 
   room.phase = "voting";
   room.votes = {};
   room.lastAnswer = null;
-  // Eliminated players are auto-considered voted so they don't block completion
+  // Eliminated + disconnected players are auto-considered voted so they never block completion
   room.players.forEach(p => { p.voted = p.eliminated || p.disconnected; });
   broadcast(room, stateMsg(room));
 }
@@ -319,10 +320,11 @@ function checkVoteDone(room: GameRoom): void {
 
 /** Shared helper: restart playing phase (called after elimination or tie). */
 function resumePlaying(room: GameRoom): void {
-  if (room.gameTimer)    clearTimeout(room.gameTimer);
-  if (room.turnTimer)    clearTimeout(room.turnTimer);
+  if (room.gameTimer)     clearTimeout(room.gameTimer);
+  if (room.turnTimer)     clearTimeout(room.turnTimer);
+  if (room.answerTimer)   clearTimeout(room.answerTimer);   // ← clear pending answer
   if (room.timerInterval) clearInterval(room.timerInterval);
-  room.gameTimer = null; room.turnTimer = null; room.timerInterval = null;
+  room.gameTimer = null; room.turnTimer = null; room.answerTimer = null; room.timerInterval = null;
 
   // Rebuild player order — only active (not eliminated, not disconnected)
   room.playerOrder = Array.from(room.players.values())
@@ -683,9 +685,8 @@ export function handleImposterDisconnect(ws: ImposterWS): void {
   const room = rooms.get(code);
   if (!room) return;
 
+  // ── Host disconnected → close room for everyone ─────────────────────────────
   if (ws.playerId === room.hostPlayerId) {
-    // Host disconnected → close room for everyone
-    // Mark host as disconnected first so broadcast skips them
     const hostPlayer = room.players.get(room.hostPlayerId);
     if (hostPlayer) { hostPlayer.ws = null; hostPlayer.disconnected = true; }
     broadcast(room, { type: "imposter:host_left" });
@@ -695,10 +696,81 @@ export function handleImposterDisconnect(ws: ImposterWS): void {
     if (room.timerInterval) clearInterval(room.timerInterval);
     rooms.delete(code);
     logger.info({ code }, "برا السالفة room closed (host disconnected)");
-  } else {
-    room.players.forEach(p => {
-      if (p.ws === ws) { p.disconnected = true; p.ws = null; }
-    });
-    broadcast(room, stateMsg(room));
+    return;
   }
+
+  // ── Regular player disconnected ─────────────────────────────────────────────
+  let disconnectedId: string | null = null;
+  room.players.forEach(p => {
+    if (p.ws === ws) { p.disconnected = true; p.ws = null; disconnectedId = p.id; }
+  });
+  if (!disconnectedId) return;
+
+  const activePhases = ["countdown","reveal","playing","voting","elimination"];
+  const gameActive   = activePhases.includes(room.phase);
+
+  // ── Case 1: The IMPOSTER disconnected during an active game → players win ──
+  if (gameActive && room.imposterId && disconnectedId === room.imposterId) {
+    if (room.gameTimer)     clearTimeout(room.gameTimer);
+    if (room.turnTimer)     clearTimeout(room.turnTimer);
+    if (room.answerTimer)   clearTimeout(room.answerTimer);
+    if (room.timerInterval) clearInterval(room.timerInterval);
+    room.gameTimer = null; room.turnTimer = null; room.answerTimer = null; room.timerInterval = null;
+
+    const imposter = room.players.get(room.imposterId);
+    room.phase = "result";
+    broadcast(room, stateMsg(room));
+    broadcast(room, {
+      type: "imposter:result",
+      imposterName: imposter?.name ?? "؟",
+      imposterId:   room.imposterId,
+      word:         room.word,
+      winner:       "players",
+      reason:       "imposter_left",
+      votes: {}, counts: {},
+    });
+    logger.info({ code, disconnectedId }, "برا السالفة: imposter left → players win");
+    return;
+  }
+
+  // ── Case 2: Player disconnects during VOTING → auto-skip their vote ────────
+  if (room.phase === "voting") {
+    const voter = room.players.get(disconnectedId);
+    if (voter && !voter.voted) {
+      voter.voted = true;
+      room.votes[disconnectedId] = "skip";
+    }
+    broadcast(room, stateMsg(room));
+    checkVoteDone(room);
+    return;
+  }
+
+  // ── Case 3: Player disconnects during PLAYING ─────────────────────────────
+  if (room.phase === "playing") {
+    const currentPlayerId = room.playerOrder[room.currentTurnIdx];
+
+    // Sub-case 3a: It was their turn (they were asking) → advance immediately
+    if (currentPlayerId === disconnectedId) {
+      broadcast(room, stateMsg(room));
+      if (room.answerTimer) { clearTimeout(room.answerTimer); room.answerTimer = null; }
+      if (room.turnTimer)   { clearTimeout(room.turnTimer);   room.turnTimer   = null; }
+      advanceTurn(room, false);
+      return;
+    }
+
+    // Sub-case 3b: They were the answer target → advance immediately
+    if (room.currentTargetId === disconnectedId) {
+      broadcast(room, stateMsg(room));
+      if (room.answerTimer) { clearTimeout(room.answerTimer); room.answerTimer = null; }
+      advanceTurn(room, true);
+      return;
+    }
+
+    // Sub-case 3c: Spectator / idle player → just update state
+    broadcast(room, stateMsg(room));
+    return;
+  }
+
+  // Lobby / countdown / reveal / elimination → just update state
+  broadcast(room, stateMsg(room));
 }

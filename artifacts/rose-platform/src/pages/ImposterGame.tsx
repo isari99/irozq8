@@ -51,6 +51,8 @@ interface Role { role: "imposter" | "player"; word?: string }
 interface Result {
   imposterName: string; imposterId: string; word: string;
   winner: "players" | "imposter";
+  reason?: string;          // "imposter_left" when imposter disconnected
+  eliminatedName?: string;  // last eliminated player (imposter wins by elimination)
   votes: Record<string, string>; counts: Record<string, number>;
 }
 interface EliminationInfo {
@@ -215,7 +217,8 @@ export default function ImposterGame() {
   }, [user]);
 
   // ── Core WS state ──────────────────────────────────────────────────────────
-  const wsRef    = useRef<WebSocket | null>(null);
+  const wsRef           = useRef<WebSocket | null>(null);
+  const currentTurnIdRef = useRef<string | null>(null);   // tracks turn to detect changes
   const [wsReady, setWsReady] = useState(false);
   const [gameState, setGameState]   = useState<GameState | null>(null);
   const [result, setResult]                 = useState<Result | null>(null);
@@ -317,6 +320,19 @@ export default function ImposterGame() {
         }
         if (msg.type === "imposter:state") {
           const gs = msg as GameState;
+
+          // ── Sync: clear active states when turn changes ─────────────────────
+          const newTurnId = gs.currentTurnId ?? null;
+          if (newTurnId !== currentTurnIdRef.current) {
+            currentTurnIdRef.current = newTurnId;
+            // I am no longer the active player in this turn
+            if (newTurnId !== playerIdRef.current) {
+              setIsMyTurn(false);
+            }
+            // Clear answer request whenever turn advances (disconnect or normal)
+            setNeedAnswer(false);
+          }
+
           setGameState(gs);
           setGameRemaining(gs.gameRemaining);
           setTurnRemaining(gs.turnRemaining);
@@ -325,6 +341,11 @@ export default function ImposterGame() {
           // If I am eliminated → clear active states (I'm now spectator)
           const myEntry = gs.players.find((p: PublicPlayer) => p.id === playerIdRef.current);
           if (myEntry?.eliminated) {
+            setIsMyTurn(false);
+            setNeedAnswer(false);
+          }
+          // Clear active states when game ends
+          if (gs.phase === "result" || gs.phase === "lobby") {
             setIsMyTurn(false);
             setNeedAnswer(false);
           }
@@ -1869,8 +1890,17 @@ function EliminationScreen({ info, players }: { info: EliminationInfo; players: 
 // ─── Result Screen ─────────────────────────────────────────────────────────────
 function ResultScreen({ result, players, onNewRound, onHome, isHost }:
   { result: Result; players: PublicPlayer[]; onNewRound: () => void; onHome: () => void; isHost: boolean }) {
-  const playersWon    = result.winner === "players";
+  const playersWon     = result.winner === "players";
+  const imposterLeft   = result.reason === "imposter_left";
   const imposterPlayer = players.find(p => p.id === result.imposterId);
+
+  // Determine the headline and sub-message
+  let headline = playersWon ? "اللاعبون فازوا! 🎉" : "برا السالفة فاز! 🕵️";
+  let subMsg   = playersWon
+    ? (imposterLeft ? "الكذاب غادر اللعبة وكشف نفسه!" : "اكتشفوا من هو الكذاب!")
+    : (result.eliminatedName
+      ? `تم إقصاء ${result.eliminatedName} وبقي الكذاب مختبئًا`
+      : "نجح الكذاب في البقاء مجهول الهوية");
 
   return (
     <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1890,25 +1920,33 @@ function ResultScreen({ result, players, onNewRound, onHome, isHost }:
         <motion.div style={{ fontSize: 72 }}
           animate={{ rotate: [0,-10,10,0], y: [0,-10,0] }}
           transition={{ duration: 0.8, delay: 0.2 }}>
-          {playersWon ? "🏆" : "🕵️"}
+          {imposterLeft ? "🚪" : playersWon ? "🏆" : "🕵️"}
         </motion.div>
 
-        <p className="text-3xl font-black"
-          style={{ color: playersWon ? "#22c55e" : "#ef4444", textShadow: `0 0 24px ${playersWon ? "#22c55e" : "#ef4444"}80` }}>
-          {playersWon ? "اللاعبون فازوا! 🎉" : "برا السالفة فاز! 🕵️"}
-        </p>
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-3xl font-black"
+            style={{ color: playersWon ? "#22c55e" : "#ef4444", textShadow: `0 0 24px ${playersWon ? "#22c55e" : "#ef4444"}80` }}>
+            {headline}
+          </p>
+          <p className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.45)" }}>{subMsg}</p>
+        </div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
           className="w-full p-5 rounded-3xl flex flex-col items-center gap-3"
           style={{ background: "rgba(10,4,24,0.92)", border: "2px solid rgba(239,68,68,0.45)" }}>
-          <p className="text-xs font-bold text-red-400/60">برا السالفة كان...</p>
+          <p className="text-xs font-bold text-red-400/60">
+            {imposterLeft ? "🚪 الكذاب الذي غادر" : "برا السالفة كان..."}
+          </p>
           {imposterPlayer && (
             <div className="w-16 h-16 rounded-2xl overflow-hidden border-2"
-              style={{ borderColor: "#ef4444", boxShadow: "0 0 22px rgba(239,68,68,0.5)" }}>
+              style={{ borderColor: imposterLeft ? "#fbbf24" : "#ef4444",
+                boxShadow: `0 0 22px ${imposterLeft ? "rgba(251,191,36,0.5)" : "rgba(239,68,68,0.5)"}` }}>
               <img src={imposterPlayer.avatar} alt={imposterPlayer.name} className="w-full h-full object-cover"/>
             </div>
           )}
-          <p className="text-2xl font-black text-red-400">{result.imposterName}</p>
+          <p className="text-2xl font-black" style={{ color: imposterLeft ? "#fbbf24" : "#f87171" }}>
+            {result.imposterName}
+          </p>
           <div className="px-5 py-2 rounded-xl"
             style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
             <p className="text-xs text-purple-400/45 mb-0.5">الكلمة كانت</p>
