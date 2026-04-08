@@ -602,47 +602,40 @@ export default function SongGame() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="flex-1 flex flex-col items-center justify-center px-5 py-6 gap-4">
+              className="flex-1 flex flex-row items-stretch overflow-hidden">
 
-              {/* ── Decorative video clip + round badge ── */}
-              <div className="flex items-center justify-center gap-5 w-full max-w-2xl">
-                <div className="flex-1 flex justify-center">
-                  <div className="relative rounded-2xl overflow-hidden shadow-lg"
-                    style={{ width: 72, height: 128, border: "2px solid rgba(224,64,251,0.28)",
-                      boxShadow: "0 0 24px rgba(224,64,251,0.18)" }}>
-                    <video src="/song-clip.mov" autoPlay loop muted playsInline
-                      className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 pointer-events-none"
-                      style={{ background: "linear-gradient(to bottom, transparent 60%, rgba(5,2,14,0.7))" }} />
-                  </div>
+              {/* ── Right sidebar – team 1 (RTL right) ── */}
+              <div className="flex-shrink-0 w-14 sm:w-20 flex items-center justify-center py-5">
+                <div className="relative rounded-2xl overflow-hidden"
+                  style={{ width: 50, height: 210, border: "2px solid rgba(224,64,251,0.3)",
+                    boxShadow: currentTurn === 1 ? "0 0 22px rgba(224,64,251,0.4)" : "0 0 10px rgba(224,64,251,0.15)" }}>
+                  <video src="/song-clip.mov" autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{ background: "linear-gradient(to bottom, rgba(224,64,251,0.15), transparent 30%, transparent 70%, rgba(5,2,14,0.6))" }} />
                 </div>
-                <div className="flex flex-col items-center gap-2 flex-shrink-0">
-                  <div className="text-5xl font-black"
-                    style={{ color: teamColor(currentTurn), textShadow: `0 0 28px ${teamColor(currentTurn)}80` }}>
-                    {currentRound}
-                  </div>
+              </div>
+
+              {/* ── Main content ── */}
+              <div className="flex-1 flex flex-col items-center justify-center py-5 gap-4 min-w-0 px-2">
+
+              {/* Round progress badge */}
+              <div className="flex items-center gap-3">
+                <div className="text-3xl font-black"
+                  style={{ color: teamColor(currentTurn), textShadow: `0 0 20px ${teamColor(currentTurn)}80` }}>
+                  {currentRound}
+                </div>
+                <div className="flex flex-col gap-1">
                   <div className="text-xs text-purple-400/40 font-bold">/ {totalRounds}</div>
-                  <div className="w-20 h-1.5 rounded-full overflow-hidden bg-purple-900/30">
+                  <div className="w-16 h-1 rounded-full overflow-hidden bg-purple-900/30">
                     <div className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${(currentRound / totalRounds) * 100}%`,
                         background: "linear-gradient(90deg, #e040fb, #7c3aed, #00e5ff)" }} />
                   </div>
                 </div>
-                <div className="flex-1 flex justify-center">
-                  <div className="relative rounded-2xl overflow-hidden shadow-lg"
-                    style={{ width: 72, height: 128, border: "2px solid rgba(0,229,255,0.28)",
-                      boxShadow: "0 0 24px rgba(0,229,255,0.18)" }}>
-                    <video src="/song-clip.mov" autoPlay loop muted playsInline
-                      className="w-full h-full object-cover"
-                      style={{ transform: "scaleX(-1)" }} />
-                    <div className="absolute inset-0 pointer-events-none"
-                      style={{ background: "linear-gradient(to bottom, transparent 60%, rgba(5,2,14,0.7))" }} />
-                  </div>
-                </div>
               </div>
 
               {/* ── Score cards ── */}
-              <div className="w-full max-w-2xl grid grid-cols-3 gap-4 items-stretch">
+              <div className="w-full max-w-xl grid grid-cols-3 gap-3 items-stretch">
                 {/* Team 1 */}
                 <div className="rounded-3xl overflow-hidden border transition-all"
                   style={{
@@ -696,7 +689,7 @@ export default function SongGame() {
               </div>
 
               {/* Current turn banner */}
-              <div className="w-full max-w-2xl rounded-2xl border py-4 text-center"
+              <div className="w-full max-w-xl rounded-2xl border py-4 text-center"
                 style={{ borderColor: `${teamColor(currentTurn)}28`, background: `${teamColor(currentTurn)}07` }}>
                 <p className="text-sm text-purple-300/35">الدور الحالي</p>
                 <p className="text-3xl font-black mt-0.5" style={{ color: teamColor(currentTurn) }}>
@@ -705,7 +698,7 @@ export default function SongGame() {
               </div>
 
               {/* Action buttons */}
-              <div className="w-full max-w-2xl space-y-3">
+              <div className="w-full max-w-xl space-y-3">
                 <motion.button onClick={playSong}
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-2xl"
@@ -742,6 +735,21 @@ export default function SongGame() {
                 className="flex items-center gap-2 py-1.5 text-sm text-purple-500/25 hover:text-purple-400/45 transition-colors">
                 <RotateCcw size={13} /> إعادة تعيين اللعبة
               </button>
+
+              </div>{/* end main content */}
+
+              {/* ── Left sidebar – team 2 (RTL left) ── */}
+              <div className="flex-shrink-0 w-14 sm:w-20 flex items-center justify-center py-5">
+                <div className="relative rounded-2xl overflow-hidden"
+                  style={{ width: 50, height: 210, border: "2px solid rgba(0,229,255,0.3)",
+                    boxShadow: currentTurn === 2 ? "0 0 22px rgba(0,229,255,0.4)" : "0 0 10px rgba(0,229,255,0.15)" }}>
+                  <video src="/song-clip.mov" autoPlay loop muted playsInline
+                    className="w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{ background: "linear-gradient(to bottom, rgba(0,229,255,0.12), transparent 30%, transparent 70%, rgba(5,2,14,0.6))" }} />
+                </div>
+              </div>
+
             </motion.div>
           )}
 
@@ -821,69 +829,105 @@ export default function SongGame() {
                 </div>
               </div>
 
-              {/* ── Teams + Timer row ── */}
-              <div className="w-full max-w-2xl grid grid-cols-3 gap-4 items-center">
-                {/* Team 1 */}
-                <motion.div layout className="rounded-2xl border overflow-hidden transition-all"
-                  style={{
-                    borderColor: currentTurn === 1 ? "#e040fb80" : "rgba(224,64,251,0.2)",
-                    background: currentTurn === 1 ? "rgba(224,64,251,0.16)" : "rgba(224,64,251,0.06)",
-                    boxShadow: currentTurn === 1 ? "0 0 32px rgba(224,64,251,0.25)" : "none",
-                  }}>
-                  <div className="h-1.5" style={{ background: currentTurn === 1
-                    ? "linear-gradient(90deg, #e040fb, #c026d3)"
-                    : "rgba(224,64,251,0.15)" }} />
-                  <div className="p-4 text-center">
-                    <p className="text-sm font-black truncate" style={{ color: currentTurn === 1 ? "#e040fb" : "#e040fb80" }}>{team1Name}</p>
-                    <p className="text-5xl font-black mt-1"
-                      style={{ color: "#e040fb", textShadow: currentTurn === 1 ? "0 0 32px #e040fb" : "0 0 20px #e040fb50" }}>{team1Score}</p>
-                    {currentTurn === 1 && <p className="text-xs font-black mt-1.5" style={{ color: "#e040fb" }}>⚡ دورهم</p>}
-                  </div>
-                </motion.div>
+              {/* ── Teams + Timer row (timer moves to active team's side) ── */}
+              <div className="w-full max-w-2xl grid grid-cols-2 gap-4 items-start">
 
-                {/* Timer */}
+                {/* Team 1 (right in RTL) */}
                 <div className="flex flex-col items-center gap-2">
-                  <div className="relative w-28 h-28">
-                    <svg className="w-28 h-28 absolute inset-0"
-                      style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
-                      viewBox="0 0 112 112">
-                      <circle cx="56" cy="56" r="48" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="7" />
-                      <motion.circle cx="56" cy="56" r="48" fill="none"
-                        stroke={timerColor} strokeWidth="7" strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 48}`}
-                        strokeDashoffset={`${2 * Math.PI * 48 * (1 - timerPct / 100)}`}
-                        transition={{ duration: 0.6 }} />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <motion.span
-                        className="text-4xl font-black tabular-nums"
-                        animate={timeLeft <= 10 && timerRunning ? { scale: [1, 1.2, 1] } : {}}
-                        transition={{ repeat: Infinity, duration: 0.8 }}
-                        style={{ color: timerColor, textShadow: `0 0 18px ${timerColor}80` }}>
-                        {timeLeft}
-                      </motion.span>
+                  <motion.div layout className="w-full rounded-2xl border overflow-hidden transition-all"
+                    style={{
+                      borderColor: currentTurn === 1 ? "#e040fb80" : "rgba(224,64,251,0.2)",
+                      background: currentTurn === 1 ? "rgba(224,64,251,0.16)" : "rgba(224,64,251,0.06)",
+                      boxShadow: currentTurn === 1 ? "0 0 32px rgba(224,64,251,0.25)" : "none",
+                    }}>
+                    <div className="h-1.5" style={{ background: currentTurn === 1
+                      ? "linear-gradient(90deg, #e040fb, #c026d3)"
+                      : "rgba(224,64,251,0.15)" }} />
+                    <div className="p-4 text-center">
+                      <p className="text-sm font-black truncate" style={{ color: currentTurn === 1 ? "#e040fb" : "#e040fb80" }}>{team1Name}</p>
+                      <p className="text-5xl font-black mt-1"
+                        style={{ color: "#e040fb", textShadow: currentTurn === 1 ? "0 0 32px #e040fb" : "0 0 20px #e040fb50" }}>{team1Score}</p>
+                      {currentTurn === 1 && <p className="text-xs font-black mt-1.5" style={{ color: "#e040fb" }}>⚡ دورهم</p>}
                     </div>
-                  </div>
-                  <div className="text-xs text-purple-400/35 font-bold">{currentRound}/{totalRounds}</div>
+                  </motion.div>
+
+                  {/* Timer – only shown when team 1 is active */}
+                  {currentTurn === 1 && (
+                    <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                      className="flex flex-col items-center gap-1">
+                      <div className="relative w-24 h-24">
+                        <svg className="w-24 h-24 absolute inset-0"
+                          style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
+                          viewBox="0 0 96 96">
+                          <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                          <motion.circle cx="48" cy="48" r="40" fill="none"
+                            stroke="#e040fb" strokeWidth="6" strokeLinecap="round"
+                            strokeDasharray={`${2 * Math.PI * 40}`}
+                            strokeDashoffset={`${2 * Math.PI * 40 * (1 - timerPct / 100)}`}
+                            transition={{ duration: 0.6 }} />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <motion.span className="text-3xl font-black tabular-nums"
+                            animate={timeLeft <= 10 && timerRunning ? { scale: [1, 1.2, 1] } : {}}
+                            transition={{ repeat: Infinity, duration: 0.8 }}
+                            style={{ color: timerColor, textShadow: `0 0 16px ${timerColor}80` }}>
+                            {timeLeft}
+                          </motion.span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-purple-400/35 font-bold">{currentRound}/{totalRounds}</div>
+                    </motion.div>
+                  )}
                 </div>
 
-                {/* Team 2 */}
-                <motion.div layout className="rounded-2xl border overflow-hidden transition-all"
-                  style={{
-                    borderColor: currentTurn === 2 ? "#00e5ff80" : "rgba(0,229,255,0.2)",
-                    background: currentTurn === 2 ? "rgba(0,229,255,0.14)" : "rgba(0,229,255,0.06)",
-                    boxShadow: currentTurn === 2 ? "0 0 32px rgba(0,229,255,0.22)" : "none",
-                  }}>
-                  <div className="h-1.5" style={{ background: currentTurn === 2
-                    ? "linear-gradient(90deg, #00e5ff, #0284c7)"
-                    : "rgba(0,229,255,0.15)" }} />
-                  <div className="p-4 text-center">
-                    <p className="text-sm font-black truncate" style={{ color: currentTurn === 2 ? "#00e5ff" : "#00e5ff80" }}>{team2Name}</p>
-                    <p className="text-5xl font-black mt-1"
-                      style={{ color: "#00e5ff", textShadow: currentTurn === 2 ? "0 0 32px #00e5ff" : "0 0 20px #00e5ff50" }}>{team2Score}</p>
-                    {currentTurn === 2 && <p className="text-xs font-black mt-1.5" style={{ color: "#00e5ff" }}>⚡ دورهم</p>}
-                  </div>
-                </motion.div>
+                {/* Team 2 (left in RTL) */}
+                <div className="flex flex-col items-center gap-2">
+                  <motion.div layout className="w-full rounded-2xl border overflow-hidden transition-all"
+                    style={{
+                      borderColor: currentTurn === 2 ? "#00e5ff80" : "rgba(0,229,255,0.2)",
+                      background: currentTurn === 2 ? "rgba(0,229,255,0.14)" : "rgba(0,229,255,0.06)",
+                      boxShadow: currentTurn === 2 ? "0 0 32px rgba(0,229,255,0.22)" : "none",
+                    }}>
+                    <div className="h-1.5" style={{ background: currentTurn === 2
+                      ? "linear-gradient(90deg, #00e5ff, #0284c7)"
+                      : "rgba(0,229,255,0.15)" }} />
+                    <div className="p-4 text-center">
+                      <p className="text-sm font-black truncate" style={{ color: currentTurn === 2 ? "#00e5ff" : "#00e5ff80" }}>{team2Name}</p>
+                      <p className="text-5xl font-black mt-1"
+                        style={{ color: "#00e5ff", textShadow: currentTurn === 2 ? "0 0 32px #00e5ff" : "0 0 20px #00e5ff50" }}>{team2Score}</p>
+                      {currentTurn === 2 && <p className="text-xs font-black mt-1.5" style={{ color: "#00e5ff" }}>⚡ دورهم</p>}
+                    </div>
+                  </motion.div>
+
+                  {/* Timer – only shown when team 2 is active */}
+                  {currentTurn === 2 && (
+                    <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                      className="flex flex-col items-center gap-1">
+                      <div className="relative w-24 h-24">
+                        <svg className="w-24 h-24 absolute inset-0"
+                          style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
+                          viewBox="0 0 96 96">
+                          <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                          <motion.circle cx="48" cy="48" r="40" fill="none"
+                            stroke="#00e5ff" strokeWidth="6" strokeLinecap="round"
+                            strokeDasharray={`${2 * Math.PI * 40}`}
+                            strokeDashoffset={`${2 * Math.PI * 40 * (1 - timerPct / 100)}`}
+                            transition={{ duration: 0.6 }} />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <motion.span className="text-3xl font-black tabular-nums"
+                            animate={timeLeft <= 10 && timerRunning ? { scale: [1, 1.2, 1] } : {}}
+                            transition={{ repeat: Infinity, duration: 0.8 }}
+                            style={{ color: timerColor, textShadow: `0 0 16px ${timerColor}80` }}>
+                            {timeLeft}
+                          </motion.span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-purple-400/35 font-bold">{currentRound}/{totalRounds}</div>
+                    </motion.div>
+                  )}
+                </div>
+
               </div>
 
               {/* Double badge */}
@@ -960,15 +1004,24 @@ export default function SongGame() {
                     <motion.button onClick={addExtraTime} disabled={currentExtraUsed}
                       whileHover={currentExtraUsed ? {} : { scale: 1.02 }}
                       whileTap={currentExtraUsed ? {} : { scale: 0.97 }}
-                      className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-base border transition-all"
+                      className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border transition-all"
                       style={{
                         background: currentExtraUsed ? "rgba(99,102,241,0.04)" : "rgba(99,102,241,0.12)",
                         borderColor: currentExtraUsed ? "rgba(99,102,241,0.14)" : "rgba(99,102,241,0.44)",
                         color: currentExtraUsed ? "rgba(129,140,248,0.3)" : "#818cf8",
                         cursor: currentExtraUsed ? "not-allowed" : "pointer",
                       }}>
-                      <Timer size={18} />
-                      {currentExtraUsed ? "زيادة الدقيقة مستخدمة ✓" : "زيادة دقيقة  (+60 ثانية)"}
+                      <Timer size={18} className="flex-shrink-0" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-black text-base">
+                          {currentExtraUsed ? "زيادة الدقيقة مستخدمة ✓" : "زيادة دقيقة  (+60 ثانية)"}
+                        </span>
+                        {!currentExtraUsed && (
+                          <span className="text-xs font-bold" style={{ color: "rgba(129,140,248,0.5)" }}>
+                            استخدام مرة واحدة لكل فريق
+                          </span>
+                        )}
+                      </div>
                     </motion.button>
                   )}
 
