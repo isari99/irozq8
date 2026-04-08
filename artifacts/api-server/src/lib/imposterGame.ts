@@ -300,6 +300,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     ws.roomCode = code;
     ws.playerId = hostPlayerId;
     send(ws, { type: "imposter:created", code, roomName, category, durationMs, hostPlayerId });
+    send(ws, stateMsg(room)); // send full state so host sees themselves in lobby immediately
     logger.info({ code, category, durationMins, hostName }, "برا السالفة room created");
     return;
   }

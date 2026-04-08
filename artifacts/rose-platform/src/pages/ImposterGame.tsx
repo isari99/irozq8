@@ -65,28 +65,24 @@ const font = { fontFamily: "'Cairo', sans-serif" };
 
 // ─── Avatar Pool ──────────────────────────────────────────────────────────────
 const AVATAR_POOL = [
-  // Avataaars (cartoon humans)
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=ffdfbf",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Nora&backgroundColor=c0aede",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Omar&backgroundColor=d1d4f9",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Sara&backgroundColor=ffd5dc",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmad&backgroundColor=b6e3f4",
-  // Lorelei (cute minimalist)
-  "https://api.dicebear.com/7.x/lorelei/svg?seed=Star&backgroundColor=fde68a",
-  "https://api.dicebear.com/7.x/lorelei/svg?seed=Moon&backgroundColor=ddd6fe",
-  "https://api.dicebear.com/7.x/lorelei/svg?seed=Sun&backgroundColor=fecaca",
-  "https://api.dicebear.com/7.x/lorelei/svg?seed=Wave&backgroundColor=bbf7d0",
-  // Big smile (happy faces)
-  "https://api.dicebear.com/7.x/big-smile/svg?seed=Happy&backgroundColor=fed7aa",
-  "https://api.dicebear.com/7.x/big-smile/svg?seed=Joy&backgroundColor=e9d5ff",
-  "https://api.dicebear.com/7.x/big-smile/svg?seed=Cheer&backgroundColor=bfdbfe",
-  "https://api.dicebear.com/7.x/big-smile/svg?seed=Fun&backgroundColor=fde68a",
-  // Notionists (clean vector)
-  "https://api.dicebear.com/7.x/notionists/svg?seed=Hero&backgroundColor=f0abfc",
-  "https://api.dicebear.com/7.x/notionists/svg?seed=Ace&backgroundColor=7dd3fc",
-  "https://api.dicebear.com/7.x/notionists/svg?seed=Rex&backgroundColor=86efac",
-  "https://api.dicebear.com/7.x/notionists/svg?seed=Zara&backgroundColor=fca5a5",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Jasmine&backgroundColor=fecaca",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Mia&backgroundColor=fed7aa",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Leo&backgroundColor=fde68a",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Zara&backgroundColor=bbf7d0",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Omar&backgroundColor=bfdbfe",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Nora&backgroundColor=ddd6fe",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Max&backgroundColor=fda4af",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara&backgroundColor=fdba74",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix&backgroundColor=fcd34d",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Layla&backgroundColor=6ee7b7",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Amir&backgroundColor=93c5fd",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Luna&backgroundColor=c4b5fd",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Rami&backgroundColor=f9a8d4",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Dina&backgroundColor=fde47f",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Kareem&backgroundColor=a7f3d0",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Hana&backgroundColor=bae6fd",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Yusuf&backgroundColor=e9d5ff",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Rima&backgroundColor=fecdd3",
 ];
 
 // ─── Draggable Streamer Box ────────────────────────────────────────────────────
@@ -451,150 +447,184 @@ export default function ImposterGame() {
 
           <AnimatePresence mode="wait">
 
-            {/* ─────────── SCREEN 1: Settings Card (shown immediately) ─────────── */}
+            {/* ─────────── SCREEN 1: Setup (Professional Desktop 2-column) ─────────── */}
             {!setupDone && (
               <motion.div key="create"
-                initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-                className="flex flex-col items-center justify-center flex-1 px-4 py-4">
+                initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
+                className="flex flex-col items-center justify-center flex-1 px-6 py-6">
 
-                <div className="w-full max-w-sm flex flex-col gap-5 p-6 rounded-3xl"
-                  style={{ background: "rgba(10,4,24,0.95)", border: `2px solid ${neonPurple}45`,
-                    boxShadow: `0 12px 60px rgba(0,0,0,0.7), 0 0 40px ${neonPurple}15` }}>
+                {/* Wide card */}
+                <div className="w-full max-w-4xl rounded-3xl overflow-hidden"
+                  style={{ background: "rgba(8,3,20,0.97)", border: `1.5px solid ${neonPurple}35`,
+                    boxShadow: `0 24px 80px rgba(0,0,0,0.8), 0 0 60px ${neonPurple}12` }}>
 
-                  {/* Card header */}
-                  <div className="flex flex-col items-center gap-2 text-center pb-2"
-                    style={{ borderBottom: `1px solid ${neonPurple}20` }}>
-                    <motion.span style={{ fontSize: 48, filter: `drop-shadow(0 0 16px ${neonPurple}80)` }}
-                      animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}>
+                  {/* ── Top header bar ── */}
+                  <div className="flex items-center gap-4 px-8 py-5"
+                    style={{ borderBottom: `1px solid rgba(255,255,255,0.07)`, background: `${neonPurple}0a` }}>
+                    <motion.span style={{ fontSize: 36, filter: `drop-shadow(0 0 12px ${neonPurple}80)` }}
+                      animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 2.5 }}>
                       🕵️
                     </motion.span>
-                    <h1 className="text-2xl font-black" style={{ color: neonPurple, textShadow: `0 0 20px ${neonPurple}60` }}>
-                      برا السالفة
-                    </h1>
-                    <p className="text-[11px] text-purple-400/40 font-bold">إعدادات الغرفة</p>
-                  </div>
-
-                  {/* Host identity */}
-                  <div className="flex flex-col gap-2.5">
-                    <p className="text-xs font-black text-purple-300/60">اسمك في اللعبة</p>
-                    <input
-                      value={hostName}
-                      onChange={e => setHostName(e.target.value)}
-                      placeholder="المضيف"
-                      maxLength={20}
-                      className="w-full bg-transparent border rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none text-right"
-                      style={{ borderColor: `${neonPurple}40` }}
-                    />
-                    {/* Avatar mini picker */}
-                    <div className="grid grid-cols-6 gap-1.5">
-                      {AVATAR_POOL.map((av, i) => (
-                        <button key={i} onClick={() => setHostAvatar(av)}
-                          className="rounded-lg overflow-hidden transition-all"
-                          style={{
-                            border: `2px solid ${hostAvatar === av ? neonPurple : "rgba(255,255,255,0.1)"}`,
-                            boxShadow: hostAvatar === av ? `0 0 10px ${neonPurple}60` : "none",
-                          }}>
-                          <img src={av} alt="" className="w-full aspect-square object-cover"/>
-                        </button>
-                      ))}
+                    <div>
+                      <h1 className="text-2xl font-black" style={{ color: neonPurple, textShadow: `0 0 16px ${neonPurple}60` }}>
+                        برا السالفة
+                      </h1>
+                      <p className="text-xs text-purple-400/40 font-bold mt-0.5">إعدادات الغرفة الجديدة</p>
                     </div>
                   </div>
 
-                  {/* Category */}
-                  <div className="flex flex-col gap-2.5">
-                    <p className="text-xs font-black text-purple-300/60">الفئة</p>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {([
-                        { id: "عام"     as Category, emoji: "🎲", color: "#22c55e" },
-                        { id: "دول"     as Category, emoji: "🌍", color: "#3b82f6" },
-                        { id: "حيوانات"as Category, emoji: "🦁", color: "#f97316" },
-                        { id: "أكلات"  as Category, emoji: "🍕", color: "#ef4444" },
-                        { id: "أشياء"  as Category, emoji: "📦", color: "#a78bfa" },
-                      ]).map(cat => {
-                        const active = selectedCategory === cat.id;
-                        return (
-                          <motion.button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
-                            className="flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all"
-                            style={{
-                              background: active ? cat.color + "22" : "rgba(255,255,255,0.04)",
-                              border: `2px solid ${active ? cat.color : "rgba(255,255,255,0.07)"}`,
-                              boxShadow: active ? `0 0 12px ${cat.color}40` : "none",
-                            }}
-                            whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
-                            <span style={{ fontSize: 18 }}>{cat.emoji}</span>
-                            <span className="text-[9px] font-black leading-none"
-                              style={{ color: active ? cat.color : "rgba(255,255,255,0.30)" }}>
-                              {cat.id}
-                            </span>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {/* ── Two-column body ── */}
+                  <div className="grid grid-cols-2 divide-x divide-white/5" style={{ direction: "rtl" }}>
 
-                  {/* Duration */}
-                  <div className="flex flex-col gap-2.5">
-                    <p className="text-xs font-black text-purple-300/60">⏱ مدة الجلسة</p>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[5, 10, 15, 20].map(d => {
-                        const active = selectedDuration === d;
-                        return (
-                          <motion.button key={d} onClick={() => setSelectedDuration(d)}
-                            className="py-3 rounded-xl font-black text-sm flex flex-col items-center gap-0.5 transition-all"
-                            style={{
-                              background: active ? `${neonCyan}18` : "rgba(255,255,255,0.04)",
-                              border: `2px solid ${active ? neonCyan : "rgba(255,255,255,0.07)"}`,
-                              color: active ? neonCyan : "rgba(255,255,255,0.35)",
-                              boxShadow: active ? `0 0 12px ${neonCyan}35` : "none",
-                            }}
-                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}>
-                            <span className="text-base leading-none">{d}</span>
-                            <span style={{ fontSize: 9 }}>دقيقة</span>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Streamer mode toggle */}
-                  <div className="flex items-center justify-between px-1 py-1"
-                    style={{ borderTop: `1px solid ${neonPurple}15` }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🎥</span>
+                    {/* ── LEFT COL: Identity ── */}
+                    <div className="p-8 flex flex-col gap-5">
                       <div>
-                        <p className="text-xs font-black text-white/60">وضع الستريمر</p>
-                        <p className="text-[10px] text-purple-400/30">مربع أسود قابل للسحب</p>
+                        <p className="text-xs font-black text-purple-300/50 mb-1.5 tracking-wider">اسمك في اللعبة</p>
+                        <input
+                          value={hostName}
+                          onChange={e => setHostName(e.target.value)}
+                          placeholder="المضيف"
+                          maxLength={20}
+                          autoFocus
+                          className="w-full bg-white/5 border rounded-xl px-4 py-3 text-white text-base placeholder-white/20 focus:outline-none focus:border-purple-500/60 text-right transition-colors"
+                          style={{ borderColor: `${neonPurple}35` }}
+                        />
+                      </div>
+
+                      {/* Avatar section */}
+                      <div>
+                        <p className="text-xs font-black text-purple-300/50 mb-3 tracking-wider">اختر شخصيتك</p>
+                        {/* Big selected preview */}
+                        <div className="flex justify-center mb-3">
+                          <div className="w-20 h-20 rounded-2xl overflow-hidden"
+                            style={{ border: `3px solid ${neonPurple}`, boxShadow: `0 0 24px ${neonPurple}55` }}>
+                            <img src={hostAvatar} alt="avatar" className="w-full h-full object-cover"/>
+                          </div>
+                        </div>
+                        {/* Grid picker */}
+                        <div className="grid grid-cols-6 gap-1.5">
+                          {AVATAR_POOL.map((av, i) => (
+                            <button key={i} onClick={() => setHostAvatar(av)}
+                              className="rounded-xl overflow-hidden transition-all duration-150"
+                              style={{
+                                border: `2px solid ${hostAvatar === av ? neonPurple : "rgba(255,255,255,0.08)"}`,
+                                boxShadow: hostAvatar === av ? `0 0 12px ${neonPurple}70` : "none",
+                                outline: "none",
+                              }}>
+                              <img src={av} alt="" className="w-full aspect-square object-cover"/>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setStreamerBoxVisible(v => !v)}
-                      className="relative w-11 h-6 rounded-full transition-all"
-                      style={{
-                        background: streamerBoxVisible
-                          ? "linear-gradient(135deg,#7c3aed,#e040fb)"
-                          : "rgba(255,255,255,0.10)",
-                      }}>
-                      <motion.span
-                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
-                        animate={{ right: streamerBoxVisible ? 2 : undefined, left: streamerBoxVisible ? undefined : 2 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }}
-                      />
-                    </button>
-                  </div>
 
-                  {/* Create button */}
-                  <motion.button onClick={handleConfirmCreate} disabled={creating}
-                    className="w-full py-4 rounded-2xl font-black text-white text-base btn-shimmer disabled:opacity-50"
-                    style={{ background: "linear-gradient(135deg,#7c3aed,#e040fb)", boxShadow: `0 6px 32px ${neonPurple}55` }}
-                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    {creating ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
-                        جاري الإنشاء...
-                      </span>
-                    ) : "إنشاء الغرفة 🚀"}
-                  </motion.button>
+                    {/* ── RIGHT COL: Settings ── */}
+                    <div className="p-8 flex flex-col gap-5">
+
+                      {/* Category */}
+                      <div>
+                        <p className="text-xs font-black text-purple-300/50 mb-3 tracking-wider">فئة الكلمات</p>
+                        <div className="grid grid-cols-5 gap-2">
+                          {([
+                            { id: "عام"      as Category, emoji: "🎲", color: "#22c55e" },
+                            { id: "دول"      as Category, emoji: "🌍", color: "#3b82f6" },
+                            { id: "حيوانات" as Category, emoji: "🦁", color: "#f97316" },
+                            { id: "أكلات"   as Category, emoji: "🍕", color: "#ef4444" },
+                            { id: "أشياء"   as Category, emoji: "📦", color: "#a78bfa" },
+                          ]).map(cat => {
+                            const active = selectedCategory === cat.id;
+                            return (
+                              <motion.button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
+                                className="flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all"
+                                style={{
+                                  background: active ? cat.color + "25" : "rgba(255,255,255,0.04)",
+                                  border: `2px solid ${active ? cat.color : "rgba(255,255,255,0.08)"}`,
+                                  boxShadow: active ? `0 0 16px ${cat.color}45` : "none",
+                                }}
+                                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}>
+                                <span style={{ fontSize: 22 }}>{cat.emoji}</span>
+                                <span className="text-[10px] font-black leading-none"
+                                  style={{ color: active ? cat.color : "rgba(255,255,255,0.35)" }}>
+                                  {cat.id}
+                                </span>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Duration */}
+                      <div>
+                        <p className="text-xs font-black text-purple-300/50 mb-3 tracking-wider">⏱ مدة الجلسة</p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[5, 10, 15, 20].map(d => {
+                            const active = selectedDuration === d;
+                            return (
+                              <motion.button key={d} onClick={() => setSelectedDuration(d)}
+                                className="py-3.5 rounded-xl font-black flex flex-col items-center gap-0.5 transition-all"
+                                style={{
+                                  background: active ? `${neonCyan}18` : "rgba(255,255,255,0.04)",
+                                  border: `2px solid ${active ? neonCyan : "rgba(255,255,255,0.08)"}`,
+                                  color: active ? neonCyan : "rgba(255,255,255,0.35)",
+                                  boxShadow: active ? `0 0 14px ${neonCyan}35` : "none",
+                                }}
+                                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.93 }}>
+                                <span className="text-lg leading-none">{d}</span>
+                                <span className="text-[10px]">دقيقة</span>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Streamer mode + Create — bottom row */}
+                      <div className="mt-auto flex flex-col gap-3 pt-3"
+                        style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+                        {/* Streamer toggle */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-lg">🎥</span>
+                            <div>
+                              <p className="text-sm font-black text-white/65">وضع الستريمر</p>
+                              <p className="text-[10px] text-purple-400/30">مربع أسود قابل للسحب على الشاشة</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setStreamerBoxVisible(v => !v)}
+                            className="relative w-12 h-6 rounded-full transition-all flex-shrink-0"
+                            style={{ background: streamerBoxVisible ? "linear-gradient(135deg,#7c3aed,#e040fb)" : "rgba(255,255,255,0.12)" }}>
+                            <motion.span
+                              className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow"
+                              animate={{ right: streamerBoxVisible ? 2 : undefined, left: streamerBoxVisible ? undefined : 2 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 25 }}/>
+                          </button>
+                        </div>
+
+                        {/* Create button */}
+                        <motion.button onClick={handleConfirmCreate} disabled={creating}
+                          className="w-full py-4 rounded-2xl font-black text-white text-lg relative overflow-hidden disabled:opacity-50"
+                          style={{ background: "linear-gradient(135deg,#7c3aed,#c026d3,#e040fb)",
+                            boxShadow: `0 8px 40px ${neonPurple}55` }}
+                          whileHover={{ scale: 1.02, boxShadow: `0 12px 50px ${neonPurple}70` }}
+                          whileTap={{ scale: 0.97 }}>
+                          {creating ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                              جاري الإنشاء...
+                            </span>
+                          ) : (
+                            <>
+                              <span>إنشاء الغرفة 🚀</span>
+                              <motion.div className="absolute inset-0 pointer-events-none"
+                                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)" }}
+                                animate={{ x: ["-100%", "200%"] }}
+                                transition={{ repeat: Infinity, duration: 2.2, ease: "linear" }}/>
+                            </>
+                          )}
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
