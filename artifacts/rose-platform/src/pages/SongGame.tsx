@@ -839,7 +839,7 @@ export default function SongGame() {
                 <div className="flex flex-col items-center gap-1.5">
                   <div className="relative w-28 h-28">
                     <svg className="w-28 h-28 absolute inset-0"
-                      style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
+                      style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
                       viewBox="0 0 112 112">
                       <circle cx="56" cy="56" r="48" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="7" />
                       <motion.circle cx="56" cy="56" r="48" fill="none"
