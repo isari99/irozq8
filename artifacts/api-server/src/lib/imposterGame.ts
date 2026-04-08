@@ -46,7 +46,6 @@ interface GameRoom {
   currentQuestion: string | null;
   qaHistory: QAEntry[];
   votes: Record<string, string>;
-  voteRound: number;
   gameEndAt: number;
   turnEndAt: number;
   lastAnswer: { targetId: string; answer: string } | null;
@@ -153,7 +152,6 @@ function stateMsg(room: GameRoom) {
     currentQuestion: room.currentQuestion,
     qaHistory: room.qaHistory,
     lastAnswer: room.lastAnswer,
-    voteRound: room.voteRound,
     gameRemaining: room.gameEndAt ? Math.max(0, room.gameEndAt - Date.now()) : 0,
     turnRemaining: room.turnEndAt ? Math.max(0, room.turnEndAt - Date.now()) : 0,
   };
@@ -239,22 +237,30 @@ function checkVoteDone(room: GameRoom): void {
   const active = Array.from(room.players.values()).filter(p => !p.disconnected && !p.eliminated);
   if (!active.every(p => p.voted)) return;
 
-  // Tally votes (skip "skip" entries)
+  // Tally votes (ignore "skip" entries)
   const counts: Record<string, number> = {};
   Object.values(room.votes).forEach(t => {
     if (t !== "skip") counts[t] = (counts[t] ?? 0) + 1;
   });
 
-  let topId = "";
+  // Find top vote count
   let topCount = 0;
-  Object.entries(counts).forEach(([id, c]) => { if (c > topCount) { topCount = c; topId = id; } });
+  Object.values(counts).forEach(c => { if (c > topCount) topCount = c; });
 
+  // All players with the top vote count
+  const topPlayers = topCount > 0
+    ? Object.keys(counts).filter(id => counts[id] === topCount)
+    : [];
+
+  // A clear winner exists only when exactly ONE player has the highest votes
+  const isTie   = topPlayers.length !== 1;
+  const topId   = isTie ? "" : topPlayers[0];
   const imposter = room.players.get(room.imposterId);
 
-  // ── Case 1: Correct! Imposter was voted out ────────────────────────────────
+  // ── Case 1: Imposter caught ────────────────────────────────────────────────
   if (topId === room.imposterId) {
     room.phase = "result";
-    broadcast(room, stateMsg(room)); // ← CRITICAL: update phase on all clients
+    broadcast(room, stateMsg(room));
     broadcast(room, {
       type: "imposter:result",
       imposterName: imposter?.name ?? "؟",
@@ -267,34 +273,22 @@ function checkVoteDone(room: GameRoom): void {
     return;
   }
 
-  // ── Case 2: All skipped or nobody selected → imposter wins ────────────────
-  if (!topId) {
-    room.phase = "result";
-    broadcast(room, stateMsg(room)); // ← CRITICAL
-    broadcast(room, {
-      type: "imposter:result",
-      imposterName: imposter?.name ?? "؟",
-      imposterId: room.imposterId,
-      word: room.word,
-      winner: "imposter",
-      votes: room.votes,
-      counts,
-    });
+  // ── Case 2: Tie or all skipped → no elimination, game continues ───────────
+  if (isTie) {
+    broadcast(room, { type: "imposter:tie", votes: room.votes, counts });
+    resumePlaying(room);
     return;
   }
 
-  // ── Case 3: Wrong person was voted out ────────────────────────────────────
+  // ── Case 3: Clear wrong vote → eliminate that player ─────────────────────
   const eliminatedPlayer = room.players.get(topId);
   if (eliminatedPlayer) eliminatedPlayer.eliminated = true;
-  room.voteRound += 1;
 
-  // Count remaining active players after elimination
+  // Remaining active players after elimination
   const remaining = Array.from(room.players.values()).filter(p => !p.disconnected && !p.eliminated);
 
-  // End condition: too few players (<3 means imposter vs ≤1 innocent) OR used 2 vote rounds
-  const MAX_VOTE_ROUNDS = 2;
-  if (remaining.length < 3 || room.voteRound >= MAX_VOTE_ROUNDS) {
-    const imposter = room.players.get(room.imposterId);
+  // Win condition: if ≤ 3 players remain, imposter wins immediately
+  if (remaining.length <= 3) {
     room.phase = "result";
     broadcast(room, stateMsg(room));
     broadcast(room, {
@@ -310,9 +304,9 @@ function checkVoteDone(room: GameRoom): void {
     return;
   }
 
-  // Show elimination screen then resume
+  // Show elimination screen then resume after 4 s
   room.phase = "elimination";
-  broadcast(room, stateMsg(room)); // update phase + eliminated flag for all clients
+  broadcast(room, stateMsg(room));
   broadcast(room, {
     type: "imposter:elimination",
     eliminatedId: topId,
@@ -320,21 +314,21 @@ function checkVoteDone(room: GameRoom): void {
     votes: room.votes,
     counts,
   });
-
-  // Auto-resume after 4 seconds
   setTimeout(() => resumeAfterElimination(room), 4_000);
 }
 
-function resumeAfterElimination(room: GameRoom): void {
-  if (room.phase !== "elimination") return;
+/** Shared helper: restart playing phase (called after elimination or tie). */
+function resumePlaying(room: GameRoom): void {
+  if (room.gameTimer)    clearTimeout(room.gameTimer);
+  if (room.turnTimer)    clearTimeout(room.turnTimer);
+  if (room.timerInterval) clearInterval(room.timerInterval);
+  room.gameTimer = null; room.turnTimer = null; room.timerInterval = null;
 
-  // Remove eliminated / disconnected players from turn order
-  room.playerOrder = room.playerOrder.filter(id => {
-    const p = room.players.get(id);
-    return p && !p.eliminated && !p.disconnected;
-  });
+  // Rebuild player order — only active (not eliminated, not disconnected)
+  room.playerOrder = Array.from(room.players.values())
+    .filter(p => !p.eliminated && !p.disconnected)
+    .map(p => p.id);
 
-  // Resume playing phase — fresh Q&A round, keep game timer running
   room.phase = "playing";
   room.votes = {};
   room.qaHistory = [];
@@ -343,11 +337,9 @@ function resumeAfterElimination(room: GameRoom): void {
   room.currentQuestion = null;
   room.lastAnswer = null;
 
-  // Restart game timer (remaining duration)
   const timeLeft = Math.max(30_000, room.gameEndAt - Date.now());
   room.gameTimer = setTimeout(() => startVoting(room), timeLeft);
 
-  // Restart turn timers
   room.turnEndAt = Date.now() + 75_000;
   room.turnTimer = setTimeout(() => advanceTurn(room, true), 75_000);
   room.timerInterval = setInterval(() => {
@@ -362,8 +354,12 @@ function resumeAfterElimination(room: GameRoom): void {
   broadcast(room, stateMsg(room));
 
   const firstId = room.playerOrder[0];
-  const firstP = room.players.get(firstId);
-  send(firstP?.ws, { type: "imposter:your_turn" });
+  send(room.players.get(firstId)?.ws, { type: "imposter:your_turn" });
+}
+
+function resumeAfterElimination(room: GameRoom): void {
+  if (room.phase !== "elimination") return;
+  resumePlaying(room);
 }
 
 // ─── Message handler ──────────────────────────────────────────────────────────
@@ -401,7 +397,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
       word: "", imposterId: "",
       currentTurnIdx: 0, currentTargetId: null, currentQuestion: null,
       qaHistory: [],
-      votes: {}, voteRound: 0, gameEndAt: 0, turnEndAt: 0, lastAnswer: null,
+      votes: {}, gameEndAt: 0, turnEndAt: 0, lastAnswer: null,
       gameTimer: null, turnTimer: null, answerTimer: null, timerInterval: null,
       usedWords: new Set(),
     };
@@ -461,7 +457,6 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.currentQuestion = null;
     room.qaHistory       = [];
     room.lastAnswer      = null;
-    room.voteRound = 0;
     room.players.forEach(p => { p.voted = false; p.eliminated = false; });
 
     // ── Phase 1: COUNTDOWN (5 s) ──────────────────────────────────────────────
@@ -630,7 +625,6 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.qaHistory = [];
     room.lastAnswer = null;
     room.gameEndAt = 0; room.turnEndAt = 0;
-    room.voteRound = 0;
     room.players.forEach(p => { p.voted = false; p.eliminated = false; });
     broadcast(room, stateMsg(room));
     return;

@@ -220,6 +220,7 @@ export default function ImposterGame() {
   const [gameState, setGameState]   = useState<GameState | null>(null);
   const [result, setResult]                 = useState<Result | null>(null);
   const [eliminationInfo, setEliminationInfo] = useState<EliminationInfo | null>(null);
+  const [showTie, setShowTie]                 = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [copied, setCopied]         = useState(false);
   const [roomCode, setRoomCode]     = useState<string>(roomParam);
@@ -338,6 +339,10 @@ export default function ImposterGame() {
         if (msg.type === "imposter:answered")  setNeedAnswer(false);
         if (msg.type === "imposter:result")      setResult(msg as Result);
         if (msg.type === "imposter:elimination") setEliminationInfo(msg as EliminationInfo);
+        if (msg.type === "imposter:tie") {
+          setShowTie(true);
+          setTimeout(() => setShowTie(false), 3_500);
+        }
         if (msg.type === "imposter:removed")   setError("تم إزالتك من الغرفة");
         if (msg.type === "imposter:host_left") setError("المضيف غادر الغرفة");
         if (msg.type === "imposter:error")     setError(msg.message);
@@ -500,10 +505,10 @@ export default function ImposterGame() {
                   </div>
 
                   {/* ── Two-column body ── */}
-                  <div className="grid grid-cols-2 divide-x divide-white/5" style={{ direction: "rtl" }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-white/5" style={{ direction: "rtl" }}>
 
                     {/* ── LEFT COL: Identity ── */}
-                    <div className="p-8 flex flex-col gap-5">
+                    <div className="p-5 sm:p-8 flex flex-col gap-4">
                       <div>
                         <p className="text-xs font-black text-purple-300/50 mb-1.5 tracking-wider">اسمك في اللعبة</p>
                         <input
@@ -545,7 +550,7 @@ export default function ImposterGame() {
                     </div>
 
                     {/* ── RIGHT COL: Settings ── */}
-                    <div className="p-8 flex flex-col gap-5">
+                    <div className="p-5 sm:p-8 flex flex-col gap-4 border-t sm:border-t-0 border-white/5">
 
                       {/* Category */}
                       <div>
@@ -566,11 +571,12 @@ export default function ImposterGame() {
                                   background: active ? cat.color + "25" : "rgba(255,255,255,0.04)",
                                   border: `2px solid ${active ? cat.color : "rgba(255,255,255,0.08)"}`,
                                   boxShadow: active ? `0 0 16px ${cat.color}45` : "none",
+                                  minHeight: "60px",
                                 }}
                                 whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}>
-                                <span style={{ fontSize: 22 }}>{cat.emoji}</span>
-                                <span className="text-[10px] font-black leading-none"
-                                  style={{ color: active ? cat.color : "rgba(255,255,255,0.35)" }}>
+                                <span style={{ fontSize: 20 }}>{cat.emoji}</span>
+                                <span className="text-[9px] font-black leading-none text-center w-full px-0.5"
+                                  style={{ color: active ? cat.color : "rgba(255,255,255,0.35)", wordBreak: "keep-all" }}>
                                   {cat.id}
                                 </span>
                               </motion.button>
@@ -1589,28 +1595,29 @@ export default function ImposterGame() {
 
               {/* MY TURN — ask (spectator cannot ask) */}
               {isMyTurn && !iAmEliminated && (
-                <div className="rounded-xl p-3 flex flex-col gap-3"
+                <div className="rounded-2xl p-4 flex flex-col gap-4"
                   style={{ background: `${neonPurple}12`, border: `2px solid ${neonPurple}50` }}>
-                  <motion.p className="text-sm font-black text-center" style={{ color: neonPurple }}
+                  <motion.p className="text-base font-black text-center" style={{ color: neonPurple }}
                     animate={{ scale: [1,1.06,1] }} transition={{ repeat: Infinity, duration: 1 }}>
                     🎯 دورك — اسأل أحد اللاعبين!
                   </motion.p>
 
                   {/* Target selector — exclude self, disconnected, eliminated */}
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-2">
                     {players.filter(p => p.id !== playerId && !p.disconnected && !p.eliminated).map((p, i) => (
                       <button key={p.id} onClick={() => setSelectedTarget(selectedTarget === p.id ? "" : p.id)}
-                        className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all"
+                        className="flex flex-col items-center gap-1.5 p-2.5 rounded-2xl transition-all active:scale-95"
                         style={{
-                          background: selectedTarget === p.id ? `${playerColor(i)}20` : "rgba(255,255,255,0.04)",
-                          border: `2px solid ${selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.08)"}`,
+                          background: selectedTarget === p.id ? `${playerColor(i)}25` : "rgba(255,255,255,0.05)",
+                          border: `2px solid ${selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.10)"}`,
+                          minHeight: "80px",
                         }}>
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border"
-                          style={{ borderColor: playerColor(i) + "60" }}>
+                        <div className="w-12 h-12 rounded-xl overflow-hidden border-2"
+                          style={{ borderColor: playerColor(i) + "70" }}>
                           <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                         </div>
-                        <p className="text-[9px] font-black truncate w-full text-center"
-                          style={{ color: selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.45)" }}>
+                        <p className="text-[11px] font-black truncate w-full text-center"
+                          style={{ color: selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.55)" }}>
                           {p.name}
                         </p>
                       </button>
@@ -1620,13 +1627,13 @@ export default function ImposterGame() {
                   {/* Question input */}
                   <textarea value={questionText} onChange={e => setQuestionText(e.target.value)}
                     placeholder="اكتب سؤالك هنا..."
-                    rows={2}
-                    className="w-full bg-transparent border rounded-xl px-3 py-2 text-white text-sm placeholder-white/25 focus:outline-none resize-none text-right"
-                    style={{ borderColor: "rgba(255,255,255,0.15)" }}/>
+                    rows={3}
+                    className="w-full bg-transparent border rounded-xl px-4 py-3 text-white text-sm placeholder-white/25 focus:outline-none resize-none text-right"
+                    style={{ borderColor: "rgba(255,255,255,0.18)", fontSize: "15px", lineHeight: "1.5" }}/>
 
                   <motion.button onClick={handleSendQuestion}
                     disabled={!selectedTarget || !questionText.trim()}
-                    className="w-full py-3 rounded-xl font-black text-white text-sm disabled:opacity-30"
+                    className="w-full py-4 rounded-2xl font-black text-white text-base disabled:opacity-30"
                     style={{ background: `linear-gradient(135deg,#7c3aed,${neonPurple})` }}
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
                     إرسال السؤال ✈️
@@ -1709,20 +1716,26 @@ export default function ImposterGame() {
               )}
 
               {/* Players mini row */}
-              <div className="flex gap-1.5 flex-wrap justify-center">
+              <div className="flex gap-2 flex-wrap justify-center pt-1">
                 {players.map((p, i) => {
                   const isCur = p.id === currentTurnId;
                   const isTgt = p.id === currentTargetId;
                   const isMe  = p.id === playerId;
+                  const color = isCur ? neonPurple : isTgt ? neonCyan : isMe ? "#ffd600" : playerColor(i);
                   return (
-                    <div key={p.id} className="flex flex-col items-center gap-0.5"
-                      title={p.name}>
-                      <div className="w-9 h-9 rounded-lg overflow-hidden"
-                        style={{ border: `2px solid ${isCur ? neonPurple : isTgt ? neonCyan : isMe ? "#ffd600" : playerColor(i) + "40"}` }}>
-                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                    <div key={p.id} className="flex flex-col items-center gap-1" title={p.name}>
+                      <div className="relative">
+                        <div className="w-11 h-11 rounded-xl overflow-hidden"
+                          style={{ border: `2.5px solid ${p.eliminated || p.disconnected ? "rgba(255,255,255,0.12)" : color + (isCur || isTgt || isMe ? "ff" : "50")}`,
+                            opacity: p.eliminated || p.disconnected ? 0.35 : 1 }}>
+                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                        </div>
+                        {p.eliminated && <span className="absolute -top-1 -right-1 text-[10px]">🚪</span>}
+                        {isCur && !p.eliminated && <span className="absolute -top-1 -right-1 text-[10px]">🎯</span>}
                       </div>
-                      <p className="text-[8px] font-black" style={{ color: isCur ? neonPurple : isTgt ? neonCyan : isMe ? "#ffd600" : playerColor(i) + "80" }}>
-                        {p.name.slice(0,5)}
+                      <p className="text-[10px] font-black max-w-[44px] truncate text-center"
+                        style={{ color: p.eliminated || p.disconnected ? "rgba(255,255,255,0.2)" : color + (isCur || isTgt || isMe ? "ff" : "90") }}>
+                        {p.name.slice(0,6)}
                       </p>
                     </div>
                   );
@@ -1735,6 +1748,20 @@ export default function ImposterGame() {
           {playerId && phase === "voting" && (
             <motion.div key="p-vote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="w-full flex flex-col items-center gap-5">
+
+              {/* Tie notification */}
+              <AnimatePresence>
+                {showTie && (
+                  <motion.div key="tie" initial={{ opacity: 0, scale: 0.85, y: -12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.85, y: -12 }}
+                    className="w-full flex flex-col items-center gap-1 px-4 py-3 rounded-2xl"
+                    style={{ background: "rgba(251,191,36,0.12)", border: "1.5px solid rgba(251,191,36,0.40)" }}>
+                    <p className="text-lg font-black text-yellow-300">🤝 تعادل!</p>
+                    <p className="text-xs text-yellow-200/60">لا يتم إخراج أحد — تستمر اللعبة</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="text-center">
                 <p className="text-2xl font-black" style={{ color: "#ffd600" }}>🗳️ من هو برا السالفة؟</p>
                 <p className="text-sm text-purple-400/40 mt-1">اختر اللاعب الذي تظن أنه برا السالفة</p>
@@ -1749,18 +1776,18 @@ export default function ImposterGame() {
                 <div className="grid grid-cols-2 gap-3 w-full">
                   {players.filter(p => p.id !== playerId && !p.disconnected && !p.eliminated).map((p, i) => (
                     <motion.button key={p.id} onClick={() => handleVote(p.id)}
-                      className="flex flex-col items-center gap-2 p-4 rounded-2xl"
-                      style={{ background: "rgba(10,4,24,0.88)", border: `2px solid ${playerColor(i)}40` }}
+                      className="flex flex-col items-center gap-2.5 p-4 rounded-2xl"
+                      style={{ background: "rgba(10,4,24,0.88)", border: `2px solid ${playerColor(i)}40`, minHeight: "110px" }}
                       whileHover={{ scale: 1.04, borderColor: playerColor(i) }}
                       whileTap={{ scale: 0.93 }}>
-                      <div className="w-12 h-12 rounded-xl overflow-hidden border-2" style={{ borderColor: playerColor(i) + "70" }}>
+                      <div className="w-16 h-16 rounded-xl overflow-hidden border-2" style={{ borderColor: playerColor(i) + "80" }}>
                         <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
                       </div>
-                      <p className="text-xs font-black" style={{ color: playerColor(i) }}>{p.name}</p>
+                      <p className="text-sm font-black text-center" style={{ color: playerColor(i) }}>{p.name}</p>
                     </motion.button>
                   ))}
                   <motion.button onClick={() => handleVote("skip")}
-                    className="col-span-2 py-3 rounded-2xl font-bold text-sm text-purple-400/40 border border-purple-500/15 hover:text-purple-300 hover:border-purple-400/25 transition-all"
+                    className="col-span-2 py-4 rounded-2xl font-bold text-sm text-purple-400/40 border border-purple-500/15 hover:text-purple-300 hover:border-purple-400/25 transition-all"
                     whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}>
                     تخطي ↩
                   </motion.button>
