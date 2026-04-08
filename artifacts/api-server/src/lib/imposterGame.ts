@@ -46,6 +46,7 @@ interface GameRoom {
   currentQuestion: string | null;
   qaHistory: QAEntry[];
   votes: Record<string, string>;
+  voteRound: number;
   gameEndAt: number;
   turnEndAt: number;
   lastAnswer: { targetId: string; answer: string } | null;
@@ -152,6 +153,7 @@ function stateMsg(room: GameRoom) {
     currentQuestion: room.currentQuestion,
     qaHistory: room.qaHistory,
     lastAnswer: room.lastAnswer,
+    voteRound: room.voteRound,
     gameRemaining: room.gameEndAt ? Math.max(0, room.gameEndAt - Date.now()) : 0,
     turnRemaining: room.turnEndAt ? Math.max(0, room.turnEndAt - Date.now()) : 0,
   };
@@ -284,9 +286,33 @@ function checkVoteDone(room: GameRoom): void {
   // ── Case 3: Wrong person was voted out ────────────────────────────────────
   const eliminatedPlayer = room.players.get(topId);
   if (eliminatedPlayer) eliminatedPlayer.eliminated = true;
+  room.voteRound += 1;
 
+  // Count remaining active players after elimination
+  const remaining = Array.from(room.players.values()).filter(p => !p.disconnected && !p.eliminated);
+
+  // End condition: too few players (<3 means imposter vs ≤1 innocent) OR used 2 vote rounds
+  const MAX_VOTE_ROUNDS = 2;
+  if (remaining.length < 3 || room.voteRound >= MAX_VOTE_ROUNDS) {
+    const imposter = room.players.get(room.imposterId);
+    room.phase = "result";
+    broadcast(room, stateMsg(room));
+    broadcast(room, {
+      type: "imposter:result",
+      imposterName: imposter?.name ?? "؟",
+      imposterId: room.imposterId,
+      word: room.word,
+      winner: "imposter",
+      eliminatedName: eliminatedPlayer?.name ?? "؟",
+      votes: room.votes,
+      counts,
+    });
+    return;
+  }
+
+  // Show elimination screen then resume
   room.phase = "elimination";
-  broadcast(room, stateMsg(room)); // update phase + eliminated flag
+  broadcast(room, stateMsg(room)); // update phase + eliminated flag for all clients
   broadcast(room, {
     type: "imposter:elimination",
     eliminatedId: topId,
@@ -302,27 +328,7 @@ function checkVoteDone(room: GameRoom): void {
 function resumeAfterElimination(room: GameRoom): void {
   if (room.phase !== "elimination") return;
 
-  // Count remaining active players (non-eliminated, non-disconnected)
-  const remaining = Array.from(room.players.values()).filter(p => !p.disconnected && !p.eliminated);
-
-  // If only 2 or fewer remain (imposter + 0 or 1), imposter wins
-  if (remaining.length < 2) {
-    const imposter = room.players.get(room.imposterId);
-    room.phase = "result";
-    broadcast(room, stateMsg(room));
-    broadcast(room, {
-      type: "imposter:result",
-      imposterName: imposter?.name ?? "؟",
-      imposterId: room.imposterId,
-      word: room.word,
-      winner: "imposter",
-      votes: room.votes,
-      counts: {},
-    });
-    return;
-  }
-
-  // Remove eliminated players from turn order
+  // Remove eliminated / disconnected players from turn order
   room.playerOrder = room.playerOrder.filter(id => {
     const p = room.players.get(id);
     return p && !p.eliminated && !p.disconnected;
@@ -395,7 +401,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
       word: "", imposterId: "",
       currentTurnIdx: 0, currentTargetId: null, currentQuestion: null,
       qaHistory: [],
-      votes: {}, gameEndAt: 0, turnEndAt: 0, lastAnswer: null,
+      votes: {}, voteRound: 0, gameEndAt: 0, turnEndAt: 0, lastAnswer: null,
       gameTimer: null, turnTimer: null, answerTimer: null, timerInterval: null,
       usedWords: new Set(),
     };
@@ -455,6 +461,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.currentQuestion = null;
     room.qaHistory       = [];
     room.lastAnswer      = null;
+    room.voteRound = 0;
     room.players.forEach(p => { p.voted = false; p.eliminated = false; });
 
     // ── Phase 1: COUNTDOWN (5 s) ──────────────────────────────────────────────
@@ -534,8 +541,9 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     if (!question) return;
     const currentId = room.playerOrder[room.currentTurnIdx];
     const current   = room.players.get(currentId);
-    if (!current || current.ws !== ws) return;
-    if (!room.players.has(targetId) || targetId === currentId) return;
+    if (!current || current.ws !== ws || current.eliminated) return;
+    const targetPlayer = room.players.get(targetId);
+    if (!targetPlayer || targetId === currentId || targetPlayer.eliminated || targetPlayer.disconnected) return;
 
     if (room.turnTimer)   clearTimeout(room.turnTimer);
     room.currentTargetId = targetId;
@@ -555,7 +563,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     const room = rooms.get(ws.roomCode ?? "");
     if (!room || room.phase !== "playing" || !room.currentTargetId || !room.currentQuestion) return;
     const target = room.players.get(room.currentTargetId);
-    if (!target || target.ws !== ws) return;
+    if (!target || target.ws !== ws || target.eliminated) return;
 
     const raw = String(msg.answer ?? "").trim();
     const answer = raw === "yes" ? "نعم" : raw === "no" ? "لا" : "";
@@ -622,6 +630,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.qaHistory = [];
     room.lastAnswer = null;
     room.gameEndAt = 0; room.turnEndAt = 0;
+    room.voteRound = 0;
     room.players.forEach(p => { p.voted = false; p.eliminated = false; });
     broadcast(room, stateMsg(room));
     return;

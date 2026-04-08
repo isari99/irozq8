@@ -321,6 +321,12 @@ export default function ImposterGame() {
           setTurnRemaining(gs.turnRemaining);
           // Clear elimination overlay when game resumes to playing
           if (gs.phase === "playing") setEliminationInfo(null);
+          // If I am eliminated → clear active states (I'm now spectator)
+          const myEntry = gs.players.find((p: PublicPlayer) => p.id === playerIdRef.current);
+          if (myEntry?.eliminated) {
+            setIsMyTurn(false);
+            setNeedAnswer(false);
+          }
         }
         if (msg.type === "imposter:timer") {
           setGameRemaining(msg.gameRemaining);
@@ -397,6 +403,7 @@ export default function ImposterGame() {
   const currentTargetId    = gameState?.currentTargetId;
   const hostPlayerId       = gameState?.hostPlayerId ?? "";
   const myPlayer           = players.find(p => p.id === playerId);
+  const iAmEliminated      = myPlayer?.eliminated === true;
   const currentTurnPlayer  = players.find(p => p.id === currentTurnId);
   const targetPlayer       = currentTargetId ? players.find(p => p.id === currentTargetId) : null;
   const inviteUrl          = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
@@ -1483,8 +1490,26 @@ export default function ImposterGame() {
             <motion.div key="p-playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="w-full flex flex-col gap-3">
 
+              {/* ── SPECTATOR BANNER (eliminated player) ── */}
+              {iAmEliminated && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+                  style={{ background: "rgba(239,68,68,0.10)", border: "1.5px solid rgba(239,68,68,0.35)" }}>
+                  <span className="text-xl flex-shrink-0">🚪</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-black text-red-400">تم إقصاؤك من الجولة</p>
+                    <p className="text-[10px] text-white/35 mt-0.5">أنت الآن مشاهد فقط — تابع اللعبة دون مشاركة</p>
+                  </div>
+                  <motion.span className="text-xs font-black px-2 py-1 rounded-lg"
+                    style={{ background: "rgba(239,68,68,0.2)", color: "#f87171" }}
+                    animate={{ opacity: [0.6, 1, 0.6] }} transition={{ repeat: Infinity, duration: 2 }}>
+                    مشاهد
+                  </motion.span>
+                </motion.div>
+              )}
+
               {/* Role badge */}
-              {myRole && (
+              {myRole && !iAmEliminated && (
                 <div className="flex items-center justify-between px-3 py-2 rounded-xl"
                   style={{ background: myRole.role === "imposter" ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.1)",
                     border: `1px solid ${myRole.role === "imposter" ? "#ef444435" : "#22c55e35"}` }}>
@@ -1562,8 +1587,8 @@ export default function ImposterGame() {
                 </div>
               )}
 
-              {/* MY TURN — ask */}
-              {isMyTurn && (
+              {/* MY TURN — ask (spectator cannot ask) */}
+              {isMyTurn && !iAmEliminated && (
                 <div className="rounded-xl p-3 flex flex-col gap-3"
                   style={{ background: `${neonPurple}12`, border: `2px solid ${neonPurple}50` }}>
                   <motion.p className="text-sm font-black text-center" style={{ color: neonPurple }}
@@ -1571,9 +1596,9 @@ export default function ImposterGame() {
                     🎯 دورك — اسأل أحد اللاعبين!
                   </motion.p>
 
-                  {/* Target selector */}
+                  {/* Target selector — exclude self, disconnected, eliminated */}
                   <div className="grid grid-cols-3 gap-1.5">
-                    {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
+                    {players.filter(p => p.id !== playerId && !p.disconnected && !p.eliminated).map((p, i) => (
                       <button key={p.id} onClick={() => setSelectedTarget(selectedTarget === p.id ? "" : p.id)}
                         className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all"
                         style={{
@@ -1609,8 +1634,8 @@ export default function ImposterGame() {
                 </div>
               )}
 
-              {/* ANSWER — نعم / لا */}
-              {needAnswer && (
+              {/* ANSWER — نعم / لا (spectator cannot answer) */}
+              {needAnswer && !iAmEliminated && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.88, y: 12 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
