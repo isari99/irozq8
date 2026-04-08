@@ -351,11 +351,9 @@ export default function ImposterGame() {
     setIsMyTurn(false);
     setQuestionText("");
   };
-  const handleSendAnswer = () => {
-    if (!answerText.trim()) return;
-    wsSend({ type: "imposter:send_answer_text", answer: answerText.trim() });
+  const handleSendAnswer = (choice: "yes" | "no") => {
+    wsSend({ type: "imposter:send_answer_text", answer: choice });
     setNeedAnswer(false);
-    setAnswerText("");
   };
 
   const copyLink = () => {
@@ -796,9 +794,14 @@ export default function ImposterGame() {
                           </div>
                           <p className="text-[10px] text-white/70 font-bold">❓ {qa.question}</p>
                           {qa.timedOut ? (
-                            <p className="text-[9px] text-orange-400/70">⏰ لم يتم الرد في الوقت المحدد</p>
+                            <span className="inline-flex items-center gap-1 text-[9px] font-black text-orange-400/80">
+                              <span>⏰</span><span>انتهى الوقت</span>
+                            </span>
                           ) : (
-                            <p className="text-[10px] text-green-400/80 font-bold">✅ {qa.answer}</p>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black w-fit ${qa.answer === "نعم" ? "text-green-300" : "text-red-400"}`}
+                              style={{ background: qa.answer === "نعم" ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)", border: `1px solid ${qa.answer === "نعم" ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)"}` }}>
+                              {qa.answer === "نعم" ? "✅" : "❌"} {qa.answer}
+                            </span>
                           )}
                         </div>
                       ))
@@ -1272,9 +1275,16 @@ export default function ImposterGame() {
                           <span style={{ color: neonPurple }}>{qa.targetName}</span>
                         </div>
                         <p className="text-[10px] text-white/65">❓ {qa.question}</p>
-                        {qa.timedOut
-                          ? <p className="text-[9px] text-orange-400/60">⏰ لم يتم الرد في الوقت المحدد</p>
-                          : <p className="text-[10px] text-green-400/75">✅ {qa.answer}</p>}
+                        {qa.timedOut ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-orange-400/70">
+                            <span>⏰</span><span>انتهى الوقت</span>
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black w-fit ${qa.answer === "نعم" ? "text-green-300" : "text-red-400"}`}
+                            style={{ background: qa.answer === "نعم" ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)", border: `1px solid ${qa.answer === "نعم" ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}` }}>
+                            {qa.answer === "نعم" ? "✅" : "❌"} {qa.answer}
+                          </span>
+                        )}
                       </div>
                     ))
                   )}
@@ -1343,32 +1353,78 @@ export default function ImposterGame() {
                 </div>
               )}
 
-              {/* ANSWER — text reply */}
+              {/* ANSWER — نعم / لا */}
               {needAnswer && (
-                <div className="rounded-xl p-3 flex flex-col gap-3"
-                  style={{ background: "rgba(0,229,255,0.08)", border: `2px solid ${neonCyan}50` }}>
-                  <motion.p className="text-sm font-black text-center" style={{ color: neonCyan }}
-                    animate={{ scale: [1,1.05,1] }} transition={{ repeat: Infinity, duration: 0.9 }}>
-                    👈 وُجّه لك سؤال!
-                  </motion.p>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.88, y: 12 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                  className="rounded-2xl p-4 flex flex-col gap-4"
+                  style={{ background: "rgba(0,229,255,0.07)", border: `2px solid ${neonCyan}55` }}>
+
+                  {/* Header */}
+                  <div className="flex items-center justify-center gap-2">
+                    <motion.span className="text-xl"
+                      animate={{ rotate: [0,-12,12,0] }} transition={{ repeat: Infinity, duration: 1 }}>👈</motion.span>
+                    <p className="text-sm font-black" style={{ color: neonCyan }}>وُجّه إليك سؤال!</p>
+                  </div>
+
+                  {/* Question bubble */}
                   {gameState?.currentQuestion && (
-                    <div className="rounded-lg px-3 py-2"
-                      style={{ background: `${neonPurple}15`, border: `1px solid ${neonPurple}30` }}>
-                      <p className="text-sm font-bold text-white">❓ {gameState.currentQuestion}</p>
+                    <div className="rounded-xl px-4 py-3 text-center"
+                      style={{ background: `${neonPurple}18`, border: `1px solid ${neonPurple}35` }}>
+                      <p className="text-[10px] text-purple-400/50 mb-1">السؤال</p>
+                      <p className="text-sm font-bold text-white leading-relaxed">❓ {gameState.currentQuestion}</p>
                     </div>
                   )}
-                  <textarea value={answerText} onChange={e => setAnswerText(e.target.value)}
-                    placeholder="اكتب ردك هنا..."
-                    rows={2}
-                    className="w-full bg-transparent border rounded-xl px-3 py-2 text-white text-sm placeholder-white/25 focus:outline-none resize-none text-right"
-                    style={{ borderColor: `${neonCyan}30` }}/>
-                  <motion.button onClick={handleSendAnswer} disabled={!answerText.trim()}
-                    className="w-full py-3 rounded-xl font-black text-white text-sm disabled:opacity-30"
-                    style={{ background: "linear-gradient(135deg,#0284c7,#00e5ff)", color: "#001a2e" }}
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
-                    إرسال الرد ✅
-                  </motion.button>
-                </div>
+
+                  {/* Who asked */}
+                  {(() => {
+                    const asker = players.find(p => p.id === currentTurnId);
+                    return asker ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-7 h-7 rounded-lg overflow-hidden border border-purple-500/40">
+                          <img src={asker.avatar} alt={asker.name} className="w-full h-full object-cover"/>
+                        </div>
+                        <p className="text-[10px] text-white/40">{asker.name} ينتظر ردك...</p>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* YES / NO buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <motion.button
+                      onClick={() => handleSendAnswer("yes")}
+                      className="py-5 rounded-2xl text-2xl font-black text-white flex flex-col items-center gap-1"
+                      style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", boxShadow: "0 6px 24px #22c55e45" }}
+                      whileHover={{ scale: 1.06, boxShadow: "0 8px 32px #22c55e70" }}
+                      whileTap={{ scale: 0.91 }}>
+                      ✅
+                      <span className="text-sm font-black">نعم</span>
+                    </motion.button>
+                    <motion.button
+                      onClick={() => handleSendAnswer("no")}
+                      className="py-5 rounded-2xl text-2xl font-black text-white flex flex-col items-center gap-1"
+                      style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 24px #ef444445" }}
+                      whileHover={{ scale: 1.06, boxShadow: "0 8px 32px #ef444470" }}
+                      whileTap={{ scale: 0.91 }}>
+                      ❌
+                      <span className="text-sm font-black">لا</span>
+                    </motion.button>
+                  </div>
+
+                  {/* Answer timer */}
+                  <div className="flex items-center gap-2 px-1">
+                    <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <motion.div className="h-full rounded-full"
+                        style={{ background: neonCyan }}
+                        initial={{ width: "100%" }}
+                        animate={{ width: "0%" }}
+                        transition={{ duration: 45, ease: "linear" }}/>
+                    </div>
+                    <span className="text-[9px] text-white/30">45s</span>
+                  </div>
+                </motion.div>
               )}
 
               {/* Players mini row */}

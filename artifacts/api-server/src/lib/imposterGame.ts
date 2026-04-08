@@ -434,14 +434,15 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     return;
   }
 
-  // Send answer (target player → free-text answer)
+  // Send answer (target player → نعم / لا)
   if (type === "imposter:send_answer_text") {
     const room = rooms.get(ws.roomCode ?? "");
     if (!room || room.phase !== "playing" || !room.currentTargetId || !room.currentQuestion) return;
     const target = room.players.get(room.currentTargetId);
     if (!target || target.ws !== ws) return;
 
-    const answer = String(msg.answer ?? "").trim().slice(0, 200);
+    const raw = String(msg.answer ?? "").trim();
+    const answer = raw === "yes" ? "نعم" : raw === "no" ? "لا" : "";
     if (!answer) return;
 
     if (room.answerTimer) clearTimeout(room.answerTimer);
