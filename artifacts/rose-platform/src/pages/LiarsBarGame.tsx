@@ -3,7 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Copy, Check, Users, ArrowRight } from "lucide-react";
 import barBg    from "@assets/بار2_1775630997287.jpg";
-import barHero  from "@assets/بار_1775632749164.png";
+import barHero  from "@assets/بار_1775633003083.png";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
