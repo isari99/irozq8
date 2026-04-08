@@ -95,6 +95,19 @@ const games = [
     emoji: "🐍",
     heroImage: "/snakes-hero.png",
   },
+  {
+    id: "chairs-game",
+    title: "لعبة الكراسي",
+    description: "اكتب join للانضمام واختر كرسيك قبل أن تخسر!",
+    icon: CircleDot,
+    color: "from-pink-600 to-purple-700",
+    borderColor: "border-pink-500/40",
+    glowColor: "shadow-pink-500/30",
+    neonColor: "#e040fb",
+    path: "/chairs-game",
+    emoji: "🪑",
+    heroImage: "/chairs-hero.png",
+  },
 ];
 
 export default function Home() {

@@ -11,6 +11,7 @@ import QuizGame from "@/pages/QuizGame";
 import SnakesGame from "@/pages/SnakesGame";
 import FruitsGame from "@/pages/FruitsGame";
 import ImposterGame from "@/pages/ImposterGame";
+import ChairsGame from "@/pages/ChairsGame";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/not-found";
 
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/snakes-game"><ProtectedRoute component={SnakesGame} /></Route>
       <Route path="/fruits-game"><ProtectedRoute component={FruitsGame} /></Route>
       <Route path="/imposter-game"><ImposterGame /></Route>
+      <Route path="/chairs-game"><ProtectedRoute component={ChairsGame} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
