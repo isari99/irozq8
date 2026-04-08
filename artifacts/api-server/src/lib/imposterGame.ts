@@ -225,14 +225,12 @@ function startVoting(room: GameRoom): void {
   room.phase = "voting";
   room.votes = {};
   room.lastAnswer = null;
-  // Mark host as already voted so only regular players need to vote
-  room.players.forEach(p => { p.voted = p.role === "host"; });
+  room.players.forEach(p => { p.voted = false; });
   broadcast(room, stateMsg(room));
 }
 
 function checkVoteDone(room: GameRoom): void {
-  // Host is excluded from voting — only regular players must vote
-  const active = Array.from(room.players.values()).filter(p => !p.disconnected && p.role !== "host");
+  const active = Array.from(room.players.values()).filter(p => !p.disconnected);
   if (!active.every(p => p.voted)) return;
 
   const counts: Record<string, number> = {};
@@ -485,7 +483,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     if (!room || room.phase !== "voting") return;
     const voterId = String(msg.voterId ?? ws.playerId ?? "");
     const voter = room.players.get(voterId);
-    if (!voter || voter.ws !== ws || voter.voted || voter.role === "host") return;
+    if (!voter || voter.ws !== ws || voter.voted) return;
     const targetId = String(msg.targetId ?? "skip");
     room.votes[voterId] = targetId;
     voter.voted = true;

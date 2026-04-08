@@ -864,9 +864,9 @@ export default function ImposterGame() {
 
                 {/* ── LEFT: Q&A History ── */}
                 <div className="lg:w-56 flex-shrink-0 rounded-2xl flex flex-col overflow-hidden"
-                  style={{ background: "rgba(6,18,28,0.92)", border: `1px solid ${neonCyan}30` }}>
+                  style={{ background: "rgba(16,10,38,0.92)", border: "1.5px solid rgba(107,70,193,0.45)" }}>
                   <div className="px-3 py-2.5 border-b flex items-center gap-2"
-                    style={{ borderColor: `${neonCyan}18`, background: `${neonCyan}06` }}>
+                    style={{ borderColor: "rgba(107,70,193,0.25)", background: "rgba(99,60,200,0.08)" }}>
                     <span className="text-base">📋</span>
                     <span className="text-xs font-black text-white/70">معلومات الجولة</span>
                   </div>
@@ -902,7 +902,7 @@ export default function ImposterGame() {
 
                 {/* ── CENTER: Main game ── */}
                 <div className="flex-1 rounded-2xl flex flex-col overflow-hidden min-h-0"
-                  style={{ background: "rgba(8,8,22,0.92)", border: `1px solid rgba(255,255,255,0.13)` }}>
+                  style={{ background: "rgba(10,6,28,0.94)", border: "1.5px solid rgba(107,70,193,0.35)" }}>
 
                   {/* Top bar */}
                   <div className="px-4 py-2.5 flex items-center justify-between border-b"
@@ -912,8 +912,9 @@ export default function ImposterGame() {
                       {wordVisible ? (
                         <span className="text-sm font-black" style={{ color: neonCyan }}>{gameState?.word ?? "..."}</span>
                       ) : (
-                        <span className="text-sm font-black tracking-widest" style={{ color: "rgba(255,255,255,0.15)" }}>
-                          {"•".repeat((gameState?.word ?? "...").length)}
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black"
+                          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.28)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                          🔒 كلمة مخفية
                         </span>
                       )}
                       <button onClick={() => setWordVisible(v => !v)}
@@ -1064,9 +1065,9 @@ export default function ImposterGame() {
 
                 {/* ── RIGHT: Players ── */}
                 <div className="lg:w-48 flex-shrink-0 rounded-2xl flex flex-col overflow-hidden"
-                  style={{ background: "rgba(10,4,24,0.88)", border: `1px solid rgba(255,255,255,0.08)` }}>
-                  <div className="px-3 py-2.5 border-b"
-                    style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                  style={{ background: "rgba(16,10,38,0.92)", border: "1.5px solid rgba(107,70,193,0.45)" }}>
+                  <div className="px-3 py-2.5 border-b flex items-center gap-2"
+                    style={{ borderColor: "rgba(107,70,193,0.25)", background: "rgba(99,60,200,0.08)" }}>
                     <span className="text-xs font-black text-white/60">👥 اللاعبون</span>
                   </div>
                   <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
@@ -1117,27 +1118,84 @@ export default function ImposterGame() {
             {/* ─────────── VOTING (host) ─────────── */}
             {setupDone && phase === "voting" && (
               <motion.div key="host-voting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-5 flex-1 px-4">
-                <div className="text-center mt-4">
-                  <p className="text-2xl font-black" style={{ color: "#ffd600" }}>🗳️ وقت التصويت!</p>
-                  <p className="text-sm text-purple-400/40 mt-1">اللاعبون يختارون من هو برا السالفة</p>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 w-full max-w-2xl">
-                  {players.map((p, i) => (
-                    <div key={p.id} className="flex flex-col items-center gap-2 p-3 rounded-2xl"
-                      style={{ background: "rgba(10,4,24,0.85)", border: `2px solid ${p.voted ? "#22c55e50" : playerColor(i) + "30"}` }}>
-                      <div className="w-11 h-11 rounded-xl overflow-hidden border-2"
-                        style={{ borderColor: p.voted ? "#22c55e" : playerColor(i) + "60" }}>
-                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                className="flex flex-col lg:flex-row gap-4 flex-1 px-4 pb-4 max-w-5xl mx-auto w-full">
+
+                {/* ── LEFT: voting status grid ── */}
+                <div className="lg:w-64 flex-shrink-0 rounded-2xl overflow-hidden"
+                  style={{ background: "rgba(16,10,38,0.92)", border: "1.5px solid rgba(107,70,193,0.45)" }}>
+                  <div className="px-4 py-3 border-b flex items-center gap-2"
+                    style={{ borderColor: "rgba(107,70,193,0.25)", background: "rgba(99,60,200,0.08)" }}>
+                    <span className="text-base">🗳️</span>
+                    <span className="text-sm font-black text-white/80">حالة التصويت</span>
+                    <span className="mr-auto text-xs font-black px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(99,60,200,0.2)", color: "#a78bfa" }}>
+                      {players.filter(p => p.voted).length} / {players.length}
+                    </span>
+                  </div>
+                  <div className="p-3 flex flex-col gap-2">
+                    {players.map((p, i) => (
+                      <div key={p.id} className="flex items-center gap-2.5 px-2 py-2 rounded-xl"
+                        style={{ background: p.voted ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${p.voted ? "rgba(34,197,94,0.30)" : "rgba(255,255,255,0.06)"}` }}>
+                        <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border"
+                          style={{ borderColor: p.voted ? "#22c55e70" : playerColor(i) + "50" }}>
+                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                        </div>
+                        <p className="text-xs font-black flex-1 truncate" style={{ color: p.voted ? "#4ade80" : playerColor(i) }}>
+                          {p.name} {p.id === playerId ? "(أنت)" : ""}
+                        </p>
+                        <span className="text-[10px] font-black flex-shrink-0"
+                          style={{ color: p.voted ? "#22c55e" : "rgba(255,255,255,0.2)" }}>
+                          {p.voted ? "✓" : "..."}
+                        </span>
                       </div>
-                      <p className="text-[10px] font-black truncate w-full text-center" style={{ color: p.voted ? "#22c55e" : playerColor(i) }}>
-                        {p.name}
-                      </p>
-                      <span className="text-[9px]" style={{ color: p.voted ? "#22c55e80" : "rgba(139,92,246,0.3)" }}>
-                        {p.voted ? "✓ صوّت" : "ينتظر..."}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── RIGHT: host voting panel ── */}
+                <div className="flex-1 rounded-2xl flex flex-col overflow-hidden"
+                  style={{ background: "rgba(16,10,38,0.92)", border: "1.5px solid rgba(107,70,193,0.45)" }}>
+                  <div className="px-4 py-3 border-b flex items-center gap-2"
+                    style={{ borderColor: "rgba(107,70,193,0.25)", background: "rgba(99,60,200,0.08)" }}>
+                    <span className="text-base">👑</span>
+                    <span className="text-sm font-black text-white/80">صوتك — اختر من هو برا السالفة</span>
+                  </div>
+                  <div className="flex-1 p-4 flex flex-col justify-center">
+                    {myPlayer?.voted ? (
+                      <div className="flex flex-col items-center justify-center gap-4 py-8">
+                        <motion.span style={{ fontSize: 56 }}
+                          animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }}>✅</motion.span>
+                        <p className="text-xl font-black text-green-400">تم تسجيل صوتك!</p>
+                        <p className="text-sm text-white/30">في انتظار بقية اللاعبين...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-center text-sm font-bold text-purple-300/50 mb-4">اضغط على اللاعب الذي تظنه برا السالفة</p>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                          {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
+                            <motion.button key={p.id} onClick={() => handleVote(p.id)}
+                              className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all"
+                              style={{ background: "rgba(255,255,255,0.03)", border: `2px solid ${playerColor(i)}40` }}
+                              whileHover={{ scale: 1.05, borderColor: playerColor(i), background: `${playerColor(i)}15` }}
+                              whileTap={{ scale: 0.93 }}>
+                              <div className="w-13 h-13 rounded-xl overflow-hidden border-2" style={{ borderColor: playerColor(i) + "70" }}>
+                                <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                              </div>
+                              <p className="text-xs font-black truncate w-full text-center" style={{ color: playerColor(i) }}>{p.name}</p>
+                            </motion.button>
+                          ))}
+                        </div>
+                        <motion.button onClick={() => handleVote("skip")}
+                          className="mt-4 py-2.5 rounded-xl font-bold text-sm transition-all"
+                          style={{ color: "rgba(255,255,255,0.3)", border: "1px solid rgba(255,255,255,0.1)" }}
+                          whileHover={{ scale: 1.02, color: "rgba(255,255,255,0.55)" }}
+                          whileTap={{ scale: 0.97 }}>
+                          تخطي ↩
+                        </motion.button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
