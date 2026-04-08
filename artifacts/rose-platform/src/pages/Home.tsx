@@ -136,39 +136,6 @@ export default function Home() {
       <div className="absolute bottom-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full opacity-10"
         style={{ background: "radial-gradient(circle, #00e5ff, transparent)" }} />
 
-      {/* ── Portrait video strip — fixed left ── */}
-      <motion.div
-        className="fixed left-0 top-0 h-full hidden xl:block pointer-events-none overflow-hidden"
-        style={{ width: 190, zIndex: 5 }}
-        initial={{ opacity: 0, x: -30 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 1.2, ease: "easeOut", delay: 0.4 }}>
-
-        {/* Right-edge neon border */}
-        <div className="absolute right-0 top-0 h-full w-px"
-          style={{ background: "linear-gradient(to bottom, transparent, #e040fb80, #00e5ff60, #e040fb80, transparent)" }} />
-
-        {/* Ambient glow from left */}
-        <div className="absolute inset-0"
-          style={{ background: "linear-gradient(to right, rgba(224,64,251,0.08), transparent)" }} />
-
-        {/* Portrait video — fills full height */}
-        <video
-          src="/rose-face-portrait.mp4"
-          autoPlay loop muted playsInline
-          className="w-full h-full object-cover"
-          style={{ objectPosition: "center top" }}
-        />
-
-        {/* Bottom fade out */}
-        <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
-          style={{ background: "linear-gradient(to top, rgba(5,0,18,1) 0%, transparent 100%)" }} />
-
-        {/* Top fade out */}
-        <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
-          style={{ background: "linear-gradient(to bottom, rgba(5,0,18,0.9) 0%, transparent 100%)" }} />
-      </motion.div>
-
       <div className="relative z-10 flex flex-col items-center min-h-screen px-4 py-12">
         {/* User bar */}
         {user && (
