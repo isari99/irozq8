@@ -602,7 +602,44 @@ export default function SongGame() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="flex-1 flex flex-col items-center justify-center px-5 py-6 gap-5">
+              className="flex-1 flex flex-col items-center justify-center px-5 py-6 gap-4">
+
+              {/* ── Decorative video clip + round badge ── */}
+              <div className="flex items-center justify-center gap-5 w-full max-w-2xl">
+                <div className="flex-1 flex justify-center">
+                  <div className="relative rounded-2xl overflow-hidden shadow-lg"
+                    style={{ width: 72, height: 128, border: "2px solid rgba(224,64,251,0.28)",
+                      boxShadow: "0 0 24px rgba(224,64,251,0.18)" }}>
+                    <video src="/song-clip.mov" autoPlay loop muted playsInline
+                      className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 pointer-events-none"
+                      style={{ background: "linear-gradient(to bottom, transparent 60%, rgba(5,2,14,0.7))" }} />
+                  </div>
+                </div>
+                <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                  <div className="text-5xl font-black"
+                    style={{ color: teamColor(currentTurn), textShadow: `0 0 28px ${teamColor(currentTurn)}80` }}>
+                    {currentRound}
+                  </div>
+                  <div className="text-xs text-purple-400/40 font-bold">/ {totalRounds}</div>
+                  <div className="w-20 h-1.5 rounded-full overflow-hidden bg-purple-900/30">
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(currentRound / totalRounds) * 100}%`,
+                        background: "linear-gradient(90deg, #e040fb, #7c3aed, #00e5ff)" }} />
+                  </div>
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <div className="relative rounded-2xl overflow-hidden shadow-lg"
+                    style={{ width: 72, height: 128, border: "2px solid rgba(0,229,255,0.28)",
+                      boxShadow: "0 0 24px rgba(0,229,255,0.18)" }}>
+                    <video src="/song-clip.mov" autoPlay loop muted playsInline
+                      className="w-full h-full object-cover"
+                      style={{ transform: "scaleX(-1)" }} />
+                    <div className="absolute inset-0 pointer-events-none"
+                      style={{ background: "linear-gradient(to bottom, transparent 60%, rgba(5,2,14,0.7))" }} />
+                  </div>
+                </div>
+              </div>
 
               {/* ── Score cards ── */}
               <div className="w-full max-w-2xl grid grid-cols-3 gap-4 items-stretch">
@@ -629,14 +666,10 @@ export default function SongGame() {
                 </div>
 
                 {/* Middle */}
-                <div className="flex flex-col items-center justify-center gap-3">
+                <div className="flex flex-col items-center justify-center gap-2">
                   <div className="text-2xl font-black" style={{ color: "rgba(167,139,250,0.4)" }}>VS</div>
-                  <div className="text-sm text-purple-400/40 font-bold">{currentRound}/{totalRounds}</div>
-                  <div className="w-full h-2 rounded-full overflow-hidden bg-purple-900/30">
-                    <motion.div className="h-full rounded-full"
-                      animate={{ width: `${(currentRound / totalRounds) * 100}%` }}
-                      style={{ background: "linear-gradient(90deg, #e040fb, #7c3aed, #00e5ff)" }} />
-                  </div>
+                  <div className="w-px h-8 rounded-full" style={{ background: "rgba(167,139,250,0.18)" }} />
+                  <Music2 size={16} style={{ color: "rgba(167,139,250,0.35)" }} />
                 </div>
 
                 {/* Team 2 */}
@@ -811,7 +844,9 @@ export default function SongGame() {
                 {/* Timer */}
                 <div className="flex flex-col items-center gap-2">
                   <div className="relative w-28 h-28">
-                    <svg className="w-28 h-28 -rotate-90 absolute inset-0" viewBox="0 0 112 112">
+                    <svg className="w-28 h-28 absolute inset-0"
+                      style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
+                      viewBox="0 0 112 112">
                       <circle cx="56" cy="56" r="48" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="7" />
                       <motion.circle cx="56" cy="56" r="48" fill="none"
                         stroke={timerColor} strokeWidth="7" strokeLinecap="round"
