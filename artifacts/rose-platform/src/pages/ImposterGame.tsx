@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Copy, Check, Users, Clock, SkipForward, Lock, Unlock } from "lucide-react";
+import { ArrowRight, Copy, Check, Users, Clock, SkipForward, Lock, Unlock, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
@@ -191,6 +192,8 @@ export default function ImposterGame() {
   const roomParam = params.get("room")?.toUpperCase() ?? "";
   const mode: Mode = roomParam ? "player" : "host";
 
+  const { user } = useAuth();
+
   // ── Host state ─────────────────────────────────────────────────────────────
   const [setupDone, setSetupDone] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category>("عام");
@@ -199,6 +202,12 @@ export default function ImposterGame() {
   const [creating, setCreating] = useState(false);
   const [hostName, setHostName] = useState("");
   const [hostAvatar, setHostAvatar] = useState(AVATAR_POOL[0]);
+  const [wordVisible, setWordVisible] = useState(true);
+
+  // Auto-fill host name from logged-in account username
+  useEffect(() => {
+    if (user?.username && !hostName) setHostName(user.username);
+  }, [user]);
 
   // ── Core WS state ──────────────────────────────────────────────────────────
   const wsRef    = useRef<WebSocket | null>(null);
@@ -327,6 +336,7 @@ export default function ImposterGame() {
       connectWs(false);
       return () => { wsRef.current?.close(); };
     }
+    return undefined;
   }, [connectWs, mode]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -683,17 +693,11 @@ export default function ImposterGame() {
                 <div className="rounded-2xl overflow-hidden"
                   style={{ border: `1.5px solid ${neonPurple}55`, background: "rgba(14,6,30,0.95)" }}>
 
-                  {/* Room code header */}
-                  <div className="flex items-center justify-between px-4 py-3"
-                    style={{ borderBottom: `1px solid ${neonPurple}25`, background: `${neonPurple}0e` }}>
-                    <span className="text-xs font-bold text-white/50">رابط الدعوة</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white/40">رمز الغرفة:</span>
-                      <span className="text-lg font-black tracking-widest"
-                        style={{ color: neonPurple, textShadow: `0 0 14px ${neonPurple}` }}>
-                        {roomCode}
-                      </span>
-                    </div>
+                  {/* Link header */}
+                  <div className="px-4 py-2.5 flex items-center gap-2"
+                    style={{ borderBottom: `1px solid ${neonPurple}20`, background: `${neonPurple}08` }}>
+                    <span className="text-base">🔗</span>
+                    <span className="text-xs font-black text-white/60">شارك هذا الرابط مع اللاعبين</span>
                   </div>
 
                   {/* Link row */}
@@ -860,9 +864,9 @@ export default function ImposterGame() {
 
                 {/* ── LEFT: Q&A History ── */}
                 <div className="lg:w-56 flex-shrink-0 rounded-2xl flex flex-col overflow-hidden"
-                  style={{ background: "rgba(10,4,24,0.88)", border: `1px solid ${neonPurple}25` }}>
+                  style={{ background: "rgba(6,18,28,0.92)", border: `1px solid ${neonCyan}30` }}>
                   <div className="px-3 py-2.5 border-b flex items-center gap-2"
-                    style={{ borderColor: `${neonPurple}20` }}>
+                    style={{ borderColor: `${neonCyan}18`, background: `${neonCyan}06` }}>
                     <span className="text-base">📋</span>
                     <span className="text-xs font-black text-white/70">معلومات الجولة</span>
                   </div>
@@ -898,14 +902,27 @@ export default function ImposterGame() {
 
                 {/* ── CENTER: Main game ── */}
                 <div className="flex-1 rounded-2xl flex flex-col overflow-hidden min-h-0"
-                  style={{ background: "rgba(10,4,24,0.88)", border: `1px solid rgba(255,255,255,0.08)` }}>
+                  style={{ background: "rgba(8,8,22,0.92)", border: `1px solid rgba(255,255,255,0.13)` }}>
 
                   {/* Top bar */}
                   <div className="px-4 py-2.5 flex items-center justify-between border-b"
-                    style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                    style={{ borderColor: "rgba(255,255,255,0.07)", background: "rgba(0,229,255,0.04)" }}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm">📍</span>
-                      <span className="text-sm font-black text-white/80">{gameState?.word ?? "..."}</span>
+                      {wordVisible ? (
+                        <span className="text-sm font-black" style={{ color: neonCyan }}>{gameState?.word ?? "..."}</span>
+                      ) : (
+                        <span className="text-sm font-black tracking-widest" style={{ color: "rgba(255,255,255,0.15)" }}>
+                          {"•".repeat((gameState?.word ?? "...").length)}
+                        </span>
+                      )}
+                      <button onClick={() => setWordVisible(v => !v)}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black transition-all"
+                        style={{ background: wordVisible ? "rgba(0,229,255,0.12)" : "rgba(255,255,255,0.08)", color: wordVisible ? neonCyan : "rgba(255,255,255,0.35)" }}
+                        title={wordVisible ? "إخفاء الكلمة عن البث" : "إظهار الكلمة"}>
+                        {wordVisible ? <Eye size={11}/> : <EyeOff size={11}/>}
+                        {wordVisible ? "مرئية" : "مخفية"}
+                      </button>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black" style={{ color: gameRemaining < 60_000 ? "#ef4444" : neonCyan }}>
@@ -1171,10 +1188,6 @@ export default function ImposterGame() {
                   style={{ color: neonPurple, textShadow: `0 0 24px ${neonPurple}80` }}>
                   برا السالفة
                 </h1>
-                <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full mt-2"
-                  style={{ background: `${neonPurple}18`, border: `1px solid ${neonPurple}40` }}>
-                  <span className="text-sm font-black" style={{ color: neonPurple }}>الغرفة: {roomParam}</span>
-                </div>
               </div>
 
               <div className="w-full flex flex-col gap-3 p-6 rounded-3xl"
@@ -1206,7 +1219,7 @@ export default function ImposterGame() {
                 </h2>
                 <div className="inline-flex items-center gap-2 mt-1.5 px-3 py-1 rounded-full text-xs font-black"
                   style={{ background: `${neonPurple}18`, border: `1px solid ${neonPurple}35`, color: neonPurple }}>
-                  الغرفة: {roomCode}
+                  في انتظار بدء اللعبة...
                 </div>
               </div>
 
