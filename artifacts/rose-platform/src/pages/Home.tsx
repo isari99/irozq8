@@ -108,6 +108,19 @@ const games = [
     emoji: "🪑",
     heroImage: "/chairs-hero.png",
   },
+  {
+    id: "liars-bar",
+    title: "Liar's Bar",
+    description: "لعبة البلوف متعددة اللاعبين — العب أوراقك أو اكذب!",
+    icon: CircleDot,
+    color: "from-red-900 to-purple-900",
+    borderColor: "border-red-500/40",
+    glowColor: "shadow-red-500/30",
+    neonColor: "#f43f5e",
+    path: "/liars-bar",
+    emoji: "🔫",
+    heroImage: "/liars-bar-hero.webp",
+  },
 ];
 
 export default function Home() {
