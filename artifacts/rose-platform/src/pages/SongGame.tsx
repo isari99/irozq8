@@ -809,136 +809,80 @@ export default function SongGame() {
                 </div>
               </div>
 
-              {/* ── Teams + Timer (timer appears under the active team only) ── */}
-              <div className="w-full max-w-2xl grid grid-cols-3 gap-3 items-start">
+              {/* ── 3-column: Team 1 | Timer (center) | Team 2 ── */}
+              <div className="w-full max-w-2xl grid grid-cols-3 gap-3 items-center">
 
-                {/* ── Team 1 column (right in RTL) ── */}
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-full rounded-2xl border overflow-hidden transition-all duration-300"
-                    style={{
-                      borderColor: currentTurn === 1 ? "#e040fb80" : "rgba(224,64,251,0.2)",
-                      background: currentTurn === 1 ? "rgba(224,64,251,0.14)" : "rgba(8,3,18,0.75)",
-                      boxShadow: currentTurn === 1 ? "0 0 28px rgba(224,64,251,0.28)" : "none",
-                    }}>
-                    <div className="p-3 text-center">
-                      <p className="text-xs font-black truncate mb-1"
-                        style={{ color: currentTurn === 1 ? "#e040fb" : "rgba(224,64,251,0.5)" }}>
-                        {team1Name}
-                      </p>
-                      <p className="text-5xl font-black"
-                        style={{ color: "#e040fb", textShadow: currentTurn === 1 ? "0 0 28px #e040fb" : "0 0 12px #e040fb50" }}>
-                        {team1Score}
-                      </p>
-                      <p className="text-xs mt-1 font-bold"
-                        style={{ color: currentTurn === 1 ? "#e040fb" : "rgba(224,64,251,0.35)" }}>
-                        {currentTurn === 1 ? "⚡ دورهم" : "درجات"}
-                      </p>
-                    </div>
+                {/* Team 1 – right in RTL */}
+                <div className="rounded-2xl border overflow-hidden transition-all duration-300"
+                  style={{
+                    borderColor: currentTurn === 1 ? "#e040fb80" : "rgba(224,64,251,0.2)",
+                    background: currentTurn === 1 ? "rgba(224,64,251,0.14)" : "rgba(8,3,18,0.75)",
+                    boxShadow: currentTurn === 1 ? "0 0 28px rgba(224,64,251,0.28)" : "none",
+                  }}>
+                  <div className="p-3 text-center">
+                    <p className="text-xs font-black truncate mb-1"
+                      style={{ color: currentTurn === 1 ? "#e040fb" : "rgba(224,64,251,0.5)" }}>
+                      {team1Name}
+                    </p>
+                    <p className="text-5xl font-black"
+                      style={{ color: "#e040fb", textShadow: currentTurn === 1 ? "0 0 28px #e040fb" : "0 0 12px #e040fb50" }}>
+                      {team1Score}
+                    </p>
+                    <p className="text-xs mt-1 font-bold"
+                      style={{ color: currentTurn === 1 ? "#e040fb" : "rgba(224,64,251,0.35)" }}>
+                      {currentTurn === 1 ? "⚡ دورهم" : "درجات"}
+                    </p>
                   </div>
-
-                  {/* Timer – only when team 1 is active */}
-                  <AnimatePresence>
-                    {currentTurn === 1 && (
-                      <motion.div key="t1-timer"
-                        initial={{ opacity: 0, scale: 0.7, y: -8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.7, y: -8 }}
-                        transition={{ duration: 0.3 }}
-                        className="flex flex-col items-center gap-1">
-                        <div className="relative w-24 h-24">
-                          <svg className="w-24 h-24 absolute inset-0"
-                            style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
-                            viewBox="0 0 96 96">
-                            <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-                            <motion.circle cx="48" cy="48" r="40" fill="none"
-                              stroke="#e040fb" strokeWidth="6" strokeLinecap="round"
-                              strokeDasharray={`${2 * Math.PI * 40}`}
-                              strokeDashoffset={`${2 * Math.PI * 40 * (1 - timerPct / 100)}`}
-                              transition={{ duration: 0.6 }} />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <motion.span className="text-3xl font-black tabular-nums"
-                              animate={timeLeft <= 10 && timerRunning ? { scale: [1, 1.2, 1] } : {}}
-                              transition={{ repeat: Infinity, duration: 0.8 }}
-                              style={{ color: timerColor, textShadow: `0 0 16px ${timerColor}80` }}>
-                              {timeLeft}
-                            </motion.span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-purple-400/35 font-bold tabular-nums">
-                          {currentRound}/{totalRounds}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
 
-                {/* ── VS divider (center) ── */}
-                <div className="flex flex-col items-center justify-start pt-4 gap-2">
-                  <div className="text-2xl font-black" style={{ color: "rgba(167,139,250,0.35)" }}>VS</div>
-                  <div className="w-px h-6 rounded-full" style={{ background: "rgba(167,139,250,0.15)" }} />
-                  <Music2 size={14} style={{ color: "rgba(167,139,250,0.3)" }} />
-                </div>
-
-                {/* ── Team 2 column (left in RTL) ── */}
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-full rounded-2xl border overflow-hidden transition-all duration-300"
-                    style={{
-                      borderColor: currentTurn === 2 ? "#00e5ff80" : "rgba(0,229,255,0.2)",
-                      background: currentTurn === 2 ? "rgba(0,229,255,0.12)" : "rgba(8,3,18,0.75)",
-                      boxShadow: currentTurn === 2 ? "0 0 28px rgba(0,229,255,0.25)" : "none",
-                    }}>
-                    <div className="p-3 text-center">
-                      <p className="text-xs font-black truncate mb-1"
-                        style={{ color: currentTurn === 2 ? "#00e5ff" : "rgba(0,229,255,0.5)" }}>
-                        {team2Name}
-                      </p>
-                      <p className="text-5xl font-black"
-                        style={{ color: "#00e5ff", textShadow: currentTurn === 2 ? "0 0 28px #00e5ff" : "0 0 12px #00e5ff50" }}>
-                        {team2Score}
-                      </p>
-                      <p className="text-xs mt-1 font-bold"
-                        style={{ color: currentTurn === 2 ? "#00e5ff" : "rgba(0,229,255,0.35)" }}>
-                        {currentTurn === 2 ? "⚡ دورهم" : "درجات"}
-                      </p>
+                {/* Timer – always centered */}
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="relative w-28 h-28">
+                    <svg className="w-28 h-28 absolute inset-0"
+                      style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
+                      viewBox="0 0 112 112">
+                      <circle cx="56" cy="56" r="48" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="7" />
+                      <motion.circle cx="56" cy="56" r="48" fill="none"
+                        stroke={timerColor} strokeWidth="7" strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 48}`}
+                        strokeDashoffset={`${2 * Math.PI * 48 * (1 - timerPct / 100)}`}
+                        transition={{ duration: 0.6 }} />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <motion.span className="text-4xl font-black tabular-nums"
+                        animate={timeLeft <= 10 && timerRunning ? { scale: [1, 1.2, 1] } : {}}
+                        transition={{ repeat: Infinity, duration: 0.8 }}
+                        style={{ color: timerColor, textShadow: `0 0 18px ${timerColor}80` }}>
+                        {timeLeft}
+                      </motion.span>
                     </div>
                   </div>
+                  <div className="text-xs text-purple-400/35 font-bold tabular-nums">
+                    {currentRound}/{totalRounds}
+                  </div>
+                </div>
 
-                  {/* Timer – only when team 2 is active */}
-                  <AnimatePresence>
-                    {currentTurn === 2 && (
-                      <motion.div key="t2-timer"
-                        initial={{ opacity: 0, scale: 0.7, y: -8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.7, y: -8 }}
-                        transition={{ duration: 0.3 }}
-                        className="flex flex-col items-center gap-1">
-                        <div className="relative w-24 h-24">
-                          <svg className="w-24 h-24 absolute inset-0"
-                            style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
-                            viewBox="0 0 96 96">
-                            <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-                            <motion.circle cx="48" cy="48" r="40" fill="none"
-                              stroke="#00e5ff" strokeWidth="6" strokeLinecap="round"
-                              strokeDasharray={`${2 * Math.PI * 40}`}
-                              strokeDashoffset={`${2 * Math.PI * 40 * (1 - timerPct / 100)}`}
-                              transition={{ duration: 0.6 }} />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <motion.span className="text-3xl font-black tabular-nums"
-                              animate={timeLeft <= 10 && timerRunning ? { scale: [1, 1.2, 1] } : {}}
-                              transition={{ repeat: Infinity, duration: 0.8 }}
-                              style={{ color: timerColor, textShadow: `0 0 16px ${timerColor}80` }}>
-                              {timeLeft}
-                            </motion.span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-purple-400/35 font-bold tabular-nums">
-                          {currentRound}/{totalRounds}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                {/* Team 2 – left in RTL */}
+                <div className="rounded-2xl border overflow-hidden transition-all duration-300"
+                  style={{
+                    borderColor: currentTurn === 2 ? "#00e5ff80" : "rgba(0,229,255,0.2)",
+                    background: currentTurn === 2 ? "rgba(0,229,255,0.12)" : "rgba(8,3,18,0.75)",
+                    boxShadow: currentTurn === 2 ? "0 0 28px rgba(0,229,255,0.25)" : "none",
+                  }}>
+                  <div className="p-3 text-center">
+                    <p className="text-xs font-black truncate mb-1"
+                      style={{ color: currentTurn === 2 ? "#00e5ff" : "rgba(0,229,255,0.5)" }}>
+                      {team2Name}
+                    </p>
+                    <p className="text-5xl font-black"
+                      style={{ color: "#00e5ff", textShadow: currentTurn === 2 ? "0 0 28px #00e5ff" : "0 0 12px #00e5ff50" }}>
+                      {team2Score}
+                    </p>
+                    <p className="text-xs mt-1 font-bold"
+                      style={{ color: currentTurn === 2 ? "#00e5ff" : "rgba(0,229,255,0.35)" }}>
+                      {currentTurn === 2 ? "⚡ دورهم" : "درجات"}
+                    </p>
+                  </div>
                 </div>
 
               </div>
