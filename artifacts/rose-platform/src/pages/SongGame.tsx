@@ -602,24 +602,18 @@ export default function SongGame() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="flex-1 flex flex-row items-stretch overflow-hidden">
+              className="flex-1 flex flex-col items-center justify-center px-5 py-5 gap-4 relative overflow-hidden">
 
-              {/* ── Right sidebar – team 1 (RTL right) ── */}
-              <div className="flex-shrink-0 w-14 sm:w-20 flex items-center justify-center py-5">
-                <div className="relative rounded-2xl overflow-hidden"
-                  style={{ width: 50, height: 210, border: "2px solid rgba(224,64,251,0.3)",
-                    boxShadow: currentTurn === 1 ? "0 0 22px rgba(224,64,251,0.4)" : "0 0 10px rgba(224,64,251,0.15)" }}>
-                  <video src="/song-clip.mov" autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 pointer-events-none"
-                    style={{ background: "linear-gradient(to bottom, rgba(224,64,251,0.15), transparent 30%, transparent 70%, rgba(5,2,14,0.6))" }} />
-                </div>
-              </div>
+              {/* ── Full background video ── */}
+              <video src="/song-clip.mov" autoPlay loop muted playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: 0.13, filter: "blur(2px) saturate(1.4)" }} />
+              {/* dark gradient overlay so content stays readable */}
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ background: "linear-gradient(to bottom, rgba(5,2,14,0.55) 0%, rgba(5,2,14,0.3) 40%, rgba(5,2,14,0.55) 100%)" }} />
 
-              {/* ── Main content ── */}
-              <div className="flex-1 flex flex-col items-center justify-center py-5 gap-4 min-w-0 px-2">
-
-              {/* Round progress badge */}
-              <div className="flex items-center gap-3">
+              {/* ── Round progress badge ── */}
+              <div className="relative z-10 flex items-center gap-3">
                 <div className="text-3xl font-black"
                   style={{ color: teamColor(currentTurn), textShadow: `0 0 20px ${teamColor(currentTurn)}80` }}>
                   {currentRound}
@@ -635,12 +629,12 @@ export default function SongGame() {
               </div>
 
               {/* ── Score cards ── */}
-              <div className="w-full max-w-xl grid grid-cols-3 gap-3 items-stretch">
+              <div className="relative z-10 w-full max-w-2xl grid grid-cols-3 gap-3 items-stretch">
                 {/* Team 1 */}
                 <div className="rounded-3xl overflow-hidden border transition-all"
                   style={{
                     borderColor: currentTurn === 1 ? "#e040fb70" : "rgba(224,64,251,0.15)",
-                    background: currentTurn === 1 ? "rgba(224,64,251,0.12)" : "rgba(8,3,18,0.85)",
+                    background: currentTurn === 1 ? "rgba(224,64,251,0.14)" : "rgba(8,3,18,0.80)",
                     boxShadow: currentTurn === 1 ? "0 0 40px rgba(224,64,251,0.22)" : "none",
                   }}>
                   {currentTurn === 1 && <div className="h-1" style={{ background: "linear-gradient(90deg, #e040fb, #c026d3)" }} />}
@@ -658,7 +652,7 @@ export default function SongGame() {
                   </div>
                 </div>
 
-                {/* Middle */}
+                {/* Middle VS */}
                 <div className="flex flex-col items-center justify-center gap-2">
                   <div className="text-2xl font-black" style={{ color: "rgba(167,139,250,0.4)" }}>VS</div>
                   <div className="w-px h-8 rounded-full" style={{ background: "rgba(167,139,250,0.18)" }} />
@@ -669,7 +663,7 @@ export default function SongGame() {
                 <div className="rounded-3xl overflow-hidden border transition-all"
                   style={{
                     borderColor: currentTurn === 2 ? "#00e5ff70" : "rgba(0,229,255,0.15)",
-                    background: currentTurn === 2 ? "rgba(0,229,255,0.10)" : "rgba(8,3,18,0.85)",
+                    background: currentTurn === 2 ? "rgba(0,229,255,0.12)" : "rgba(8,3,18,0.80)",
                     boxShadow: currentTurn === 2 ? "0 0 40px rgba(0,229,255,0.2)" : "none",
                   }}>
                   {currentTurn === 2 && <div className="h-1" style={{ background: "linear-gradient(90deg, #00e5ff, #0284c7)" }} />}
@@ -688,17 +682,17 @@ export default function SongGame() {
                 </div>
               </div>
 
-              {/* Current turn banner */}
-              <div className="w-full max-w-xl rounded-2xl border py-4 text-center"
-                style={{ borderColor: `${teamColor(currentTurn)}28`, background: `${teamColor(currentTurn)}07` }}>
+              {/* ── Current turn banner ── */}
+              <div className="relative z-10 w-full max-w-2xl rounded-2xl border py-4 text-center"
+                style={{ borderColor: `${teamColor(currentTurn)}28`, background: `${teamColor(currentTurn)}08` }}>
                 <p className="text-sm text-purple-300/35">الدور الحالي</p>
                 <p className="text-3xl font-black mt-0.5" style={{ color: teamColor(currentTurn) }}>
                   {teamName(currentTurn)}
                 </p>
               </div>
 
-              {/* Action buttons */}
-              <div className="w-full max-w-xl space-y-3">
+              {/* ── Action buttons ── */}
+              <div className="relative z-10 w-full max-w-2xl space-y-3">
                 <motion.button onClick={playSong}
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-2xl"
@@ -732,23 +726,9 @@ export default function SongGame() {
               </div>
 
               <button onClick={resetFull}
-                className="flex items-center gap-2 py-1.5 text-sm text-purple-500/25 hover:text-purple-400/45 transition-colors">
+                className="relative z-10 flex items-center gap-2 py-1.5 text-sm text-purple-500/25 hover:text-purple-400/45 transition-colors">
                 <RotateCcw size={13} /> إعادة تعيين اللعبة
               </button>
-
-              </div>{/* end main content */}
-
-              {/* ── Left sidebar – team 2 (RTL left) ── */}
-              <div className="flex-shrink-0 w-14 sm:w-20 flex items-center justify-center py-5">
-                <div className="relative rounded-2xl overflow-hidden"
-                  style={{ width: 50, height: 210, border: "2px solid rgba(0,229,255,0.3)",
-                    boxShadow: currentTurn === 2 ? "0 0 22px rgba(0,229,255,0.4)" : "0 0 10px rgba(0,229,255,0.15)" }}>
-                  <video src="/song-clip.mov" autoPlay loop muted playsInline
-                    className="w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
-                  <div className="absolute inset-0 pointer-events-none"
-                    style={{ background: "linear-gradient(to bottom, rgba(0,229,255,0.12), transparent 30%, transparent 70%, rgba(5,2,14,0.6))" }} />
-                </div>
-              </div>
 
             </motion.div>
           )}
@@ -857,7 +837,7 @@ export default function SongGame() {
                       className="flex flex-col items-center gap-1">
                       <div className="relative w-24 h-24">
                         <svg className="w-24 h-24 absolute inset-0"
-                          style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
+                          style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
                           viewBox="0 0 96 96">
                           <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
                           <motion.circle cx="48" cy="48" r="40" fill="none"
@@ -905,7 +885,7 @@ export default function SongGame() {
                       className="flex flex-col items-center gap-1">
                       <div className="relative w-24 h-24">
                         <svg className="w-24 h-24 absolute inset-0"
-                          style={{ transform: "scaleX(-1) rotate(-90deg)", transformOrigin: "center" }}
+                          style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
                           viewBox="0 0 96 96">
                           <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
                           <motion.circle cx="48" cy="48" r="40" fill="none"
