@@ -15,6 +15,7 @@ interface RoomPlayer {
   ws: ImposterWS | null;
   voted: boolean;
   disconnected: boolean;
+  eliminated: boolean;
   role: "host" | "player";
 }
 
@@ -33,7 +34,7 @@ interface GameRoom {
   roomName: string;
   category: Category;
   durationMs: number;
-  phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "result";
+  phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "elimination" | "result";
   hostWs: ImposterWS;
   hostPlayerId: string;
   players: Map<string, RoomPlayer>;
@@ -128,6 +129,7 @@ function publicPlayers(room: GameRoom) {
     id: p.id, name: p.name, avatar: p.avatar,
     connected: !!(p.ws && p.ws.readyState === WebSocket.OPEN),
     voted: p.voted, disconnected: p.disconnected,
+    eliminated: p.eliminated,
     role: p.role,
   }));
 }
@@ -201,7 +203,7 @@ function advanceTurn(room: GameRoom, timedOut?: boolean): void {
   let next = (room.currentTurnIdx + 1) % room.playerOrder.length;
   for (let i = 0; i < room.playerOrder.length; i++) {
     const p = room.players.get(room.playerOrder[next]);
-    if (p && !p.disconnected) break;
+    if (p && !p.disconnected && !p.eliminated) break;
     next = (next + 1) % room.playerOrder.length;
   }
   room.currentTurnIdx = next;
@@ -225,14 +227,17 @@ function startVoting(room: GameRoom): void {
   room.phase = "voting";
   room.votes = {};
   room.lastAnswer = null;
-  room.players.forEach(p => { p.voted = false; });
+  // Eliminated players are auto-considered voted so they don't block completion
+  room.players.forEach(p => { p.voted = p.eliminated || p.disconnected; });
   broadcast(room, stateMsg(room));
 }
 
 function checkVoteDone(room: GameRoom): void {
-  const active = Array.from(room.players.values()).filter(p => !p.disconnected);
+  // Only non-eliminated, non-disconnected players need to cast a vote
+  const active = Array.from(room.players.values()).filter(p => !p.disconnected && !p.eliminated);
   if (!active.every(p => p.voted)) return;
 
+  // Tally votes (skip "skip" entries)
   const counts: Record<string, number> = {};
   Object.values(room.votes).forEach(t => {
     if (t !== "skip") counts[t] = (counts[t] ?? 0) + 1;
@@ -243,18 +248,116 @@ function checkVoteDone(room: GameRoom): void {
   Object.entries(counts).forEach(([id, c]) => { if (c > topCount) { topCount = c; topId = id; } });
 
   const imposter = room.players.get(room.imposterId);
-  const winner = topId === room.imposterId ? "players" : "imposter";
-  room.phase = "result";
 
+  // ── Case 1: Correct! Imposter was voted out ────────────────────────────────
+  if (topId === room.imposterId) {
+    room.phase = "result";
+    broadcast(room, stateMsg(room)); // ← CRITICAL: update phase on all clients
+    broadcast(room, {
+      type: "imposter:result",
+      imposterName: imposter?.name ?? "؟",
+      imposterId: room.imposterId,
+      word: room.word,
+      winner: "players",
+      votes: room.votes,
+      counts,
+    });
+    return;
+  }
+
+  // ── Case 2: All skipped or nobody selected → imposter wins ────────────────
+  if (!topId) {
+    room.phase = "result";
+    broadcast(room, stateMsg(room)); // ← CRITICAL
+    broadcast(room, {
+      type: "imposter:result",
+      imposterName: imposter?.name ?? "؟",
+      imposterId: room.imposterId,
+      word: room.word,
+      winner: "imposter",
+      votes: room.votes,
+      counts,
+    });
+    return;
+  }
+
+  // ── Case 3: Wrong person was voted out ────────────────────────────────────
+  const eliminatedPlayer = room.players.get(topId);
+  if (eliminatedPlayer) eliminatedPlayer.eliminated = true;
+
+  room.phase = "elimination";
+  broadcast(room, stateMsg(room)); // update phase + eliminated flag
   broadcast(room, {
-    type: "imposter:result",
-    imposterName: imposter?.name ?? "؟",
-    imposterId: room.imposterId,
-    word: room.word,
-    winner,
+    type: "imposter:elimination",
+    eliminatedId: topId,
+    eliminatedName: eliminatedPlayer?.name ?? "؟",
     votes: room.votes,
     counts,
   });
+
+  // Auto-resume after 4 seconds
+  setTimeout(() => resumeAfterElimination(room), 4_000);
+}
+
+function resumeAfterElimination(room: GameRoom): void {
+  if (room.phase !== "elimination") return;
+
+  // Count remaining active players (non-eliminated, non-disconnected)
+  const remaining = Array.from(room.players.values()).filter(p => !p.disconnected && !p.eliminated);
+
+  // If only 2 or fewer remain (imposter + 0 or 1), imposter wins
+  if (remaining.length < 2) {
+    const imposter = room.players.get(room.imposterId);
+    room.phase = "result";
+    broadcast(room, stateMsg(room));
+    broadcast(room, {
+      type: "imposter:result",
+      imposterName: imposter?.name ?? "؟",
+      imposterId: room.imposterId,
+      word: room.word,
+      winner: "imposter",
+      votes: room.votes,
+      counts: {},
+    });
+    return;
+  }
+
+  // Remove eliminated players from turn order
+  room.playerOrder = room.playerOrder.filter(id => {
+    const p = room.players.get(id);
+    return p && !p.eliminated && !p.disconnected;
+  });
+
+  // Resume playing phase — fresh Q&A round, keep game timer running
+  room.phase = "playing";
+  room.votes = {};
+  room.qaHistory = [];
+  room.currentTurnIdx = 0;
+  room.currentTargetId = null;
+  room.currentQuestion = null;
+  room.lastAnswer = null;
+
+  // Restart game timer (remaining duration)
+  const timeLeft = Math.max(30_000, room.gameEndAt - Date.now());
+  room.gameTimer = setTimeout(() => startVoting(room), timeLeft);
+
+  // Restart turn timers
+  room.turnEndAt = Date.now() + 75_000;
+  room.turnTimer = setTimeout(() => advanceTurn(room, true), 75_000);
+  room.timerInterval = setInterval(() => {
+    if (room.phase !== "playing") { clearInterval(room.timerInterval!); room.timerInterval = null; return; }
+    broadcast(room, {
+      type: "imposter:timer",
+      gameRemaining: Math.max(0, room.gameEndAt - Date.now()),
+      turnRemaining: Math.max(0, room.turnEndAt - Date.now()),
+    });
+  }, 1_000);
+
+  broadcast(room, stateMsg(room));
+
+  const firstId = room.playerOrder[0];
+  const firstP = room.players.get(firstId);
+  send(firstP?.ws, { type: "imposter:your_turn" });
 }
 
 // ─── Message handler ──────────────────────────────────────────────────────────
@@ -281,7 +384,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
 
     const hostPlayer: RoomPlayer = {
       id: hostPlayerId, name: hostName, avatar: hostAvatar,
-      ws, voted: false, disconnected: false, role: "host",
+      ws, voted: false, disconnected: false, eliminated: false, role: "host",
     };
 
     const room: GameRoom = {
@@ -316,7 +419,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     if (room.phase !== "lobby") { send(ws, { type: "imposter:error", message: "اللعبة بدأت بالفعل" }); return; }
 
     const playerId = `${name.toLowerCase().replace(/\s+/g,"_")}_${Date.now().toString(36)}`;
-    const player: RoomPlayer = { id: playerId, name, avatar, ws, voted: false, disconnected: false, role: "player" };
+    const player: RoomPlayer = { id: playerId, name, avatar, ws, voted: false, disconnected: false, eliminated: false, role: "player" };
     room.players.set(playerId, player);
     room.playerOrder.push(playerId);
     ws.roomCode = code;
@@ -352,7 +455,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.currentQuestion = null;
     room.qaHistory       = [];
     room.lastAnswer      = null;
-    room.players.forEach(p => { p.voted = false; });
+    room.players.forEach(p => { p.voted = false; p.eliminated = false; });
 
     // ── Phase 1: COUNTDOWN (5 s) ──────────────────────────────────────────────
     room.phase = "countdown";
@@ -519,7 +622,7 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     room.qaHistory = [];
     room.lastAnswer = null;
     room.gameEndAt = 0; room.turnEndAt = 0;
-    room.players.forEach(p => { p.voted = false; });
+    room.players.forEach(p => { p.voted = false; p.eliminated = false; });
     broadcast(room, stateMsg(room));
     return;
   }

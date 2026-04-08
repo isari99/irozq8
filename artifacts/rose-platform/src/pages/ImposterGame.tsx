@@ -32,11 +32,12 @@ interface QAEntry {
 interface PublicPlayer {
   id: string; name: string; avatar: string;
   connected: boolean; voted: boolean; disconnected: boolean;
+  eliminated: boolean;
   role: "host" | "player";
 }
 interface GameState {
   code: string; roomName: string; category: Category; durationMs: number;
-  phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "result";
+  phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "elimination" | "result";
   word: string;
   hostPlayerId: string;
   players: PublicPlayer[]; playerOrder: string[];
@@ -50,6 +51,10 @@ interface Role { role: "imposter" | "player"; word?: string }
 interface Result {
   imposterName: string; imposterId: string; word: string;
   winner: "players" | "imposter";
+  votes: Record<string, string>; counts: Record<string, number>;
+}
+interface EliminationInfo {
+  eliminatedId: string; eliminatedName: string;
   votes: Record<string, string>; counts: Record<string, number>;
 }
 
@@ -213,7 +218,8 @@ export default function ImposterGame() {
   const wsRef    = useRef<WebSocket | null>(null);
   const [wsReady, setWsReady] = useState(false);
   const [gameState, setGameState]   = useState<GameState | null>(null);
-  const [result, setResult]         = useState<Result | null>(null);
+  const [result, setResult]                 = useState<Result | null>(null);
+  const [eliminationInfo, setEliminationInfo] = useState<EliminationInfo | null>(null);
   const [error, setError]           = useState<string | null>(null);
   const [copied, setCopied]         = useState(false);
   const [roomCode, setRoomCode]     = useState<string>(roomParam);
@@ -313,6 +319,8 @@ export default function ImposterGame() {
           setGameState(gs);
           setGameRemaining(gs.gameRemaining);
           setTurnRemaining(gs.turnRemaining);
+          // Clear elimination overlay when game resumes to playing
+          if (gs.phase === "playing") setEliminationInfo(null);
         }
         if (msg.type === "imposter:timer") {
           setGameRemaining(msg.gameRemaining);
@@ -322,7 +330,8 @@ export default function ImposterGame() {
         if (msg.type === "imposter:your_turn") { setIsMyTurn(true); setNeedAnswer(false); }
         if (msg.type === "imposter:answer_now") { setNeedAnswer(true); setIsMyTurn(false); }
         if (msg.type === "imposter:answered")  setNeedAnswer(false);
-        if (msg.type === "imposter:result")    setResult(msg as Result);
+        if (msg.type === "imposter:result")      setResult(msg as Result);
+        if (msg.type === "imposter:elimination") setEliminationInfo(msg as EliminationInfo);
         if (msg.type === "imposter:removed")   setError("تم إزالتك من الغرفة");
         if (msg.type === "imposter:host_left") setError("المضيف غادر الغرفة");
         if (msg.type === "imposter:error")     setError(msg.message);
@@ -359,7 +368,7 @@ export default function ImposterGame() {
     wsSend({ type: "imposter:change_avatar", avatar });
     setShowAvatarPicker(false);
   };
-  const handleNewRound     = ()             => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); wsSend({ type: "imposter:new_round" }); };
+  const handleNewRound     = ()             => { setResult(null); setEliminationInfo(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); wsSend({ type: "imposter:new_round" }); };
   const handleVote         = (t: string)   => wsSend({ type: "imposter:vote", voterId: playerIdRef.current, targetId: t });
   const handleRemove       = (pid: string) => wsSend({ type: "imposter:remove_player", playerId: pid });
   const handleKick         = (pid: string) => wsSend({ type: "imposter:kick", playerId: pid });
@@ -1129,24 +1138,25 @@ export default function ImposterGame() {
                     <span className="text-sm font-black text-white/80">حالة التصويت</span>
                     <span className="mr-auto text-xs font-black px-2 py-0.5 rounded-full"
                       style={{ background: "rgba(99,60,200,0.2)", color: "#a78bfa" }}>
-                      {players.filter(p => p.voted).length} / {players.length}
+                      {players.filter(p => !p.eliminated && p.voted).length} / {players.filter(p => !p.eliminated).length}
                     </span>
                   </div>
                   <div className="p-3 flex flex-col gap-2">
                     {players.map((p, i) => (
                       <div key={p.id} className="flex items-center gap-2.5 px-2 py-2 rounded-xl"
-                        style={{ background: p.voted ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
-                          border: `1px solid ${p.voted ? "rgba(34,197,94,0.30)" : "rgba(255,255,255,0.06)"}` }}>
+                        style={{ background: p.eliminated ? "rgba(239,68,68,0.06)" : p.voted ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${p.eliminated ? "rgba(239,68,68,0.25)" : p.voted ? "rgba(34,197,94,0.30)" : "rgba(255,255,255,0.06)"}` }}>
                         <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border"
-                          style={{ borderColor: p.voted ? "#22c55e70" : playerColor(i) + "50" }}>
-                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                          style={{ borderColor: p.eliminated ? "#ef444470" : p.voted ? "#22c55e70" : playerColor(i) + "50" }}>
+                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" style={{ opacity: p.eliminated ? 0.4 : 1 }}/>
                         </div>
-                        <p className="text-xs font-black flex-1 truncate" style={{ color: p.voted ? "#4ade80" : playerColor(i) }}>
+                        <p className="text-xs font-black flex-1 truncate"
+                          style={{ color: p.eliminated ? "#ef444480" : p.voted ? "#4ade80" : playerColor(i) }}>
                           {p.name} {p.id === playerId ? "(أنت)" : ""}
                         </p>
                         <span className="text-[10px] font-black flex-shrink-0"
-                          style={{ color: p.voted ? "#22c55e" : "rgba(255,255,255,0.2)" }}>
-                          {p.voted ? "✓" : "..."}
+                          style={{ color: p.eliminated ? "#ef4444" : p.voted ? "#22c55e" : "rgba(255,255,255,0.2)" }}>
+                          {p.eliminated ? "🚪" : p.voted ? "✓" : "..."}
                         </span>
                       </div>
                     ))}
@@ -1173,7 +1183,7 @@ export default function ImposterGame() {
                       <>
                         <p className="text-center text-sm font-bold text-purple-300/50 mb-4">اضغط على اللاعب الذي تظنه برا السالفة</p>
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                          {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
+                          {players.filter(p => p.id !== playerId && !p.disconnected && !p.eliminated).map((p, i) => (
                             <motion.button key={p.id} onClick={() => handleVote(p.id)}
                               className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all"
                               style={{ background: "rgba(255,255,255,0.03)", border: `2px solid ${playerColor(i)}40` }}
@@ -1198,6 +1208,11 @@ export default function ImposterGame() {
                   </div>
                 </div>
               </motion.div>
+            )}
+
+            {/* ─────────── ELIMINATION (host) ─────────── */}
+            {setupDone && phase === "elimination" && eliminationInfo && (
+              <EliminationScreen info={eliminationInfo} players={players} />
             )}
 
             {/* ─────────── RESULT (host) ─────────── */}
@@ -1707,7 +1722,7 @@ export default function ImposterGame() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 w-full">
-                  {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
+                  {players.filter(p => p.id !== playerId && !p.disconnected && !p.eliminated).map((p, i) => (
                     <motion.button key={p.id} onClick={() => handleVote(p.id)}
                       className="flex flex-col items-center gap-2 p-4 rounded-2xl"
                       style={{ background: "rgba(10,4,24,0.88)", border: `2px solid ${playerColor(i)}40` }}
@@ -1729,16 +1744,73 @@ export default function ImposterGame() {
             </motion.div>
           )}
 
+          {/* ── ELIMINATION ── */}
+          {phase === "elimination" && eliminationInfo && (
+            <EliminationScreen info={eliminationInfo} players={players} />
+          )}
+
           {/* ── RESULT ── */}
           {phase === "result" && result && (
             <ResultScreen result={result} players={players}
-              onNewRound={() => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); }}
+              onNewRound={() => { setResult(null); setEliminationInfo(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); }}
               onHome={() => navigate("/")} isHost={false} />
           )}
 
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+// ─── Elimination Screen ────────────────────────────────────────────────────────
+function EliminationScreen({ info, players }: { info: EliminationInfo; players: PublicPlayer[] }) {
+  const eliminatedPlayer = players.find(p => p.id === info.eliminatedId);
+  const topVotes = info.counts[info.eliminatedId] ?? 0;
+
+  return (
+    <motion.div key="elimination" initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center px-4 text-center"
+      style={{ background: "rgba(5,0,18,0.96)" }} dir="rtl">
+
+      <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
+        className="mb-6 text-6xl">🚪</motion.div>
+
+      <motion.p initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
+        className="text-2xl font-black text-white mb-1">
+        خرج من اللعبة!
+      </motion.p>
+
+      {eliminatedPlayer && (
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.35, type: "spring" }}
+          className="my-5 flex flex-col items-center gap-3">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden border-4 border-red-500/60 shadow-lg shadow-red-500/20">
+            <img src={eliminatedPlayer.avatar} alt={eliminatedPlayer.name} className="w-full h-full object-cover" />
+          </div>
+          <p className="text-xl font-black text-red-400">{eliminatedPlayer.name}</p>
+          <p className="text-sm text-white/40">حصل على {topVotes} {topVotes === 1 ? "صوت" : "أصوات"}</p>
+        </motion.div>
+      )}
+
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+        className="px-6 py-3 rounded-2xl mb-6"
+        style={{ background: "rgba(234,179,8,0.12)", border: "1.5px solid rgba(234,179,8,0.35)" }}>
+        <p className="text-lg font-black text-yellow-400">GG تعيش وتاكل غيرها 😅</p>
+      </motion.div>
+
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.75 }}
+        className="text-sm text-white/40">
+        اللعبة مستمرة... الكذاب لا يزال بينكم 🕵️
+      </motion.p>
+
+      {/* Progress bar */}
+      <motion.div className="mt-6 w-48 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+        <motion.div className="h-full rounded-full"
+          style={{ background: "rgba(234,179,8,0.7)" }}
+          initial={{ width: "100%" }}
+          animate={{ width: "0%" }}
+          transition={{ duration: 4, ease: "linear" }} />
+      </motion.div>
+    </motion.div>
   );
 }
 
