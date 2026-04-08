@@ -23,16 +23,23 @@ function fmt(ms: number): string {
 type Category = "دول" | "حيوانات" | "أكلات" | "أشياء" | "عام";
 type Mode = "host" | "player";
 
+interface QAEntry {
+  askerId: string; askerName: string;
+  targetId: string; targetName: string;
+  question: string; answer: string | null; timedOut: boolean;
+}
 interface PublicPlayer {
   id: string; name: string; avatar: string;
   connected: boolean; voted: boolean; disconnected: boolean;
 }
 interface GameState {
   code: string; roomName: string; category: Category; durationMs: number;
-  phase: "lobby" | "playing" | "voting" | "result";
+  phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "result";
+  word: string;
   players: PublicPlayer[]; playerOrder: string[];
   currentTurnIdx: number; currentTurnId: string | null;
-  currentTargetId: string | null;
+  currentTargetId: string | null; currentQuestion: string | null;
+  qaHistory: QAEntry[];
   lastAnswer: { targetId: string; answer: string } | null;
   gameRemaining: number; turnRemaining: number;
 }
@@ -210,6 +217,14 @@ export default function ImposterGame() {
   const [needAnswer, setNeedAnswer]       = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
+  // ── Q&A input ──────────────────────────────────────────────────────────────
+  const [selectedTarget, setSelectedTarget] = useState<string>("");
+  const [questionText, setQuestionText]     = useState("");
+  const [answerText, setAnswerText]         = useState("");
+
+  // ── Countdown ──────────────────────────────────────────────────────────────
+  const [countdown, setCountdown] = useState(5);
+
   // ── Timers ─────────────────────────────────────────────────────────────────
   const [gameRemaining, setGameRemaining] = useState(0);
   const [turnRemaining, setTurnRemaining] = useState(0);
@@ -218,6 +233,26 @@ export default function ImposterGame() {
   const gameStateRef = useRef<GameState | null>(null);
   useEffect(() => { playerIdRef.current = playerId; }, [playerId]);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+
+  // Countdown animation
+  useEffect(() => {
+    if (gameState?.phase !== "countdown") return;
+    setCountdown(5);
+    let n = 5;
+    const iv = setInterval(() => {
+      n -= 1;
+      setCountdown(n > 0 ? n : 0);
+      if (n <= 0) clearInterval(iv);
+    }, 1_000);
+    return () => clearInterval(iv);
+  }, [gameState?.phase]);
+
+  // Reset Q&A input on new turn
+  useEffect(() => {
+    setSelectedTarget("");
+    setQuestionText("");
+    setAnswerText("");
+  }, [gameState?.currentTurnId]);
 
   // ── WS send ────────────────────────────────────────────────────────────────
   const wsSend = useCallback((msg: object) => {
@@ -307,10 +342,21 @@ export default function ImposterGame() {
     setShowAvatarPicker(false);
   };
   const handleNewRound     = ()             => { setResult(null); setMyRole(null); setIsMyTurn(false); setNeedAnswer(false); wsSend({ type: "imposter:new_round" }); };
-  const handleSelectTarget = (t: string)   => { wsSend({ type: "imposter:select_target", targetId: t }); setIsMyTurn(false); };
-  const handleAnswer       = (a: "yes"|"no") => { wsSend({ type: "imposter:answer", answer: a }); setNeedAnswer(false); };
   const handleVote         = (t: string)   => wsSend({ type: "imposter:vote", voterId: playerIdRef.current, targetId: t });
   const handleRemove       = (pid: string) => wsSend({ type: "imposter:remove_player", playerId: pid });
+
+  const handleSendQuestion = () => {
+    if (!selectedTarget || !questionText.trim()) return;
+    wsSend({ type: "imposter:send_question", targetId: selectedTarget, question: questionText.trim() });
+    setIsMyTurn(false);
+    setQuestionText("");
+  };
+  const handleSendAnswer = () => {
+    if (!answerText.trim()) return;
+    wsSend({ type: "imposter:send_answer_text", answer: answerText.trim() });
+    setNeedAnswer(false);
+    setAnswerText("");
+  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomCode}`);
@@ -676,83 +722,205 @@ export default function ImposterGame() {
               </motion.div>
             )}
 
-            {/* ─────────── SCREEN 3: Playing (host view) ─────────── */}
+            {/* ─────────── COUNTDOWN ─────────── */}
+            {setupDone && phase === "countdown" && (
+              <motion.div key="host-countdown" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center flex-1 gap-6 px-4">
+                <motion.div className="text-base font-black text-white/60 tracking-wider"
+                  animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+                  جاري تجهيز الجولة...
+                </motion.div>
+                <motion.div key={countdown}
+                  initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}
+                  className="text-8xl font-black"
+                  style={{ color: neonPurple, textShadow: `0 0 40px ${neonPurple}80` }}>
+                  {countdown}
+                </motion.div>
+                <div className="flex gap-1.5 mt-2">
+                  {[0,1,2,3,4].map(i => (
+                    <motion.div key={i} className="w-2 h-2 rounded-full"
+                      style={{ background: i < (5 - countdown) ? neonPurple : "rgba(255,255,255,0.15)" }}
+                      animate={{ scale: i === (5 - countdown - 1) ? [1, 1.4, 1] : 1 }}
+                      transition={{ duration: 0.3 }} />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* ─────────── WORD REVEAL ─────────── */}
+            {setupDone && phase === "reveal" && (
+              <motion.div key="host-reveal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center flex-1 gap-5 px-4">
+                <motion.div animate={{ opacity: [0.6, 1, 0.6] }} transition={{ repeat: Infinity, duration: 2 }}
+                  className="text-sm font-black text-white/40">الكشف عن السالفة...</motion.div>
+                <div className="w-full max-w-sm rounded-3xl p-8 flex flex-col items-center gap-3 text-center"
+                  style={{ background: "rgba(10,4,24,0.95)", border: `2px solid ${neonPurple}60`,
+                    boxShadow: `0 0 60px ${neonPurple}25` }}>
+                  <span className="text-3xl">📍</span>
+                  <p className="text-xs font-black text-white/40">المكان / السالفة</p>
+                  <motion.p className="text-4xl font-black"
+                    initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                    style={{ color: neonPurple, textShadow: `0 0 30px ${neonPurple}` }}>
+                    {gameState?.word ?? "..."}
+                  </motion.p>
+                </div>
+                <p className="text-xs text-white/25">ستبدأ اللعبة بعد لحظات...</p>
+              </motion.div>
+            )}
+
+            {/* ─────────── PLAYING — 3-column layout ─────────── */}
             {setupDone && phase === "playing" && (
               <motion.div key="host-playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col gap-4 flex-1 px-4 pb-4">
+                className="flex flex-col lg:flex-row gap-3 flex-1 px-3 pb-3 min-h-0">
 
-                {/* Timer bar */}
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-xs text-purple-400/50 font-bold">وقت المتبقي</span>
-                  <span className="text-lg font-black" style={{ color: gameRemaining < 60_000 ? "#ef4444" : neonCyan }}>
-                    {fmt(gameRemaining)}
-                  </span>
+                {/* ── LEFT: Q&A History ── */}
+                <div className="lg:w-56 flex-shrink-0 rounded-2xl flex flex-col overflow-hidden"
+                  style={{ background: "rgba(10,4,24,0.88)", border: `1px solid ${neonPurple}25` }}>
+                  <div className="px-3 py-2.5 border-b flex items-center gap-2"
+                    style={{ borderColor: `${neonPurple}20` }}>
+                    <span className="text-base">📋</span>
+                    <span className="text-xs font-black text-white/70">معلومات الجولة</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+                    {(gameState?.qaHistory ?? []).length === 0 ? (
+                      <p className="text-center text-white/20 text-[10px] py-4">لا يوجد أسئلة بعد...</p>
+                    ) : (
+                      [...(gameState?.qaHistory ?? [])].reverse().map((qa, idx) => (
+                        <div key={idx} className="rounded-xl p-2 flex flex-col gap-1"
+                          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                          <div className="flex items-center gap-1 text-[9px] font-black"
+                            style={{ color: neonCyan }}>
+                            <span>{qa.askerName}</span>
+                            <span className="text-white/30">←</span>
+                            <span style={{ color: neonPurple }}>{qa.targetName}</span>
+                          </div>
+                          <p className="text-[10px] text-white/70 font-bold">❓ {qa.question}</p>
+                          {qa.timedOut ? (
+                            <p className="text-[9px] text-orange-400/70">⏰ لم يتم الرد في الوقت المحدد</p>
+                          ) : (
+                            <p className="text-[10px] text-green-400/80 font-bold">✅ {qa.answer}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
 
-                {/* Turn card */}
-                <div className="rounded-2xl p-4 flex flex-col items-center gap-3"
-                  style={{ background: "rgba(10,4,24,0.90)", border: `1px solid ${neonPurple}30` }}>
-                  {currentTurnPlayer ? (
-                    <>
-                      <p className="text-[10px] text-purple-400/50 font-bold">يسأل الآن</p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl overflow-hidden border-2"
-                          style={{ borderColor: neonPurple, boxShadow: `0 0 14px ${neonPurple}60` }}>
-                          <img src={currentTurnPlayer.avatar} alt={currentTurnPlayer.name} className="w-full h-full object-cover"/>
-                        </div>
-                        <p className="text-lg font-black" style={{ color: neonPurple }}>{currentTurnPlayer.name}</p>
+                {/* ── CENTER: Main game ── */}
+                <div className="flex-1 rounded-2xl flex flex-col overflow-hidden min-h-0"
+                  style={{ background: "rgba(10,4,24,0.88)", border: `1px solid rgba(255,255,255,0.08)` }}>
+
+                  {/* Top bar */}
+                  <div className="px-4 py-2.5 flex items-center justify-between border-b"
+                    style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">📍</span>
+                      <span className="text-sm font-black text-white/80">{gameState?.word ?? "..."}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black" style={{ color: gameRemaining < 60_000 ? "#ef4444" : neonCyan }}>
+                        {fmt(gameRemaining)}
+                      </span>
+                      <div className="w-20 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${(gameRemaining / (gameState?.durationMs ?? 1)) * 100}%`,
+                            background: gameRemaining < 60_000 ? "#ef4444" : neonCyan }} />
                       </div>
-                      {targetPlayer && (
-                        <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl"
-                          style={{ background: `${neonCyan}15`, border: `1px solid ${neonCyan}40` }}>
-                          <img src={targetPlayer.avatar} alt={targetPlayer.name} className="w-5 h-5 rounded-lg"/>
-                          <p className="text-sm font-black" style={{ color: neonCyan }}>{targetPlayer.name}</p>
+                    </div>
+                  </div>
+
+                  {/* Current turn */}
+                  <div className="px-4 py-3 border-b flex items-center gap-3"
+                    style={{ borderColor: "rgba(255,255,255,0.07)", background: `${neonPurple}08` }}>
+                    <span className="text-base">🎮</span>
+                    <span className="text-sm font-black" style={{ color: neonPurple }}>
+                      الدور على {currentTurnPlayer?.name ?? "..."}
+                    </span>
+                    {currentTargetId && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-black"
+                        style={{ background: `${neonCyan}20`, color: neonCyan }}>
+                        → {targetPlayer?.name}
+                      </span>
+                    )}
+                    {/* Turn timer */}
+                    <div className="mr-auto flex items-center gap-1.5">
+                      <Clock size={11} color={turnRemaining < 15_000 ? "#ef4444" : "rgba(255,255,255,0.35)"}/>
+                      <span className="text-xs font-black"
+                        style={{ color: turnRemaining < 15_000 ? "#ef4444" : "rgba(255,255,255,0.35)" }}>
+                        {Math.ceil(turnRemaining / 1000)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Q&A active */}
+                  <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-2">
+                    {(gameState?.currentQuestion) && (
+                      <div className="rounded-xl p-3 flex flex-col gap-1.5"
+                        style={{ background: `${neonPurple}12`, border: `1px solid ${neonPurple}35` }}>
+                        <div className="flex items-center gap-1 text-[10px] font-black" style={{ color: neonPurple }}>
+                          <span>{currentTurnPlayer?.name}</span>
+                          <span className="text-white/30 text-xs">→</span>
+                          <span style={{ color: neonCyan }}>{targetPlayer?.name}</span>
                         </div>
-                      )}
-                      <div className="w-full flex items-center gap-2 mt-1">
-                        <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                          <motion.div className="h-full rounded-full"
-                            style={{ background: turnRemaining < 15_000 ? "#ef4444" : neonCyan }}
-                            animate={{ width: `${(turnRemaining / 60_000) * 100}%` }}
-                            transition={{ duration: 0.5 }} />
-                        </div>
-                        <span className="text-xs font-black w-10 text-left"
-                          style={{ color: turnRemaining < 15_000 ? "#ef4444" : neonCyan }}>
-                          {fmt(turnRemaining)}
-                        </span>
+                        <p className="text-sm font-bold text-white">❓ {gameState.currentQuestion}</p>
+                        <motion.p className="text-[10px] text-white/40"
+                          animate={{ opacity: [0.4,1,0.4] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+                          ينتظر الرد...
+                        </motion.p>
                       </div>
-                    </>
-                  ) : <p className="text-purple-400/40 text-sm">في انتظار الدور...</p>}
+                    )}
+                    {gameState?.lastAnswer && (
+                      <div className="rounded-xl p-3"
+                        style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)" }}>
+                        <p className="text-sm font-bold text-green-400">✅ {gameState.lastAnswer.answer}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Host controls */}
+                  <div className="px-4 pb-4">
+                    <button onClick={handleForceVote}
+                      className="w-full py-2 rounded-xl text-xs font-bold border transition-all text-red-400/50 hover:text-red-400 border-red-500/10 hover:border-red-400/30">
+                      <SkipForward size={10} className="inline ml-1"/> التخطي للتصويت
+                    </button>
+                  </div>
                 </div>
 
-                {/* Players mini grid */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 flex-1">
-                  {players.map((p, i) => {
-                    const isCur = p.id === currentTurnId;
-                    const isTgt = p.id === currentTargetId;
-                    return (
-                      <div key={p.id} className="flex flex-col items-center gap-1.5 p-2 rounded-xl"
-                        style={{
-                          background: isCur ? `${neonPurple}15` : isTgt ? `${neonCyan}10` : "rgba(10,4,24,0.70)",
-                          border: `2px solid ${isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "20"}`,
-                        }}>
-                        <div className="w-9 h-9 rounded-lg overflow-hidden border"
-                          style={{ borderColor: isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "50" }}>
-                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                {/* ── RIGHT: Players ── */}
+                <div className="lg:w-48 flex-shrink-0 rounded-2xl flex flex-col overflow-hidden"
+                  style={{ background: "rgba(10,4,24,0.88)", border: `1px solid rgba(255,255,255,0.08)` }}>
+                  <div className="px-3 py-2.5 border-b"
+                    style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                    <span className="text-xs font-black text-white/60">👥 اللاعبون</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+                    {players.map((p, i) => {
+                      const isCur = p.id === currentTurnId;
+                      const isTgt = p.id === currentTargetId;
+                      return (
+                        <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl"
+                          style={{
+                            background: isCur ? `${neonPurple}18` : isTgt ? `${neonCyan}12` : "rgba(255,255,255,0.03)",
+                            border: `1.5px solid ${isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) + "30"}`,
+                          }}>
+                          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 border"
+                            style={{ borderColor: isCur ? neonPurple : playerColor(i) + "50" }}>
+                            <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-black truncate"
+                              style={{ color: isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) }}>
+                              {p.name}
+                            </p>
+                            <p className="text-[9px] font-bold text-white/25">
+                              {isCur ? "✏️ يسأل" : isTgt ? "💬 يجاوب" : p.disconnected ? "❌ غير متصل" : "🟢 متصل"}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-[10px] font-black truncate w-full text-center"
-                          style={{ color: isCur ? neonPurple : isTgt ? neonCyan : playerColor(i) }}>
-                          {p.name}
-                        </p>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-
-                <button onClick={handleForceVote}
-                  className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-purple-400/30 hover:text-red-400 border border-purple-500/10 hover:border-red-400/30 transition-all">
-                  <SkipForward size={12}/> التخطي للتصويت
-                </button>
               </motion.div>
             )}
 
@@ -990,102 +1158,238 @@ export default function ImposterGame() {
             </motion.div>
           )}
 
-          {/* ── ROLE REVEAL ── */}
-          {playerId && phase === "playing" && myRole && !isMyTurn && !needAnswer && (() => {
-            const isImposter = myRole.role === "imposter";
-            return (
-              <motion.div key="p-role"
-                initial={{ opacity: 0, scale: 0.75 }} animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 18 }}
-                className="w-full flex flex-col items-center gap-5 p-6 rounded-3xl text-center"
-                style={{
-                  background: isImposter ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)",
-                  border: `2px solid ${isImposter ? "#ef4444" : "#22c55e"}`,
-                }}>
-                <motion.span style={{ fontSize: 68 }}
-                  animate={{ rotate: [0,-10,10,0] }} transition={{ repeat: Infinity, duration: 2 }}>
-                  {isImposter ? "🕵️" : "😎"}
-                </motion.span>
-                {isImposter ? (
-                  <div>
-                    <p className="text-3xl font-black text-red-400">برا السالفة! 🤫</p>
-                    <p className="text-sm text-red-300/60 mt-2">أجب بذكاء دون أن يكشفوك</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-xl font-black text-green-400 mb-3">جوا السالفة ✅</p>
-                    <div className="px-6 py-3 rounded-2xl"
-                      style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)" }}>
-                      <p className="text-xs text-green-400/60 mb-1">الكلمة السرية</p>
-                      <p className="text-3xl font-black text-white">{myRole.word}</p>
-                    </div>
-                    <p className="text-xs text-green-300/50 mt-3">اكشف من هو برا السالفة!</p>
-                  </div>
-                )}
-                <p className="text-xs text-purple-400/30">انتظر دورك...</p>
+          {/* ── COUNTDOWN (player) ── */}
+          {playerId && phase === "countdown" && (
+            <motion.div key="p-countdown" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-6 text-center">
+              <motion.div className="text-sm font-black text-white/50"
+                animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+                جاري تجهيز الجولة...
               </motion.div>
-            );
-          })()}
-
-          {/* ── MY TURN ── */}
-          {playerId && phase === "playing" && isMyTurn && (
-            <motion.div key="p-ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center gap-4">
-              <motion.div className="text-center"
-                animate={{ scale: [1,1.08,1] }} transition={{ repeat: Infinity, duration: 1 }}>
-                <p className="text-2xl font-black" style={{ color: neonPurple }}>دورك الآن! 🎯</p>
-                <p className="text-sm text-purple-400/40 mt-1">اختر لاعباً تسأله</p>
+              <motion.div key={countdown}
+                initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="text-9xl font-black"
+                style={{ color: neonPurple, textShadow: `0 0 50px ${neonPurple}80` }}>
+                {countdown}
               </motion.div>
-              <div className="grid grid-cols-2 gap-3 w-full">
-                {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
-                  <motion.button key={p.id} onClick={() => handleSelectTarget(p.id)}
-                    className="flex flex-col items-center gap-2 p-4 rounded-2xl"
-                    style={{ background: "rgba(10,4,24,0.90)", border: `2px solid ${playerColor(i)}40` }}
-                    whileHover={{ scale: 1.04, borderColor: playerColor(i) }}
-                    whileTap={{ scale: 0.95 }}>
-                    <div className="w-14 h-14 rounded-2xl overflow-hidden border-2" style={{ borderColor: playerColor(i) }}>
-                      <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
-                    </div>
-                    <p className="text-sm font-black" style={{ color: playerColor(i) }}>{p.name}</p>
-                  </motion.button>
+              <div className="flex gap-2">
+                {[0,1,2,3,4].map(i => (
+                  <div key={i} className="w-2 h-2 rounded-full transition-all duration-500"
+                    style={{ background: i < (5 - countdown) ? neonPurple : "rgba(255,255,255,0.15)" }} />
                 ))}
-              </div>
-              <div className="w-full flex items-center gap-2">
-                <div className="flex-1 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                  <motion.div className="h-full rounded-full"
-                    style={{ background: turnRemaining < 15_000 ? "#ef4444" : neonPurple }}
-                    animate={{ width: `${(turnRemaining/60_000)*100}%` }} transition={{ duration: 0.5 }}/>
-                </div>
-                <span className="text-xs font-black" style={{ color: turnRemaining < 15_000 ? "#ef4444" : neonPurple }}>
-                  {fmt(turnRemaining)}
-                </span>
               </div>
             </motion.div>
           )}
 
-          {/* ── ANSWER ── */}
-          {playerId && phase === "playing" && needAnswer && (
-            <motion.div key="p-answer" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 220, damping: 20 }}
-              className="w-full flex flex-col items-center gap-6 text-center">
-              <motion.p className="text-2xl font-black" style={{ color: "#ffd600" }}
-                animate={{ scale: [1,1.05,1] }} transition={{ repeat: Infinity, duration: 0.8 }}>
-                وُجّه لك سؤال! 👈
+          {/* ── REVEAL (player) ── */}
+          {playerId && phase === "reveal" && myRole && (
+            <motion.div key="p-reveal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+              className="w-full flex flex-col items-center gap-5 text-center">
+              {myRole.role === "imposter" ? (
+                <div className="w-full rounded-3xl p-7 flex flex-col items-center gap-4"
+                  style={{ background: "rgba(239,68,68,0.12)", border: "2px solid #ef4444" }}>
+                  <motion.span style={{ fontSize: 64 }}
+                    animate={{ rotate: [0,-10,10,0] }} transition={{ repeat: Infinity, duration: 2 }}>🕵️</motion.span>
+                  <p className="text-3xl font-black text-red-400">برا السالفة! 🤫</p>
+                  <p className="text-sm text-red-300/60">أجب بذكاء دون أن يكشفوك</p>
+                  <div className="w-full rounded-2xl px-5 py-3 mt-1"
+                    style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                    <p className="text-[10px] text-red-400/50 mb-1">ملاحظة</p>
+                    <p className="text-sm text-white/70">أنت لا تعرف الكلمة — حاول اكتشافها من السياق!</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full rounded-3xl p-7 flex flex-col items-center gap-4"
+                  style={{ background: "rgba(34,197,94,0.12)", border: "2px solid #22c55e" }}>
+                  <motion.span style={{ fontSize: 64 }}
+                    animate={{ scale: [1,1.08,1] }} transition={{ repeat: Infinity, duration: 2 }}>😎</motion.span>
+                  <p className="text-2xl font-black text-green-400">جوا السالفة ✅</p>
+                  <div className="w-full rounded-2xl px-6 py-4"
+                    style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)" }}>
+                    <p className="text-xs text-green-400/60 mb-2">📍 المكان / السالفة</p>
+                    <p className="text-3xl font-black text-white">{myRole.word}</p>
+                  </div>
+                  <p className="text-xs text-green-300/50">اكشف من هو برا السالفة!</p>
+                </div>
+              )}
+              <motion.p className="text-xs text-white/20"
+                animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ repeat: Infinity, duration: 1.8 }}>
+                ستبدأ اللعبة بعد لحظات...
               </motion.p>
-              <p className="text-purple-400/50 text-sm">أجب بـ نعم أو لا فقط</p>
-              <div className="flex gap-4 w-full">
-                <motion.button onClick={() => handleAnswer("yes")}
-                  className="flex-1 py-6 rounded-3xl text-3xl font-black text-white"
-                  style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)", boxShadow: "0 6px 28px #22c55e50" }}
-                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}>
-                  ✅ نعم
-                </motion.button>
-                <motion.button onClick={() => handleAnswer("no")}
-                  className="flex-1 py-6 rounded-3xl text-3xl font-black text-white"
-                  style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 28px #ef444450" }}
-                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}>
-                  ❌ لا
-                </motion.button>
+            </motion.div>
+          )}
+
+          {/* ── PLAYING (unified: ask + answer + wait) ── */}
+          {playerId && phase === "playing" && (
+            <motion.div key="p-playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="w-full flex flex-col gap-3">
+
+              {/* Role badge */}
+              {myRole && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl"
+                  style={{ background: myRole.role === "imposter" ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.1)",
+                    border: `1px solid ${myRole.role === "imposter" ? "#ef444435" : "#22c55e35"}` }}>
+                  <span className="text-xs font-black" style={{ color: myRole.role === "imposter" ? "#ef4444" : "#22c55e" }}>
+                    {myRole.role === "imposter" ? "🕵️ أنت برا السالفة" : `😎 الكلمة: ${myRole.word}`}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <Clock size={10} color={turnRemaining < 15_000 ? "#ef4444" : "rgba(255,255,255,0.35)"}/>
+                    <span className="text-[10px] font-black"
+                      style={{ color: turnRemaining < 15_000 ? "#ef4444" : "rgba(255,255,255,0.35)" }}>
+                      {Math.ceil(turnRemaining/1000)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Current turn + location */}
+              <div className="rounded-xl px-3 py-2 flex items-center justify-between"
+                style={{ background: "rgba(10,4,24,0.85)", border: `1px solid ${neonPurple}25` }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs">📍</span>
+                  <span className="text-xs font-black text-white/60">{gameState?.word ?? "..."}</span>
+                </div>
+                <span className="text-xs font-black" style={{ color: neonPurple }}>
+                  {currentTurnPlayer?.id === playerId ? "🎯 دورك!" : `🎮 دور ${currentTurnPlayer?.name ?? "..."}`}
+                </span>
+              </div>
+
+              {/* Q&A History */}
+              <div className="rounded-xl flex flex-col gap-1.5 max-h-40 overflow-y-auto"
+                style={{ background: "rgba(10,4,24,0.80)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="px-3 pt-2 pb-1 border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                  <span className="text-[10px] font-black text-white/40">📋 سجل الأسئلة</span>
+                </div>
+                <div className="p-2 flex flex-col gap-1.5">
+                  {(gameState?.qaHistory ?? []).length === 0 ? (
+                    <p className="text-center text-white/20 text-[10px] py-2">لا يوجد أسئلة بعد...</p>
+                  ) : (
+                    [...(gameState?.qaHistory ?? [])].reverse().map((qa, idx) => (
+                      <div key={idx} className="rounded-lg p-2 flex flex-col gap-0.5"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="flex items-center gap-1 text-[9px] font-black" style={{ color: neonCyan }}>
+                          <span>{qa.askerName}</span><span className="text-white/25">→</span>
+                          <span style={{ color: neonPurple }}>{qa.targetName}</span>
+                        </div>
+                        <p className="text-[10px] text-white/65">❓ {qa.question}</p>
+                        {qa.timedOut
+                          ? <p className="text-[9px] text-orange-400/60">⏰ لم يتم الرد في الوقت المحدد</p>
+                          : <p className="text-[10px] text-green-400/75">✅ {qa.answer}</p>}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Active Q (waiting for answer) */}
+              {gameState?.currentQuestion && !needAnswer && !isMyTurn && (
+                <div className="rounded-xl p-3 flex flex-col gap-1.5"
+                  style={{ background: `${neonPurple}10`, border: `1px solid ${neonPurple}30` }}>
+                  <p className="text-[10px] font-black" style={{ color: neonCyan }}>
+                    {currentTurnPlayer?.name} → {targetPlayer?.name}
+                  </p>
+                  <p className="text-sm font-bold text-white">❓ {gameState.currentQuestion}</p>
+                  <motion.p className="text-[10px] text-white/35"
+                    animate={{ opacity: [0.4,1,0.4] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+                    ينتظر الرد...
+                  </motion.p>
+                </div>
+              )}
+
+              {/* MY TURN — ask */}
+              {isMyTurn && (
+                <div className="rounded-xl p-3 flex flex-col gap-3"
+                  style={{ background: `${neonPurple}12`, border: `2px solid ${neonPurple}50` }}>
+                  <motion.p className="text-sm font-black text-center" style={{ color: neonPurple }}
+                    animate={{ scale: [1,1.06,1] }} transition={{ repeat: Infinity, duration: 1 }}>
+                    🎯 دورك — اسأل أحد اللاعبين!
+                  </motion.p>
+
+                  {/* Target selector */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {players.filter(p => p.id !== playerId && !p.disconnected).map((p, i) => (
+                      <button key={p.id} onClick={() => setSelectedTarget(selectedTarget === p.id ? "" : p.id)}
+                        className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all"
+                        style={{
+                          background: selectedTarget === p.id ? `${playerColor(i)}20` : "rgba(255,255,255,0.04)",
+                          border: `2px solid ${selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.08)"}`,
+                        }}>
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border"
+                          style={{ borderColor: playerColor(i) + "60" }}>
+                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                        </div>
+                        <p className="text-[9px] font-black truncate w-full text-center"
+                          style={{ color: selectedTarget === p.id ? playerColor(i) : "rgba(255,255,255,0.45)" }}>
+                          {p.name}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Question input */}
+                  <textarea value={questionText} onChange={e => setQuestionText(e.target.value)}
+                    placeholder="اكتب سؤالك هنا..."
+                    rows={2}
+                    className="w-full bg-transparent border rounded-xl px-3 py-2 text-white text-sm placeholder-white/25 focus:outline-none resize-none text-right"
+                    style={{ borderColor: "rgba(255,255,255,0.15)" }}/>
+
+                  <motion.button onClick={handleSendQuestion}
+                    disabled={!selectedTarget || !questionText.trim()}
+                    className="w-full py-3 rounded-xl font-black text-white text-sm disabled:opacity-30"
+                    style={{ background: `linear-gradient(135deg,#7c3aed,${neonPurple})` }}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
+                    إرسال السؤال ✈️
+                  </motion.button>
+                </div>
+              )}
+
+              {/* ANSWER — text reply */}
+              {needAnswer && (
+                <div className="rounded-xl p-3 flex flex-col gap-3"
+                  style={{ background: "rgba(0,229,255,0.08)", border: `2px solid ${neonCyan}50` }}>
+                  <motion.p className="text-sm font-black text-center" style={{ color: neonCyan }}
+                    animate={{ scale: [1,1.05,1] }} transition={{ repeat: Infinity, duration: 0.9 }}>
+                    👈 وُجّه لك سؤال!
+                  </motion.p>
+                  {gameState?.currentQuestion && (
+                    <div className="rounded-lg px-3 py-2"
+                      style={{ background: `${neonPurple}15`, border: `1px solid ${neonPurple}30` }}>
+                      <p className="text-sm font-bold text-white">❓ {gameState.currentQuestion}</p>
+                    </div>
+                  )}
+                  <textarea value={answerText} onChange={e => setAnswerText(e.target.value)}
+                    placeholder="اكتب ردك هنا..."
+                    rows={2}
+                    className="w-full bg-transparent border rounded-xl px-3 py-2 text-white text-sm placeholder-white/25 focus:outline-none resize-none text-right"
+                    style={{ borderColor: `${neonCyan}30` }}/>
+                  <motion.button onClick={handleSendAnswer} disabled={!answerText.trim()}
+                    className="w-full py-3 rounded-xl font-black text-white text-sm disabled:opacity-30"
+                    style={{ background: "linear-gradient(135deg,#0284c7,#00e5ff)", color: "#001a2e" }}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
+                    إرسال الرد ✅
+                  </motion.button>
+                </div>
+              )}
+
+              {/* Players mini row */}
+              <div className="flex gap-1.5 flex-wrap justify-center">
+                {players.map((p, i) => {
+                  const isCur = p.id === currentTurnId;
+                  const isTgt = p.id === currentTargetId;
+                  const isMe  = p.id === playerId;
+                  return (
+                    <div key={p.id} className="flex flex-col items-center gap-0.5"
+                      title={p.name}>
+                      <div className="w-9 h-9 rounded-lg overflow-hidden"
+                        style={{ border: `2px solid ${isCur ? neonPurple : isTgt ? neonCyan : isMe ? "#ffd600" : playerColor(i) + "40"}` }}>
+                        <img src={p.avatar} alt={p.name} className="w-full h-full object-cover"/>
+                      </div>
+                      <p className="text-[8px] font-black" style={{ color: isCur ? neonPurple : isTgt ? neonCyan : isMe ? "#ffd600" : playerColor(i) + "80" }}>
+                        {p.name.slice(0,5)}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </motion.div>
           )}

@@ -17,12 +17,22 @@ interface RoomPlayer {
   disconnected: boolean;
 }
 
+interface QAEntry {
+  askerId: string;
+  askerName: string;
+  targetId: string;
+  targetName: string;
+  question: string;
+  answer: string | null;
+  timedOut: boolean;
+}
+
 interface GameRoom {
   code: string;
   roomName: string;
   category: Category;
   durationMs: number;
-  phase: "lobby" | "playing" | "voting" | "result";
+  phase: "lobby" | "countdown" | "reveal" | "playing" | "voting" | "result";
   hostWs: ImposterWS;
   players: Map<string, RoomPlayer>;
   playerOrder: string[];
@@ -30,12 +40,15 @@ interface GameRoom {
   imposterId: string;
   currentTurnIdx: number;
   currentTargetId: string | null;
+  currentQuestion: string | null;
+  qaHistory: QAEntry[];
   votes: Record<string, string>;
   gameEndAt: number;
   turnEndAt: number;
   lastAnswer: { targetId: string; answer: string } | null;
   gameTimer: ReturnType<typeof setTimeout> | null;
   turnTimer: ReturnType<typeof setTimeout> | null;
+  answerTimer: ReturnType<typeof setTimeout> | null;
   timerInterval: ReturnType<typeof setInterval> | null;
   usedWords: Set<string>;
 }
@@ -126,11 +139,14 @@ function stateMsg(room: GameRoom) {
     category: room.category,
     durationMs: room.durationMs,
     phase: room.phase,
+    word: room.word,
     players: publicPlayers(room),
     playerOrder: room.playerOrder,
     currentTurnIdx: room.currentTurnIdx,
     currentTurnId: room.playerOrder[room.currentTurnIdx] ?? null,
     currentTargetId: room.currentTargetId,
+    currentQuestion: room.currentQuestion,
+    qaHistory: room.qaHistory,
     lastAnswer: room.lastAnswer,
     gameRemaining: room.gameEndAt ? Math.max(0, room.gameEndAt - Date.now()) : 0,
     turnRemaining: room.turnEndAt ? Math.max(0, room.turnEndAt - Date.now()) : 0,
@@ -156,11 +172,28 @@ function pickWord(room: GameRoom): string {
 }
 
 // ─── Turn management ──────────────────────────────────────────────────────────
-function advanceTurn(room: GameRoom): void {
+function advanceTurn(room: GameRoom, timedOut?: boolean): void {
   if (room.phase !== "playing") return;
-  if (room.turnTimer) clearTimeout(room.turnTimer);
+  if (room.turnTimer)   clearTimeout(room.turnTimer);
+  if (room.answerTimer) clearTimeout(room.answerTimer);
+  room.answerTimer = null;
+
+  if (timedOut && room.currentTargetId && room.currentQuestion) {
+    const asker   = room.players.get(room.playerOrder[room.currentTurnIdx]);
+    const target  = room.players.get(room.currentTargetId);
+    room.qaHistory.push({
+      askerId:    room.playerOrder[room.currentTurnIdx],
+      askerName:  asker?.name ?? "؟",
+      targetId:   room.currentTargetId,
+      targetName: target?.name ?? "؟",
+      question:   room.currentQuestion,
+      answer:     null,
+      timedOut:   true,
+    });
+  }
 
   room.currentTargetId = null;
+  room.currentQuestion = null;
   room.lastAnswer = null;
 
   let next = (room.currentTurnIdx + 1) % room.playerOrder.length;
@@ -170,13 +203,13 @@ function advanceTurn(room: GameRoom): void {
     next = (next + 1) % room.playerOrder.length;
   }
   room.currentTurnIdx = next;
-  room.turnEndAt = Date.now() + 60_000;
-  room.turnTimer = setTimeout(() => advanceTurn(room), 60_000);
+  room.turnEndAt = Date.now() + 75_000;
+  room.turnTimer = setTimeout(() => advanceTurn(room, true), 75_000);
 
   broadcast(room, stateMsg(room));
 
   const curId = room.playerOrder[room.currentTurnIdx];
-  const curP = room.players.get(curId);
+  const curP  = room.players.get(curId);
   send(curP?.ws, { type: "imposter:your_turn" });
 }
 
@@ -246,9 +279,10 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
       phase: "lobby", hostWs: ws,
       players: new Map(), playerOrder: [],
       word: "", imposterId: "",
-      currentTurnIdx: 0, currentTargetId: null,
+      currentTurnIdx: 0, currentTargetId: null, currentQuestion: null,
+      qaHistory: [],
       votes: {}, gameEndAt: 0, turnEndAt: 0, lastAnswer: null,
-      gameTimer: null, turnTimer: null, timerInterval: null,
+      gameTimer: null, turnTimer: null, answerTimer: null, timerInterval: null,
       usedWords: new Set(),
     };
     rooms.set(code, room);
@@ -295,46 +329,67 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     if (!room || room.hostWs !== ws) return;
     if (room.players.size < 3) { send(ws, { type: "imposter:error", message: "يلزم ٣ لاعبين على الأقل" }); return; }
 
-    room.word = pickWord(room);
-    const ids = Array.from(room.players.keys());
-    room.imposterId = ids[Math.floor(Math.random() * ids.length)];
-    room.playerOrder = shuffle([...ids]);
-    room.currentTurnIdx = 0;
+    // Pick word + imposter immediately
+    room.word      = pickWord(room);
+    const ids      = Array.from(room.players.keys());
+    room.imposterId   = ids[Math.floor(Math.random() * ids.length)];
+    room.playerOrder  = shuffle([...ids]);
+    room.currentTurnIdx  = 0;
     room.currentTargetId = null;
-    room.lastAnswer = null;
-    room.phase = "playing";
-    room.gameEndAt = Date.now() + room.durationMs;
-    room.turnEndAt = Date.now() + 60_000;
+    room.currentQuestion = null;
+    room.qaHistory       = [];
+    room.lastAnswer      = null;
+    room.players.forEach(p => { p.voted = false; });
 
-    // Send roles privately
-    room.players.forEach(p => {
-      const isImposter = p.id === room.imposterId;
-      send(p.ws, {
-        type: "imposter:role",
-        role: isImposter ? "imposter" : "player",
-        word: isImposter ? null : room.word,
-      });
-    });
-
+    // ── Phase 1: COUNTDOWN (5 s) ──────────────────────────────────────────────
+    room.phase = "countdown";
     broadcast(room, stateMsg(room));
 
-    // Notify first player
-    const first = room.players.get(room.playerOrder[0]);
-    send(first?.ws, { type: "imposter:your_turn" });
+    setTimeout(() => {
+      if (!rooms.has(room.code)) return;
 
-    // Timers
-    room.gameTimer = setTimeout(() => startVoting(room), room.durationMs);
-    room.turnTimer = setTimeout(() => advanceTurn(room), 60_000);
-    room.timerInterval = setInterval(() => {
-      if (room.phase !== "playing") { clearInterval(room.timerInterval!); room.timerInterval = null; return; }
-      broadcast(room, {
-        type: "imposter:timer",
-        gameRemaining: Math.max(0, room.gameEndAt - Date.now()),
-        turnRemaining: Math.max(0, room.turnEndAt - Date.now()),
+      // ── Phase 2: REVEAL (3 s) ──────────────────────────────────────────────
+      room.phase = "reveal";
+      // Send role privately to each player
+      room.players.forEach(p => {
+        const isImposter = p.id === room.imposterId;
+        send(p.ws, {
+          type: "imposter:role",
+          role: isImposter ? "imposter" : "player",
+          word: isImposter ? null : room.word,
+        });
       });
-    }, 1_000);
+      broadcast(room, stateMsg(room));
 
-    logger.info({ code: room.code, word: room.word, category: room.category }, "برا السالفة game started");
+      setTimeout(() => {
+        if (!rooms.has(room.code)) return;
+
+        // ── Phase 3: PLAYING ──────────────────────────────────────────────────
+        room.phase      = "playing";
+        room.gameEndAt  = Date.now() + room.durationMs;
+        room.turnEndAt  = Date.now() + 75_000;
+        broadcast(room, stateMsg(room));
+
+        // Notify first player
+        const first = room.players.get(room.playerOrder[0]);
+        send(first?.ws, { type: "imposter:your_turn" });
+
+        // Timers
+        room.gameTimer = setTimeout(() => startVoting(room), room.durationMs);
+        room.turnTimer = setTimeout(() => advanceTurn(room, true), 75_000);
+        room.timerInterval = setInterval(() => {
+          if (room.phase !== "playing") { clearInterval(room.timerInterval!); room.timerInterval = null; return; }
+          broadcast(room, {
+            type: "imposter:timer",
+            gameRemaining: Math.max(0, room.gameEndAt - Date.now()),
+            turnRemaining: Math.max(0, room.turnEndAt - Date.now()),
+          });
+        }, 1_000);
+
+        logger.info({ code: room.code, word: room.word, category: room.category }, "برا السالفة game started");
+      }, 3_000);
+    }, 5_000);
+
     return;
   }
 
@@ -354,34 +409,57 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
     return;
   }
 
-  // Select target
-  if (type === "imposter:select_target") {
+  // Send question (current turn player → selects target + writes question)
+  if (type === "imposter:send_question") {
     const room = rooms.get(ws.roomCode ?? "");
     if (!room || room.phase !== "playing") return;
-    const targetId = String(msg.targetId ?? "");
+    const targetId  = String(msg.targetId ?? "");
+    const question  = String(msg.question  ?? "").trim().slice(0, 200);
+    if (!question) return;
     const currentId = room.playerOrder[room.currentTurnIdx];
-    const current = room.players.get(currentId);
+    const current   = room.players.get(currentId);
     if (!current || current.ws !== ws) return;
     if (!room.players.has(targetId) || targetId === currentId) return;
 
+    if (room.turnTimer)   clearTimeout(room.turnTimer);
     room.currentTargetId = targetId;
+    room.currentQuestion = question;
     broadcast(room, stateMsg(room));
+
     const target = room.players.get(targetId);
     send(target?.ws, { type: "imposter:answer_now" });
+
+    // Answer timer: 45 seconds
+    room.answerTimer = setTimeout(() => advanceTurn(room, true), 45_000);
     return;
   }
 
-  // Answer yes/no
-  if (type === "imposter:answer") {
+  // Send answer (target player → free-text answer)
+  if (type === "imposter:send_answer_text") {
     const room = rooms.get(ws.roomCode ?? "");
-    if (!room || room.phase !== "playing" || !room.currentTargetId) return;
+    if (!room || room.phase !== "playing" || !room.currentTargetId || !room.currentQuestion) return;
     const target = room.players.get(room.currentTargetId);
     if (!target || target.ws !== ws) return;
 
-    const answer = msg.answer === "yes" ? "yes" : "no";
+    const answer = String(msg.answer ?? "").trim().slice(0, 200);
+    if (!answer) return;
+
+    if (room.answerTimer) clearTimeout(room.answerTimer);
+    room.answerTimer = null;
+
+    const asker = room.players.get(room.playerOrder[room.currentTurnIdx]);
+    room.qaHistory.push({
+      askerId:    room.playerOrder[room.currentTurnIdx],
+      askerName:  asker?.name ?? "؟",
+      targetId:   room.currentTargetId,
+      targetName: target.name,
+      question:   room.currentQuestion,
+      answer,
+      timedOut:   false,
+    });
     room.lastAnswer = { targetId: room.currentTargetId, answer };
-    broadcast(room, { type: "imposter:answered", targetId: room.currentTargetId, answer });
-    advanceTurn(room);
+    broadcast(room, stateMsg(room));
+    setTimeout(() => advanceTurn(room), 1_500);
     return;
   }
 
@@ -412,13 +490,21 @@ export function handleImposterMessage(ws: ImposterWS, msg: Record<string, unknow
   if (type === "imposter:new_round") {
     const room = rooms.get(ws.roomCode ?? "");
     if (!room || room.hostWs !== ws) return;
+    if (room.gameTimer)   clearTimeout(room.gameTimer);
+    if (room.turnTimer)   clearTimeout(room.turnTimer);
+    if (room.answerTimer) clearTimeout(room.answerTimer);
+    if (room.timerInterval) clearInterval(room.timerInterval);
+    room.gameTimer = null; room.turnTimer = null; room.answerTimer = null; room.timerInterval = null;
     room.phase = "lobby";
     room.votes = {};
     room.word = "";
     room.imposterId = "";
     room.currentTurnIdx = 0;
     room.currentTargetId = null;
+    room.currentQuestion = null;
+    room.qaHistory = [];
     room.lastAnswer = null;
+    room.gameEndAt = 0; room.turnEndAt = 0;
     room.players.forEach(p => { p.voted = false; });
     broadcast(room, stateMsg(room));
     return;
@@ -446,8 +532,9 @@ export function handleImposterDisconnect(ws: ImposterWS): void {
 
   if (room.hostWs === ws) {
     broadcast(room, { type: "imposter:host_left" });
-    if (room.gameTimer) clearTimeout(room.gameTimer);
-    if (room.turnTimer) clearTimeout(room.turnTimer);
+    if (room.gameTimer)     clearTimeout(room.gameTimer);
+    if (room.turnTimer)     clearTimeout(room.turnTimer);
+    if (room.answerTimer)   clearTimeout(room.answerTimer);
     if (room.timerInterval) clearInterval(room.timerInterval);
     rooms.delete(code);
     logger.info({ code }, "برا السالفة room closed (host left)");
