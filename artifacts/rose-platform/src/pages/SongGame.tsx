@@ -604,14 +604,6 @@ export default function SongGame() {
               transition={{ duration: 0.3 }}
               className="flex-1 flex flex-col items-center justify-center px-5 py-5 gap-4 relative overflow-hidden">
 
-              {/* ── Full background video ── */}
-              <video src="/song-clip.mov" autoPlay loop muted playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: 0.13, filter: "blur(2px) saturate(1.4)" }} />
-              {/* dark gradient overlay so content stays readable */}
-              <div className="absolute inset-0 pointer-events-none"
-                style={{ background: "linear-gradient(to bottom, rgba(5,2,14,0.55) 0%, rgba(5,2,14,0.3) 40%, rgba(5,2,14,0.55) 100%)" }} />
-
               {/* ── Round progress badge ── */}
               <div className="relative z-10 flex items-center gap-3">
                 <div className="text-3xl font-black"
