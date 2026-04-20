@@ -457,12 +457,9 @@ export default function SongGame() {
   const clearClipWatch = () => {
     if (clipWatchRef.current) { clearInterval(clipWatchRef.current); clipWatchRef.current = null; }
   };
-  const clearLoadTimeout = () => {
-    if (loadTimeoutRef.current) { clearTimeout(loadTimeoutRef.current); loadTimeoutRef.current = null; }
-  };
   const destroyPlayer = useCallback(() => {
     clearClipWatch();
-    clearLoadTimeout();
+    if (loadTimeoutRef.current) { clearTimeout(loadTimeoutRef.current); loadTimeoutRef.current = null; }
     if (ytPlayerRef.current) {
       try { ytPlayerRef.current.destroy(); } catch (_) {}
       ytPlayerRef.current = null;
@@ -487,20 +484,10 @@ export default function SongGame() {
   useEffect(() => {
     if (phase !== "play") { destroyPlayer(); return; }
     setAudioState("loading");
-
     loadYouTubeAPI().then(() => {
       if (!ytContainerRef.current) return;
       destroyPlayer();
       const gc = activeClipRef.current;
-
-      // Safety net: if onReady never fires within 10 s, auto-skip the song
-      loadTimeoutRef.current = setTimeout(() => {
-        if (ytPlayerRef.current) {
-          failedSongIds.current.add(gc.song.youtubeId);
-          skipToNextSong();
-        }
-      }, 10_000);
-
       ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
         height: "1", width: "1",
         videoId: gc.song.youtubeId,
@@ -511,8 +498,7 @@ export default function SongGame() {
         },
         events: {
           onReady: (e: any) => {
-            clearLoadTimeout();                       // onReady fired — cancel safety timeout
-            e.target.setVolume(volumeRef.current);   // use ref to avoid stale closure
+            e.target.setVolume(volumeRef.current);
             e.target.playVideo();
             setAudioState("playing");
             startClipWatch(gc.clip);
@@ -524,19 +510,18 @@ export default function SongGame() {
               setAudioState(prev => prev === "stopped" ? "stopped" : "paused");
           },
           onError: (e: any) => {
-            // ANY YouTube error → mark failed + auto-skip silently
-            // Codes: 2=invalid param, 5=HTML5, 100=not found, 101/150=embed blocked
-            clearLoadTimeout();
-            failedSongIds.current.add(gc.song.youtubeId);
-            setTimeout(() => skipToNextSong(), 600);
+            // Codes 100, 101, 150 = video unavailable / embedding blocked → auto-skip
+            const fatal = e?.data === 100 || e?.data === 101 || e?.data === 150;
+            if (fatal) {
+              failedSongIds.current.add(gc.song.youtubeId);
+              setTimeout(() => skipToNextSong(), 800);
+            } else {
+              setAudioState("error");
+            }
           },
         },
       });
-    }).catch(() => {
-      clearLoadTimeout();
-      setAudioState("error");
-    });
-
+    }).catch(() => setAudioState("error"));
     return () => destroyPlayer();
   }, [phase, currentGameIndex]);
 
