@@ -1,249 +1,372 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Volume2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-// ─── YouTube loader ────────────────────────────────────────────────────────────
+// ─── YouTube API ──────────────────────────────────────────────────────────────
 declare global {
   interface Window { YT: any; onYouTubeIframeAPIReady?: () => void; _ytReady?: boolean }
 }
-let _ytP: Promise<void> | null = null;
+let _ytPromise: Promise<void> | null = null;
 function loadYT(): Promise<void> {
-  if (_ytP) return _ytP;
-  _ytP = new Promise(res => {
-    if (window._ytReady && window.YT?.Player) { res(); return; }
+  if (_ytPromise) return _ytPromise;
+  _ytPromise = new Promise(resolve => {
+    if (window._ytReady && window.YT?.Player) { resolve(); return; }
     const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { window._ytReady = true; prev?.(); res(); };
+    window.onYouTubeIframeAPIReady = () => { window._ytReady = true; prev?.(); resolve(); };
     if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api";
+      const s = document.createElement("script");
+      s.src = "https://www.youtube.com/iframe_api";
       document.head.appendChild(s);
     }
   });
-  return _ytP;
+  return _ytPromise;
 }
 
 // ─── Twitch photo ─────────────────────────────────────────────────────────────
-async function fetchTwitchPhoto(username: string): Promise<string> {
+async function fetchTwitchPhoto(u: string): Promise<string> {
   try {
-    const res = await fetch(`https://api.ivr.fi/v2/twitch/user?login=${username}`);
+    const res  = await fetch(`https://api.ivr.fi/v2/twitch/user?login=${u}`);
     const data = await res.json();
-    const u = Array.isArray(data) ? data[0] : data?.data?.[0];
-    const url = u?.profileImageURL ?? u?.logo ?? u?.profile_image_url;
+    const obj  = Array.isArray(data) ? data[0] : data?.data?.[0];
+    const url  = obj?.profileImageURL ?? obj?.logo ?? obj?.profile_image_url;
     if (url) return url.replace("{width}", "150").replace("{height}", "150");
   } catch {}
-  return `https://unavatar.io/twitch/${username}`;
+  return `https://unavatar.io/twitch/${u}`;
 }
 
-// ─── Songs ────────────────────────────────────────────────────────────────────
-interface Song { id: string; title: string; artist: string; start: number }
+// ─── Song pool ────────────────────────────────────────────────────────────────
+interface Song { ytId: string; start: number }
 const SONGS: Song[] = [
-  { id: "joevqtOJFes", title: "يا طير",        artist: "راشد الماجد",  start: 25 },
-  { id: "_nSq4Mtlfno", title: "ندمان",           artist: "نبيل شعيل",    start: 30 },
-  { id: "5Gi9Q9P0bVI", title: "يا عمري انا",    artist: "فرقة ميامي",   start: 24 },
-  { id: "QUBvVTNRp4Q", title: "بشرة خير",       artist: "حسين الجسمي",  start: 30 },
-  { id: "KLJA-srM_yM", title: "نور العين",       artist: "عمرو دياب",    start: 25 },
-  { id: "EgmXTmj62ic", title: "تملى معاك",      artist: "عمرو دياب",    start: 35 },
-  { id: "a_vfYHbLr7Y", title: "وغلاوتك",        artist: "عمرو دياب",    start: 30 },
-  { id: "qzcIKpmEBHo", title: "أخاصمك آه",      artist: "نانسي عجرم",   start: 20 },
-  { id: "1nlzrBWh0H8", title: "يا سلام",         artist: "نانسي عجرم",   start: 22 },
-  { id: "UFn1-pTQ85s", title: "من نظرة",        artist: "نانسي عجرم",   start: 18 },
-  { id: "iOP9PYLICK8", title: "بدنا نولع الجو", artist: "نانسي عجرم",   start: 18 },
-  { id: "jHEYg6VZoOw", title: "يللا",           artist: "نانسي عجرم",   start: 15 },
-  { id: "WlqefHeYYR0", title: "يا نور العين",    artist: "مطرف المطرف",  start: 32 },
-  { id: "z6RC2T3Q7rs", title: "قمرين",           artist: "عمرو دياب",    start: 28 },
-  { id: "D_hH-bn5dD0", title: "أنا يللي بحبك",  artist: "نانسي عجرم",   start: 22 },
-  { id: "YRadUqAv7i8", title: "إحساس جديد",     artist: "نانسي عجرم",   start: 22 },
-  { id: "dNQMH3WVMNs", title: "قلبي يا قلبي",   artist: "نانسي عجرم",   start: 18 },
-  { id: "vZ0OFwpvIv0", title: "شيخ الشباب",     artist: "نانسي عجرم",   start: 20 },
+  { ytId: "joevqtOJFes", start: 25 }, { ytId: "_nSq4Mtlfno", start: 30 },
+  { ytId: "5Gi9Q9P0bVI", start: 24 }, { ytId: "QUBvVTNRp4Q", start: 30 },
+  { ytId: "KLJA-srM_yM", start: 25 }, { ytId: "EgmXTmj62ic", start: 35 },
+  { ytId: "a_vfYHbLr7Y", start: 30 }, { ytId: "qzcIKpmEBHo", start: 20 },
+  { ytId: "1nlzrBWh0H8", start: 22 }, { ytId: "UFn1-pTQ85s", start: 18 },
+  { ytId: "jHEYg6VZoOw", start: 15 }, { ytId: "WlqefHeYYR0", start: 32 },
+  { ytId: "z6RC2T3Q7rs", start: 28 }, { ytId: "D_hH-bn5dD0", start: 22 },
+  { ytId: "YRadUqAv7i8", start: 22 }, { ytId: "dNQMH3WVMNs", start: 18 },
+  { ytId: "vZ0OFwpvIv0", start: 20 }, { ytId: "BQeTM1N2NjQ", start: 30 },
+  { ytId: "GUYKNXvwHaM", start: 28 }, { ytId: "qSil6ttEg30", start: 25 },
+  { ytId: "B2LRL03ioXM", start: 32 }, { ytId: "7oMBJEjxu6s", start: 20 },
 ];
-const CLIP_DURATIONS = [10, 15, 20, 22] as const;
+const CLIP_DURATIONS = [12, 15, 18, 22];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Phase = "lobby" | "spinning" | "selecting" | "elimination" | "winner";
 interface Player { username: string; displayName: string; avatar: string }
 
-// ─── Geometry ─────────────────────────────────────────────────────────────────
-const TOTAL      = 600;   // SVG/container size
-const CX         = 300;   // center
-const CY         = 300;
-const DISC_R     = 224;   // disc radius
-const PLAYER_R   = 284;   // players outside disc
-const CHAIR_R_IN = 128;   // chairs inside disc ring
-const SELECT_S   = 20;
+// ─── Disc geometry ────────────────────────────────────────────────────────────
+const SZ       = 600;
+const CX       = 300;
+const CY       = 300;
+const DISC_R   = 222;
+const PLAYER_R = 286;
+const CHAIR_R  = 130;
+const SELECT_S = 20;
+const CYAN     = "#00d4ff";
 
-// ─── Colors (matching reference images exactly) ───────────────────────────────
-const CYAN       = "#00d4ff";
-const CYAN_GLOW  = "rgba(0,212,255,0.45)";
-const DISC_FILL  = "#0c1628";
-const PAGE_BG    = "linear-gradient(135deg, #0a0e1a 0%, #0f1a2e 60%, #0a0e1a 100%)";
+// ─── Shared avatar fallback ───────────────────────────────────────────────────
+const avatarFallback = (username: string) =>
+  `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}`;
 
-// ─── Chair SVG icon — sofa shape matching reference ──────────────────────────
-function ChairSVG({ size = 40 }: { size?: number }) {
-  const s = size / 40;
+// ─── ChairIcon ────────────────────────────────────────────────────────────────
+function ChairIcon() {
   return (
-    <svg width={size} height={Math.round(size * 0.78)} viewBox="0 0 40 31"
-      style={{ filter: `drop-shadow(0 0 5px ${CYAN})`, overflow: "visible" }}>
-      {/* Backrest */}
-      <rect x="6" y="0" width="28" height="13" rx="4.5"
-        fill="rgba(0,212,255,0.13)" stroke={CYAN} strokeWidth={1.8} />
-      {/* Left armrest */}
-      <rect x="1" y="10" width="7" height="14" rx="3.5"
-        fill="rgba(0,212,255,0.13)" stroke={CYAN} strokeWidth={1.8} />
-      {/* Right armrest */}
-      <rect x="32" y="10" width="7" height="14" rx="3.5"
-        fill="rgba(0,212,255,0.13)" stroke={CYAN} strokeWidth={1.8} />
-      {/* Seat cushion */}
-      <rect x="6" y="12" width="28" height="13" rx="4.5"
-        fill="rgba(0,212,255,0.13)" stroke={CYAN} strokeWidth={1.8} />
-      {/* Legs */}
-      <line x1="10" y1="25" x2="10" y2="31" stroke={CYAN} strokeWidth={1.8} strokeLinecap="round" />
-      <line x1="30" y1="25" x2="30" y2="31" stroke={CYAN} strokeWidth={1.8} strokeLinecap="round" />
+    <svg width="38" height="30" viewBox="0 0 38 30"
+      style={{ filter: `drop-shadow(0 0 6px ${CYAN})`, overflow: "visible" }}>
+      <rect x="6" y="0" width="26" height="12" rx="4"
+        fill="rgba(0,212,255,0.12)" stroke={CYAN} strokeWidth={1.8} />
+      <rect x="1" y="9" width="6.5" height="13" rx="3"
+        fill="rgba(0,212,255,0.12)" stroke={CYAN} strokeWidth={1.8} />
+      <rect x="30.5" y="9" width="6.5" height="13" rx="3"
+        fill="rgba(0,212,255,0.12)" stroke={CYAN} strokeWidth={1.8} />
+      <rect x="6" y="11" width="26" height="12" rx="4"
+        fill="rgba(0,212,255,0.12)" stroke={CYAN} strokeWidth={1.8} />
+      <line x1="11" y1="23" x2="11" y2="30" stroke={CYAN} strokeWidth={1.8} strokeLinecap="round" />
+      <line x1="27" y1="23" x2="27" y2="30" stroke={CYAN} strokeWidth={1.8} strokeLinecap="round" />
     </svg>
   );
 }
 
-// ─── Volume slider — horizontal, matches reference image ─────────────────────
-function VolumeSlider({ vol, onChange }: { vol: number; onChange: (v: number) => void }) {
+// ─── Avatar circle ────────────────────────────────────────────────────────────
+function AvatarCircle({ src, size, borderColor, glow, style: extraStyle }:
+  { src: string; size: number; borderColor?: string; glow?: boolean; style?: React.CSSProperties }
+) {
+  const bc = borderColor ?? CYAN;
   return (
     <div style={{
-      position: "absolute", top: 18, left: 18, zIndex: 30,
-      display: "flex", alignItems: "center", gap: 10,
-      background: "rgba(8,18,38,0.80)", borderRadius: 24,
-      padding: "7px 16px", direction: "rtl",
-      border: "1px solid rgba(0,212,255,0.25)",
-      boxShadow: "0 2px 16px rgba(0,0,0,0.4)",
+      width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+      border: `2.5px solid ${bc}`,
+      boxShadow: glow ? `0 0 14px ${bc}90` : `0 0 6px ${bc}50`,
+      ...extraStyle,
     }}>
-      <span style={{ color: CYAN, fontSize: 15 }}>♫</span>
-      <input
-        type="range" min={0} max={100} value={vol}
-        onChange={e => onChange(+e.target.value)}
-        style={{
-          width: 110, direction: "ltr", accentColor: CYAN,
-          cursor: "pointer", outline: "none", border: "none",
-          background: "transparent",
-        }}
-      />
-      <span style={{
-        color: CYAN, fontSize: 12, fontWeight: 700,
-        fontFamily: "'Cairo','Arial',sans-serif", whiteSpace: "nowrap",
-      }}>مستوى الصوت</span>
+      <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        onError={e => { (e.target as HTMLImageElement).src = avatarFallback("u"); }} />
     </div>
   );
 }
 
-// ─── Back button — minimal, top-right ─────────────────────────────────────────
-function BackBtn({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      style={{
-        position: "absolute", top: 18, right: 18, zIndex: 30,
-        background: "rgba(8,18,38,0.75)", border: "1px solid rgba(255,255,255,0.12)",
-        borderRadius: 16, padding: "6px 14px",
-        color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 700,
-        cursor: "pointer", fontFamily: "'Cairo','Arial',sans-serif",
-      }}>
-      ← رجوع
-    </button>
-  );
-}
+// ─── Main component ───────────────────────────────────────────────────────────
+export default function ChairsGame() {
+  const [, navigate]  = useLocation();
+  const { user }      = useAuth();
 
-// ─── Dot grid for disc interior ───────────────────────────────────────────────
-function DotGrid() {
-  return (
-    <defs>
-      <pattern id="cg" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-        <circle cx="10" cy="10" r="1" fill="rgba(0,212,255,0.12)" />
-      </pattern>
-      <clipPath id="discClip">
-        <circle cx={CX} cy={CY} r={DISC_R - 2} />
-      </clipPath>
-    </defs>
-  );
-}
+  const [phase, setPhase]                 = useState<Phase>("lobby");
+  const [players, setPlayers]             = useState<Player[]>([]);
+  const [chairOccupied, setChairOccupied] = useState<Record<number, Player>>({});
+  const [selTimer, setSelTimer]           = useState(SELECT_S);
+  const [eliminated, setEliminated]       = useState<Player | null>(null);
+  const [winner, setWinner]               = useState<Player | null>(null);
+  const [roundNum, setRoundNum]           = useState(1);
+  const [volume, setVolume]               = useState(80);
+  const [twitchOk, setTwitchOk]          = useState(false);
 
-// ─── Lobby card ───────────────────────────────────────────────────────────────
-function LobbyScreen({ players, onStart }: { players: Player[]; onStart: () => void }) {
-  return (
-    <div style={{
-      position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", gap: 24,
-      fontFamily: "'Cairo','Arial',sans-serif", direction: "rtl",
-    }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 52, fontWeight: 900, color: "#fff",
-          textShadow: `0 0 30px ${CYAN}` }}>
-          اكتب{" "}
-          <span style={{ color: CYAN, textShadow: `0 0 20px ${CYAN}` }}>join</span>
-          {" "}في الشات
-        </div>
-        <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: 600, marginTop: 6 }}>
-          لعبة الكراسي الموسيقية 🪑
-        </div>
-      </div>
+  // refs — avoid stale closures
+  const phaseRef   = useRef<Phase>("lobby");
+  const playersRef = useRef<Player[]>([]);
+  const chairRef   = useRef<Record<number, Player>>({});
+  const volumeRef  = useRef(80);
+  volumeRef.current = volume;
 
-      <div style={{
-        background: "rgba(0,212,255,0.06)", border: `1.5px solid rgba(0,212,255,0.25)`,
-        borderRadius: 20, padding: "16px 24px", minWidth: 320,
-      }}>
-        {players.length === 0 ? (
-          <div style={{ textAlign: "center", color: "rgba(255,255,255,0.45)", fontSize: 14 }}>
-            في انتظار المشاركين...
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-            {players.map(p => (
-              <div key={p.username} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <img src={p.avatar} alt={p.displayName}
-                  style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
-                    border: `2.5px solid ${CYAN}`, boxShadow: `0 0 10px ${CYAN}60` }}
-                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", fontWeight: 700,
-                  maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {p.displayName}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ textAlign: "center", marginTop: 10, color: CYAN, fontSize: 13, fontWeight: 700 }}>
-          {players.length} لاعب
-        </div>
-      </div>
+  // YouTube refs
+  const ytDivRef   = useRef<HTMLDivElement>(null);
+  const ytRef      = useRef<any>(null);
+  const songIdxRef = useRef(Math.floor(Math.random() * SONGS.length));
 
-      <button
-        onClick={onStart}
-        disabled={players.length < 2}
-        style={{
-          padding: "16px 60px", borderRadius: 16, fontFamily: "'Cairo','Arial',sans-serif",
-          fontSize: 18, fontWeight: 900,
-          background: players.length >= 2
-            ? `linear-gradient(135deg, ${CYAN}, #0099bb)`
-            : "rgba(255,255,255,0.08)",
-          color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.3)",
-          border: "none", cursor: players.length >= 2 ? "pointer" : "not-allowed",
-          boxShadow: players.length >= 2 ? `0 6px 28px ${CYAN}60` : "none",
-        }}>
-        {players.length >= 2 ? `ابدأ اللعبة (${players.length} لاعبين)` : "انتظر اللاعبين..."}
-      </button>
-    </div>
-  );
-}
+  // timers
+  const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cdTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsRef        = useRef<WebSocket | null>(null);
+  const connRef      = useRef(false);
 
-// ─── Main game disc ───────────────────────────────────────────────────────────
-function GameDisc({
-  phase, players, numChairs, chairOccupied, selTimer, eliminated, winner, roundNum,
-}: {
-  phase: Phase; players: Player[]; numChairs: number;
-  chairOccupied: Record<number, Player>; selTimer: number;
-  eliminated: Player | null; winner: Player | null; roundNum: number;
-}) {
-  // Chair positions inside disc
+  // keep refs in sync
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  useEffect(() => { playersRef.current = players; }, [players]);
+  useEffect(() => { chairRef.current = chairOccupied; }, [chairOccupied]);
+
+  // ── Load YouTube API on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    loadYT(); // pre-warm the API
+    return () => { destroyYT(); clearAllTimers(); };
+  }, []);
+
+  // ── YouTube helpers ────────────────────────────────────────────────────────
+  const destroyYT = () => {
+    if (ytRef.current) {
+      try { ytRef.current.pauseVideo(); } catch {}
+      try { ytRef.current.destroy();    } catch {}
+      ytRef.current = null;
+    }
+  };
+
+  const clearAllTimers = () => {
+    if (clipTimerRef.current) { clearTimeout(clipTimerRef.current);  clipTimerRef.current = null; }
+    if (selTimerRef.current)  { clearInterval(selTimerRef.current);  selTimerRef.current  = null; }
+    if (cdTimerRef.current)   { clearTimeout(cdTimerRef.current);    cdTimerRef.current   = null; }
+  };
+
+  // Play a random song via a fresh YT.Player — called once per round
+  const playSong = useCallback((onStop: () => void) => {
+    destroyYT();
+    if (!ytDivRef.current) return;
+
+    // Rotate through songs (shuffle-like)
+    songIdxRef.current = (songIdxRef.current + 1) % SONGS.length;
+    const s   = SONGS[songIdxRef.current];
+    const dur = CLIP_DURATIONS[Math.floor(Math.random() * CLIP_DURATIONS.length)];
+
+    loadYT().then(() => {
+      if (!ytDivRef.current) return;
+      ytRef.current = new window.YT.Player(ytDivRef.current, {
+        height: "1", width: "1",
+        videoId: s.ytId,
+        playerVars: {
+          autoplay: 1, start: s.start,
+          controls: 0, modestbranding: 1, rel: 0, fs: 0,
+          iv_load_policy: 3, disablekb: 1, playsinline: 1,
+        },
+        events: {
+          onReady: (e: any) => {
+            try { e.target.setVolume(volumeRef.current); e.target.playVideo(); } catch {}
+            // Auto-stop after clip duration
+            clipTimerRef.current = setTimeout(() => {
+              try { e.target.pauseVideo(); } catch {}
+              onStop();
+            }, dur * 1000);
+          },
+          onError: () => {
+            // Skip bad video immediately
+            clearTimeout(clipTimerRef.current!);
+            onStop();
+          },
+        },
+      });
+    });
+  }, []);
+
+  // ── Game flow ──────────────────────────────────────────────────────────────
+  const doEliminate = useCallback(() => {
+    clearAllTimers();
+    const cur  = playersRef.current;
+    const occ  = chairRef.current;
+    const sat  = new Set(Object.values(occ).map(p => p.username));
+    const outs = cur.filter(p => !sat.has(p.username));
+    const eli  = outs[Math.floor(Math.random() * outs.length)] ?? null;
+
+    setEliminated(eli);
+    phaseRef.current = "elimination";
+    setPhase("elimination");
+
+    cdTimerRef.current = setTimeout(() => {
+      const rem = playersRef.current.filter(p => p.username !== eli?.username);
+      playersRef.current = rem;
+      setPlayers(rem);
+
+      if (rem.length <= 1) {
+        setWinner(rem[0] ?? null);
+        phaseRef.current = "winner";
+        setPhase("winner");
+      } else {
+        setRoundNum(r => r + 1);
+        startRound(rem);
+      }
+    }, 3500);
+  }, []);
+
+  const startSelecting = useCallback(() => {
+    setChairOccupied({});  chairRef.current = {};
+    phaseRef.current = "selecting";
+    setPhase("selecting");
+
+    let t = SELECT_S;
+    setSelTimer(t);
+    selTimerRef.current = setInterval(() => {
+      t--;
+      setSelTimer(t);
+      if (t <= 0) {
+        clearInterval(selTimerRef.current!); selTimerRef.current = null;
+        doEliminate();
+      }
+    }, 1000);
+  }, [doEliminate]);
+
+  const startRound = useCallback((pl: Player[]) => {
+    if (pl.length < 2) return;
+    clearAllTimers();
+    setChairOccupied({});  chairRef.current = {};
+    setEliminated(null);
+    phaseRef.current = "spinning";
+    setPhase("spinning");
+    playSong(() => {
+      if (phaseRef.current === "spinning") startSelecting();
+    });
+  }, [playSong, startSelecting]);
+
+  const handleStart = () => {
+    const pl = playersRef.current;
+    if (pl.length < 2) return;
+    setRoundNum(1);
+    startRound(pl);
+  };
+
+  // ── Chat handler ──────────────────────────────────────────────────────────
+  const handleChat = useCallback((username: string, text: string) => {
+    const msg = text.trim().toLowerCase();
+    const ph  = phaseRef.current;
+
+    if (msg === "join" && ph === "lobby") {
+      if (playersRef.current.some(p => p.username === username)) return;
+      const np: Player = {
+        username, displayName: username,
+        avatar: avatarFallback(username),
+      };
+      setPlayers(prev => { const n = [...prev, np]; playersRef.current = n; return n; });
+      fetchTwitchPhoto(username).then(url =>
+        setPlayers(prev => {
+          const n = prev.map(p => p.username === username ? { ...p, avatar: url } : p);
+          playersRef.current = n; return n;
+        })
+      );
+      return;
+    }
+
+    if (ph === "selecting") {
+      const num = parseInt(msg, 10);
+      const cur = playersRef.current;
+      const occ = chairRef.current;
+      const maxChair = cur.length - 1;
+      if (isNaN(num) || num < 1 || num > maxChair) return;
+      if (occ[num]) return;
+      const p = cur.find(x => x.username === username);
+      if (!p) return;
+      if (Object.values(occ).some(x => x.username === username)) return;
+
+      setChairOccupied(prev => {
+        const n = { ...prev, [num]: p };
+        chairRef.current = n;
+        if (Object.keys(n).length >= maxChair) {
+          setTimeout(() => doEliminate(), 500);
+        }
+        return n;
+      });
+    }
+  }, [doEliminate]);
+
+  // ── Twitch IRC ────────────────────────────────────────────────────────────
+  const connectTwitch = useCallback((channel: string) => {
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    const ws = new WebSocket("wss://irc-ws.chat.twitch.tv");
+    wsRef.current = ws;
+    ws.onopen = () => {
+      ws.send("PASS SCHMOOPIIE");
+      ws.send(`NICK justinfan${Math.floor(Math.random() * 89999) + 10001}`);
+      ws.send(`JOIN #${channel.toLowerCase()}`);
+    };
+    ws.onmessage = e => {
+      for (const line of (e.data as string).split("\r\n").filter(Boolean)) {
+        if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); continue; }
+        if (line.includes("366") || line.includes("ROOMSTATE")) { setTwitchOk(true); continue; }
+        const m = line.match(/^(?:@[^ ]+ )?:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
+        if (m) handleChat(m[1], m[2].trim());
+      }
+    };
+    ws.onclose = () => setTwitchOk(false);
+  }, [handleChat]);
+
+  useEffect(() => {
+    if (!connRef.current && user?.username) {
+      connRef.current = true;
+      setTimeout(() => connectTwitch(user.username), 100);
+    }
+    return () => { wsRef.current?.close(); };
+  }, [user?.username]);
+
+  const handleBack = () => {
+    clearAllTimers(); destroyYT();
+    wsRef.current?.close();
+    navigate("/");
+  };
+
+  const resetToLobby = () => {
+    clearAllTimers(); destroyYT();
+    setPlayers([]); playersRef.current = [];
+    setChairOccupied({}); chairRef.current = {};
+    setEliminated(null); setWinner(null);
+    setRoundNum(1);
+    phaseRef.current = "lobby"; setPhase("lobby");
+  };
+
+  // ── Derived layout ────────────────────────────────────────────────────────
+  const numChairs = Math.max(players.length - 1, 1);
+
   const chairPositions = Array.from({ length: numChairs }, (_, i) => {
     const a = (i / numChairs) * 2 * Math.PI - Math.PI / 2;
-    return { num: i + 1, x: CX + CHAIR_R_IN * Math.cos(a), y: CY + CHAIR_R_IN * Math.sin(a) };
+    return { num: i + 1, x: CX + CHAIR_R * Math.cos(a), y: CY + CHAIR_R * Math.sin(a) };
   });
 
-  // Player positions outside disc
   const playerPositions = players.map((p, i) => {
     const a = (i / players.length) * 2 * Math.PI - Math.PI / 2;
     return { player: p, x: CX + PLAYER_R * Math.cos(a), y: CY + PLAYER_R * Math.sin(a) };
@@ -251,448 +374,453 @@ function GameDisc({
 
   const isSpinning  = phase === "spinning";
   const isSelecting = phase === "selecting";
+  const isGamePhase = phase !== "lobby";
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ width: TOTAL, height: TOTAL, position: "relative", flexShrink: 0 }}>
-      {/* ── SVG disc layer ── */}
-      <svg width={TOTAL} height={TOTAL} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-        <DotGrid />
+    <div className="gradient-bg min-h-screen w-full flex flex-col overflow-hidden relative"
+      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
 
-        {/* Outer glow ring */}
-        <circle cx={CX} cy={CY} r={DISC_R + 6}
-          fill="none" stroke={CYAN_GLOW} strokeWidth={12} />
-
-        {/* Disc fill */}
-        <circle cx={CX} cy={CY} r={DISC_R} fill={DISC_FILL} />
-
-        {/* Dot grid inside disc */}
-        <rect x={CX - DISC_R} y={CY - DISC_R}
-          width={DISC_R * 2} height={DISC_R * 2}
-          fill="url(#cg)" clipPath="url(#discClip)" />
-
-        {/* Disc border */}
-        <circle cx={CX} cy={CY} r={DISC_R}
-          fill="none" stroke={CYAN} strokeWidth={3} />
-
-        {/* ── SPINNING center ── */}
-        {isSpinning && (
-          <g>
-            {/* Music note */}
-            <text x={CX} y={CY - 10} textAnchor="middle" fontSize={68}
-              fill={CYAN} style={{ filter: `drop-shadow(0 0 14px ${CYAN})` }}>♫</text>
-            {/* "الموسيقى تعمل..." */}
-            <text x={CX} y={CY + 50} textAnchor="middle" fontSize={18}
-              fontWeight="700" fill={CYAN}
-              fontFamily="Cairo,Arial,sans-serif"
-              style={{ filter: `drop-shadow(0 0 8px ${CYAN})` }}>
-              الموسيقى تعمل...
-            </text>
-          </g>
-        )}
-
-        {/* ── SELECTING center — big countdown ── */}
-        {isSelecting && (
-          <g>
-            <text x={CX} y={CY + 22} textAnchor="middle" fontSize={100}
-              fontWeight="900" fill={CYAN}
-              fontFamily="Cairo,Arial,sans-serif"
-              style={{ filter: `drop-shadow(0 0 20px ${CYAN})` }}>
-              {selTimer}
-            </text>
-          </g>
-        )}
-
-        {/* ── ELIMINATION center ── */}
-        {phase === "elimination" && eliminated && (
-          <g>
-            <text x={CX} y={CY - 30} textAnchor="middle" fontSize={42}
-              fill="#f87171" fontFamily="Cairo,Arial,sans-serif" fontWeight="900">
-              خرج!
-            </text>
-            <text x={CX} y={CY + 24} textAnchor="middle" fontSize={22}
-              fill="#f87171" fontFamily="Cairo,Arial,sans-serif" fontWeight="700">
-              {eliminated.displayName}
-            </text>
-          </g>
-        )}
-
-        {/* ── WINNER center ── */}
-        {phase === "winner" && winner && (
-          <g>
-            <text x={CX} y={CY - 40} textAnchor="middle" fontSize={44}
-              fill={CYAN} fontFamily="Cairo,Arial,sans-serif" fontWeight="900"
-              style={{ filter: `drop-shadow(0 0 16px ${CYAN})` }}>
-              🏆
-            </text>
-            <text x={CX} y={CY + 10} textAnchor="middle" fontSize={26}
-              fill={CYAN} fontFamily="Cairo,Arial,sans-serif" fontWeight="900"
-              style={{ filter: `drop-shadow(0 0 12px ${CYAN})` }}>
-              الفائز!
-            </text>
-            <text x={CX} y={CY + 44} textAnchor="middle" fontSize={18}
-              fill="#fff" fontFamily="Cairo,Arial,sans-serif" fontWeight="700">
-              {winner.displayName}
-            </text>
-          </g>
-        )}
-
-        {/* ── Bottom instruction text inside disc ── */}
-        {(isSpinning || isSelecting) && (
-          <text x={CX} y={CY + DISC_R - 30} textAnchor="middle" fontSize={15}
-            fontWeight="700" fill={CYAN}
-            fontFamily="Cairo,Arial,sans-serif"
-            style={{ filter: `drop-shadow(0 0 6px ${CYAN})` }}>
-            {isSpinning ? "اكتب اقرب كرسي" : "اكتب رقم الكرسي"}
-          </text>
-        )}
-
-        {/* ── Round indicator (spinning) ── */}
-        {isSpinning && (
-          <text x={CX} y={CY - DISC_R + 36} textAnchor="middle" fontSize={13}
-            fill="rgba(0,212,255,0.65)" fontFamily="Cairo,Arial,sans-serif" fontWeight="700">
-            جولة {roundNum}
-          </text>
-        )}
-      </svg>
-
-      {/* ── Players outside disc (HTML overlaid) ── */}
-      {playerPositions.map(({ player: p, x, y }) => {
-        const eliminated_p = phase === "elimination" && eliminated?.username === p.username;
-        const isWinner_p   = phase === "winner" && winner?.username === p.username;
-        return (
-          <div key={p.username} style={{
-            position: "absolute",
-            left: x - 28, top: y - 36,
-            width: 56, height: 70,
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-            opacity: eliminated_p ? 0.22 : 1,
-            transition: "opacity 0.4s",
-          }}>
-            <div style={{
-              width: 50, height: 50, borderRadius: "50%", overflow: "hidden",
-              border: `2.5px solid ${isWinner_p ? "#fbbf24" : CYAN}`,
-              boxShadow: `0 0 ${isWinner_p ? 20 : 10}px ${isWinner_p ? "#fbbf24" : CYAN}80`,
-            }}>
-              <img src={p.avatar} alt={p.displayName}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-            </div>
-            <span style={{
-              fontSize: 10, fontWeight: 800, color: "#fff",
-              textShadow: "0 1px 4px rgba(0,0,0,0.9)",
-              maxWidth: 56, overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: "nowrap", textAlign: "center",
-              fontFamily: "'Cairo','Arial',sans-serif",
-            }}>
-              {p.displayName}
-            </span>
-          </div>
-        );
-      })}
-
-      {/* ── Chairs inside disc (HTML overlaid, shown only in selecting/elimination) ── */}
-      {(isSelecting || phase === "elimination") && chairPositions.map(({ num, x, y }) => {
-        const seated = chairOccupied[num];
-        return (
-          <motion.div key={num}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: (num - 1) * 0.04, type: "spring", stiffness: 400, damping: 24 }}
-            style={{
-              position: "absolute",
-              left: x - 22, top: y - 42,
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-            }}>
-            {/* Chair icon or occupied player avatar */}
-            {seated ? (
-              <div style={{
-                width: 40, height: 40, borderRadius: "50%", overflow: "hidden",
-                border: `2.5px solid ${CYAN}`,
-                boxShadow: `0 0 14px ${CYAN}`,
-              }}>
-                <img src={seated.avatar} alt={seated.displayName}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${seated.username}`; }} />
-              </div>
-            ) : (
-              <ChairSVG size={38} />
-            )}
-            {/* Number box below chair */}
-            <div style={{
-              background: "rgba(8,18,38,0.88)",
-              border: `1.5px solid ${CYAN}`,
-              borderRadius: 6, padding: "2px 8px", minWidth: 26,
-              textAlign: "center",
-              boxShadow: `0 0 6px ${CYAN}50`,
-            }}>
-              <span style={{
-                color: "#fff", fontSize: 12, fontWeight: 800,
-                fontFamily: "'Cairo','Arial',sans-serif",
-              }}>{num}</span>
-            </div>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-export default function ChairsGame() {
-  const [, navigate]  = useLocation();
-  const { user }      = useAuth();
-
-  const [phase, setPhase]                 = useState<Phase>("lobby");
-  const [players, setPlayers]             = useState<Player[]>([]);
-  const [roundNum, setRoundNum]           = useState(1);
-  const [chairOccupied, setChairOccupied] = useState<Record<number, Player>>({});
-  const [eliminated, setEliminated]       = useState<Player | null>(null);
-  const [winner, setWinner]               = useState<Player | null>(null);
-  const [selTimer, setSelTimer]           = useState(SELECT_S);
-  const [volume, setVolume]               = useState(80);
-
-  const phaseRef   = useRef<Phase>("lobby");
-  const playersRef = useRef<Player[]>([]);
-  const chairRef   = useRef<Record<number, Player>>({});
-  const ytRef      = useRef<any>(null);
-  const ytDivRef   = useRef<HTMLDivElement>(null);
-  const songIdxRef = useRef(0);
-  const connRef    = useRef(false);
-
-  const selInt  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const clipInt = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cdInt   = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => { phaseRef.current = phase; }, [phase]);
-  useEffect(() => { playersRef.current = players; }, [players]);
-  useEffect(() => { chairRef.current = chairOccupied; }, [chairOccupied]);
-
-  const numChairs = Math.max(players.length - 1, 1);
-
-  const clrAll = () => {
-    [selInt, clipInt, cdInt].forEach(r => { if (r.current) { clearInterval(r.current); r.current = null; } });
-  };
-
-  const changeVolume = useCallback((v: number) => {
-    setVolume(v);
-    try { ytRef.current?.setVolume(v); } catch {}
-  }, []);
-
-  // YouTube setup
-  useEffect(() => {
-    loadYT().then(() => {
-      if (!ytDivRef.current || ytRef.current) return;
-      ytRef.current = new window.YT.Player(ytDivRef.current, {
-        width: "1", height: "1",
-        playerVars: { autoplay: 0, controls: 0, fs: 0, modestbranding: 1, rel: 0, playsinline: 1 },
-        events: { onReady: () => { try { ytRef.current?.setVolume(volume); } catch {} } },
-      });
-    });
-    return () => { clrAll(); try { ytRef.current?.destroy(); } catch {}; ytRef.current = null; };
-  }, []);
-
-  const playMusic = useCallback(() => {
-    const shuffled = [...SONGS].sort(() => Math.random() - 0.5);
-    const s = shuffled[songIdxRef.current % SONGS.length];
-    songIdxRef.current++;
-    try { ytRef.current?.loadVideoById({ videoId: s.id, startSeconds: s.start }); } catch {}
-    try { ytRef.current?.setVolume(volume); } catch {}
-  }, [volume]);
-
-  const stopMusic = useCallback(() => {
-    try { ytRef.current?.pauseVideo(); } catch {}
-  }, []);
-
-  // Eliminate & auto-advance
-  const doEliminate = useCallback(() => {
-    clrAll();
-    const cur = playersRef.current;
-    const occ = chairRef.current;
-    const sat = new Set(Object.values(occ).map(p => p.username));
-    const out = cur.filter(p => !sat.has(p.username));
-    const eli = out[Math.floor(Math.random() * out.length)] ?? null;
-    setEliminated(eli);
-    phaseRef.current = "elimination"; setPhase("elimination");
-
-    // Auto-advance after 3 seconds
-    let cd = 3;
-    cdInt.current = setInterval(() => {
-      cd--;
-      if (cd <= 0) {
-        clearInterval(cdInt.current!); cdInt.current = null;
-        const rem = playersRef.current.filter(p => p.username !== eli?.username);
-        playersRef.current = rem;
-        if (rem.length <= 1) {
-          setWinner(rem[0] ?? null);
-          setPlayers(rem);
-          phaseRef.current = "winner"; setPhase("winner");
-        } else {
-          setPlayers(rem);
-          setRoundNum(r => r + 1);
-          setTimeout(() => startRound(rem), 100);
-        }
-      }
-    }, 1000);
-  }, []);
-
-  const stopSpin = useCallback(() => {
-    clrAll(); stopMusic();
-    setChairOccupied({}); chairRef.current = {};
-    phaseRef.current = "selecting"; setPhase("selecting");
-    let t = SELECT_S; setSelTimer(t);
-    selInt.current = setInterval(() => {
-      t--; setSelTimer(t);
-      if (t <= 0) { clearInterval(selInt.current!); selInt.current = null; doEliminate(); }
-    }, 1000);
-  }, [stopMusic, doEliminate]);
-
-  const startRound = (pl: Player[]) => {
-    if (pl.length < 2) return;
-    clrAll();
-    setChairOccupied({}); chairRef.current = {};
-    setEliminated(null);
-    phaseRef.current = "spinning"; setPhase("spinning");
-    playMusic();
-    const dur = CLIP_DURATIONS[Math.floor(Math.random() * CLIP_DURATIONS.length)];
-    let t = dur;
-    clipInt.current = setInterval(() => {
-      t--;
-      if (t <= 0) { clearInterval(clipInt.current!); clipInt.current = null; stopSpin(); }
-    }, 1000);
-  };
-
-  const handleStart = useCallback(() => {
-    const pl = playersRef.current;
-    if (pl.length < 2) return;
-    startRound(pl);
-  }, []);
-
-  const handleChat = useCallback((username: string, text: string) => {
-    const msg = text.trim().toLowerCase();
-    const ph  = phaseRef.current;
-    const pl  = playersRef.current;
-
-    if (msg === "join" && ph === "lobby") {
-      if (pl.some(p => p.username === username)) return;
-      const np: Player = { username, displayName: username, avatar: `https://unavatar.io/twitch/${username}` };
-      setPlayers(prev => { const n = [...prev, np]; playersRef.current = n; return n; });
-      fetchTwitchPhoto(username).then(url =>
-        setPlayers(prev => { const n = prev.map(p => p.username === username ? { ...p, avatar: url } : p); playersRef.current = n; return n; })
-      );
-      return;
-    }
-
-    if (ph === "selecting") {
-      const num = parseInt(msg, 10);
-      const occ = chairRef.current; const cur = playersRef.current;
-      if (isNaN(num) || num < 1 || num > cur.length - 1) return;
-      if (occ[num]) return;
-      const p = cur.find(x => x.username === username); if (!p) return;
-      if (Object.values(occ).some(x => x.username === username)) return;
-      setChairOccupied(prev => {
-        const n = { ...prev, [num]: p }; chairRef.current = n;
-        if (Object.keys(n).length >= cur.length - 1) setTimeout(() => doEliminate(), 500);
-        return n;
-      });
-    }
-  }, [doEliminate]);
-
-  // Twitch IRC
-  if (!connRef.current && user?.username) {
-    connRef.current = true;
-    setTimeout(() => {
-      const ws = new WebSocket("wss://irc-ws.chat.twitch.tv");
-      ws.onopen = () => {
-        ws.send("PASS SCHMOOPIIE");
-        ws.send(`NICK justinfan${Math.floor(Math.random() * 89999) + 10000}`);
-        ws.send(`JOIN #${user.username.toLowerCase()}`);
-      };
-      ws.onmessage = e => {
-        for (const line of (e.data as string).split("\r\n").filter(Boolean)) {
-          if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); continue; }
-          const m = line.match(/^(?:@[^ ]+ )?:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
-          if (m) handleChat(m[1], m[2].trim());
-        }
-      };
-    }, 80);
-  }
-
-  const handleBack = () => { clrAll(); stopMusic(); navigate("/"); };
-
-  const isPlaying = phase !== "lobby";
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-  return (
-    <div style={{
-      width: "100%", height: "100vh", overflow: "hidden", position: "relative",
-      background: PAGE_BG, fontFamily: "'Cairo','Arial',sans-serif",
-    }}>
-      {/* Hidden YouTube player */}
-      <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }}>
+      {/* Hidden YouTube mount */}
+      <div style={{ position: "fixed", top: -2, left: -2, width: 1, height: 1,
+        overflow: "hidden", zIndex: -10, pointerEvents: "none" }}>
         <div ref={ytDivRef} />
       </div>
 
-      {/* Volume slider — always visible */}
-      <VolumeSlider vol={volume} onChange={changeVolume} />
+      {/* ── LOBBY ─────────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+      {!isGamePhase && (
+        <motion.div key="lobby"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="flex-1 flex flex-col">
 
-      {/* Back button */}
-      <BackBtn onClick={handleBack} />
+          {/* Header */}
+          <header className="relative z-20 flex items-center justify-between px-6 py-4
+            border-b border-white/5"
+            style={{ background: "rgba(5,2,14,0.92)", backdropFilter: "blur(20px)" }}>
+            <button onClick={handleBack}
+              className="flex items-center gap-2 text-white/40 hover:text-cyan-400 transition-colors font-bold text-sm">
+              <ArrowRight size={16} />
+              <span>رجوع</span>
+            </button>
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl font-black neon-text-cyan" style={{ color: CYAN }}>
+                🪑 الكراسي الموسيقية
+              </span>
+            </div>
+            {/* Twitch status */}
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${twitchOk ? "bg-cyan-400" : "bg-white/20"}`} />
+              <span className="text-xs font-bold"
+                style={{ color: twitchOk ? CYAN : "rgba(255,255,255,0.3)" }}>
+                {twitchOk ? "متصل" : "جاري..."}
+              </span>
+            </div>
+          </header>
 
-      {/* ── LOBBY ── */}
-      {!isPlaying && (
-        <LobbyScreen players={players} onStart={handleStart} />
+          {/* Main lobby content */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 py-8">
+
+            {/* Join instruction card */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-center"
+              style={{
+                background: "rgba(0,212,255,0.06)",
+                border: `2px solid ${CYAN}40`,
+                borderRadius: 24, padding: "32px 48px",
+                boxShadow: `0 0 40px ${CYAN}15`,
+              }}>
+              <p className="text-4xl font-black" style={{ color: CYAN,
+                textShadow: `0 0 20px ${CYAN}` }}>
+                اكتب{" "}
+                <span style={{
+                  background: CYAN, color: "#000", borderRadius: 10,
+                  padding: "2px 14px", fontFamily: "monospace", fontSize: "2.2rem",
+                }}>join</span>
+                {" "}في الشات
+              </p>
+              <p className="text-base font-bold mt-3" style={{ color: "rgba(255,255,255,0.55)" }}>
+                Type <span style={{ color: CYAN, fontFamily: "monospace", fontWeight: 900 }}>join</span> in the chat to join the musical chairs game
+              </p>
+            </motion.div>
+
+            {/* Players grid */}
+            <div style={{
+              background: "rgba(0,0,0,0.35)", border: "1.5px solid rgba(0,212,255,0.2)",
+              borderRadius: 20, padding: "20px 28px",
+              minWidth: 340, maxWidth: 560, width: "100%",
+            }}>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-black" style={{ color: CYAN }}>
+                  اللاعبون المنضمون
+                </span>
+                <span className="text-sm font-bold px-3 py-1 rounded-full"
+                  style={{ background: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}40` }}>
+                  {players.length} لاعب
+                </span>
+              </div>
+
+              {players.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <span className="text-3xl opacity-30">🪑</span>
+                  <p className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    في انتظار اللاعبين...
+                  </p>
+                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
+                    Waiting for players...
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {players.map((p, i) => (
+                    <motion.div key={p.username}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: i * 0.05, type: "spring", stiffness: 350, damping: 22 }}
+                      className="flex flex-col items-center gap-2">
+                      <div style={{
+                        width: 52, height: 52, borderRadius: "50%", overflow: "hidden",
+                        border: `2.5px solid ${CYAN}`,
+                        boxShadow: `0 0 12px ${CYAN}60`,
+                      }}>
+                        <img src={p.avatar} alt={p.displayName}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={e => { (e.target as HTMLImageElement).src = avatarFallback(p.username); }} />
+                      </div>
+                      <span className="text-xs font-black"
+                        style={{ color: "#fff", maxWidth: 56, overflow: "hidden",
+                          textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.displayName}
+                      </span>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Start button */}
+            <motion.button
+              whileHover={players.length >= 2 ? { scale: 1.04 } : {}}
+              whileTap={players.length >= 2 ? { scale: 0.97 } : {}}
+              onClick={handleStart}
+              disabled={players.length < 2}
+              style={{
+                padding: "18px 72px", borderRadius: 18,
+                fontSize: 20, fontWeight: 900, fontFamily: "'Cairo','Arial',sans-serif",
+                background: players.length >= 2
+                  ? `linear-gradient(135deg, ${CYAN} 0%, #0099cc 100%)`
+                  : "rgba(255,255,255,0.07)",
+                color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.25)",
+                border: players.length >= 2 ? "none" : `1.5px solid rgba(255,255,255,0.1)`,
+                cursor: players.length >= 2 ? "pointer" : "not-allowed",
+                boxShadow: players.length >= 2 ? `0 8px 32px ${CYAN}60` : "none",
+                transition: "all 0.2s",
+              }}>
+              {players.length >= 2 ? `▶ ابدأ اللعبة — ${players.length} لاعبين` : "⌛ انتظر اللاعبين..."}
+            </motion.button>
+          </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      {/* ── GAME DISC — centered, all play phases ── */}
-      {isPlaying && (
-        <div style={{
-          position: "absolute", inset: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <GameDisc
-            phase={phase}
-            players={players}
-            numChairs={numChairs}
-            chairOccupied={chairOccupied}
-            selTimer={selTimer}
-            eliminated={eliminated}
-            winner={winner}
-            roundNum={roundNum}
-          />
-        </div>
-      )}
+      {/* ── GAME SCREEN ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+      {isGamePhase && (
+        <motion.div key="game"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="flex-1 flex flex-col items-center justify-center relative">
 
-      {/* Winner — back to lobby button */}
-      {phase === "winner" && (
-        <div style={{
-          position: "absolute", bottom: 40, left: "50%", transform: "translateX(-50%)",
-          display: "flex", gap: 16,
-        }}>
-          <button onClick={() => {
-            clrAll(); stopMusic();
-            setPlayers([]); playersRef.current = [];
-            setChairOccupied({}); chairRef.current = {};
-            setEliminated(null); setWinner(null);
-            setRoundNum(1); setPhase("lobby"); phaseRef.current = "lobby";
-          }} style={{
-            padding: "12px 36px", borderRadius: 14, fontSize: 15, fontWeight: 900,
-            background: `linear-gradient(135deg, ${CYAN}, #0099bb)`,
-            color: "#000", border: "none", cursor: "pointer",
-            fontFamily: "'Cairo','Arial',sans-serif",
-            boxShadow: `0 4px 20px ${CYAN}60`,
+          {/* Volume slider — top left */}
+          <div style={{
+            position: "absolute", top: 16, left: 16, zIndex: 30,
+            display: "flex", alignItems: "center", gap: 10,
+            background: "rgba(8,16,36,0.85)", borderRadius: 24,
+            padding: "7px 16px", border: `1px solid ${CYAN}30`,
+            boxShadow: "0 2px 16px rgba(0,0,0,0.5)",
           }}>
-            العب مجدداً
+            <span style={{ color: CYAN, fontSize: 15, fontWeight: 900 }}>♫</span>
+            <input type="range" min={0} max={100} value={volume}
+              onChange={e => {
+                const v = +e.target.value;
+                setVolume(v);
+                try { ytRef.current?.setVolume(v); } catch {}
+              }}
+              style={{ width: 110, direction: "ltr", accentColor: CYAN, cursor: "pointer" }} />
+            <span style={{ color: CYAN, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
+              مستوى الصوت
+            </span>
+          </div>
+
+          {/* Back button — top right */}
+          <button onClick={handleBack}
+            style={{
+              position: "absolute", top: 16, right: 16, zIndex: 30,
+              background: "rgba(8,16,36,0.75)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 14, padding: "7px 16px",
+              color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 800,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <ArrowRight size={13} />
+            <span>رجوع</span>
           </button>
-          <button onClick={handleBack} style={{
-            padding: "12px 28px", borderRadius: 14, fontSize: 14, fontWeight: 700,
-            background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)",
-            border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer",
-            fontFamily: "'Cairo','Arial',sans-serif",
-          }}>
-            الرئيسية
-          </button>
-        </div>
+
+          {/* ── DISC + PLAYERS ─────────────────────────────────────────────── */}
+          <div style={{ width: SZ, height: SZ, position: "relative", flexShrink: 0 }}>
+
+            {/* Spinning outer ring — dashed, rotates during spinning phase */}
+            {isSpinning && (
+              <div className="animate-spin-slow"
+                style={{
+                  position: "absolute",
+                  top: CY - DISC_R - 16, left: CX - DISC_R - 16,
+                  width: (DISC_R + 16) * 2, height: (DISC_R + 16) * 2,
+                  borderRadius: "50%",
+                  border: `2px dashed ${CYAN}55`,
+                  pointerEvents: "none",
+                }} />
+            )}
+
+            {/* Second spinning ring (opposite direction) */}
+            {isSpinning && (
+              <div style={{
+                position: "absolute",
+                top: CY - DISC_R - 28, left: CX - DISC_R - 28,
+                width: (DISC_R + 28) * 2, height: (DISC_R + 28) * 2,
+                borderRadius: "50%",
+                border: `1.5px dashed ${CYAN}28`,
+                pointerEvents: "none",
+                animation: "spin-slow 13s linear infinite reverse",
+              }} />
+            )}
+
+            {/* Outer glow halo */}
+            <div style={{
+              position: "absolute",
+              top: CY - DISC_R - 8, left: CX - DISC_R - 8,
+              width: (DISC_R + 8) * 2, height: (DISC_R + 8) * 2,
+              borderRadius: "50%",
+              boxShadow: `0 0 40px ${CYAN}35, 0 0 80px ${CYAN}15`,
+              pointerEvents: "none",
+            }} />
+
+            {/* SVG disc */}
+            <svg width={SZ} height={SZ} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+              <defs>
+                <pattern id="cgDot" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <circle cx="10" cy="10" r="1" fill={`${CYAN}18`} />
+                </pattern>
+                <clipPath id="discMask">
+                  <circle cx={CX} cy={CY} r={DISC_R - 2} />
+                </clipPath>
+              </defs>
+
+              {/* Disc fill */}
+              <circle cx={CX} cy={CY} r={DISC_R} fill="#0c1628" />
+
+              {/* Dot grid */}
+              <rect x={CX - DISC_R} y={CY - DISC_R}
+                width={DISC_R * 2} height={DISC_R * 2}
+                fill="url(#cgDot)" clipPath="url(#discMask)" />
+
+              {/* Disc border */}
+              <circle cx={CX} cy={CY} r={DISC_R}
+                fill="none" stroke={CYAN} strokeWidth={3} />
+
+              {/* ── CENTER CONTENT ── */}
+              {/* Spinning: music note + text */}
+              {isSpinning && (
+                <g>
+                  <text x={CX} y={CY - 10} textAnchor="middle" fontSize={72}
+                    fill={CYAN} fontFamily="serif"
+                    style={{ filter: `drop-shadow(0 0 16px ${CYAN})` }}>♫</text>
+                  <text x={CX} y={CY + 48} textAnchor="middle"
+                    fontSize={18} fontWeight="800" fill={CYAN}
+                    fontFamily="Cairo,Arial,sans-serif"
+                    style={{ filter: `drop-shadow(0 0 8px ${CYAN})` }}>
+                    الموسيقى تعمل...
+                  </text>
+                </g>
+              )}
+
+              {/* Selecting: big countdown */}
+              {isSelecting && (
+                <text x={CX} y={CY + 28} textAnchor="middle"
+                  fontSize={108} fontWeight="900" fill={CYAN}
+                  fontFamily="Cairo,Arial,sans-serif"
+                  style={{ filter: `drop-shadow(0 0 22px ${CYAN})` }}>
+                  {selTimer}
+                </text>
+              )}
+
+              {/* Elimination: red cross-out */}
+              {phase === "elimination" && eliminated && (
+                <g>
+                  <text x={CX} y={CY - 18} textAnchor="middle"
+                    fontSize={40} fontWeight="900" fill="#f87171"
+                    fontFamily="Cairo,Arial,sans-serif"
+                    style={{ filter: "drop-shadow(0 0 10px #f87171)" }}>
+                    خرج! ❌
+                  </text>
+                  <text x={CX} y={CY + 30} textAnchor="middle"
+                    fontSize={22} fontWeight="700" fill="#fca5a5"
+                    fontFamily="Cairo,Arial,sans-serif">
+                    {eliminated.displayName}
+                  </text>
+                </g>
+              )}
+
+              {/* Winner */}
+              {phase === "winner" && winner && (
+                <g>
+                  <text x={CX} y={CY - 30} textAnchor="middle" fontSize={50}
+                    style={{ filter: `drop-shadow(0 0 18px ${CYAN})` }}>🏆</text>
+                  <text x={CX} y={CY + 16} textAnchor="middle"
+                    fontSize={26} fontWeight="900" fill={CYAN}
+                    fontFamily="Cairo,Arial,sans-serif"
+                    style={{ filter: `drop-shadow(0 0 12px ${CYAN})` }}>
+                    الفائز
+                  </text>
+                  <text x={CX} y={CY + 50} textAnchor="middle"
+                    fontSize={18} fontWeight="700" fill="#fff"
+                    fontFamily="Cairo,Arial,sans-serif">
+                    {winner.displayName}
+                  </text>
+                </g>
+              )}
+
+              {/* Bottom instruction */}
+              {(isSpinning || isSelecting) && (
+                <text x={CX} y={CY + DISC_R - 26} textAnchor="middle"
+                  fontSize={14} fontWeight="800" fill={CYAN}
+                  fontFamily="Cairo,Arial,sans-serif"
+                  style={{ filter: `drop-shadow(0 0 6px ${CYAN})` }}>
+                  {isSpinning ? "اكتب اقرب كرسي" : "اكتب رقم الكرسي"}
+                </text>
+              )}
+
+              {/* Round badge */}
+              {isSpinning && (
+                <text x={CX} y={CY - DISC_R + 32} textAnchor="middle"
+                  fontSize={13} fontWeight="700" fill={`${CYAN}90`}
+                  fontFamily="Cairo,Arial,sans-serif">
+                  جولة {roundNum}
+                </text>
+              )}
+            </svg>
+
+            {/* ── PLAYERS outside disc ─────────────────────────────────────── */}
+            {playerPositions.map(({ player: p, x, y }) => {
+              const seated = isSelecting || phase === "elimination"
+                ? Object.values(chairOccupied).some(c => c.username === p.username) : false;
+              const isOut  = phase === "elimination" && eliminated?.username === p.username;
+              const isWin  = phase === "winner" && winner?.username === p.username;
+              return (
+                <div key={p.username} style={{
+                  position: "absolute",
+                  left: x - 28, top: y - 38,
+                  width: 56, display: "flex", flexDirection: "column",
+                  alignItems: "center", gap: 3,
+                  opacity: isOut ? 0.2 : 1,
+                  transition: "opacity 0.5s",
+                }}>
+                  <div style={{
+                    width: 50, height: 50, borderRadius: "50%", overflow: "hidden",
+                    border: `2.5px solid ${isWin ? "#fbbf24" : seated ? CYAN : CYAN}`,
+                    boxShadow: `0 0 ${isWin ? 22 : seated ? 16 : 8}px ${isWin ? "#fbbf24" : CYAN}${seated ? "dd" : "70"}`,
+                    transition: "box-shadow 0.4s",
+                  }}>
+                    <img src={p.avatar} alt={p.displayName}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={e => { (e.target as HTMLImageElement).src = avatarFallback(p.username); }} />
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: 900, color: "#fff",
+                    textShadow: "0 1px 5px rgba(0,0,0,1)", maxWidth: 56,
+                    overflow: "hidden", textOverflow: "ellipsis",
+                    whiteSpace: "nowrap", textAlign: "center",
+                  }}>
+                    {p.displayName}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* ── CHAIRS inside disc ───────────────────────────────────────── */}
+            <AnimatePresence>
+            {(isSelecting || phase === "elimination") && chairPositions.map(({ num, x, y }) => {
+              const seated = chairOccupied[num];
+              return (
+                <motion.div key={num}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ delay: (num - 1) * 0.05, type: "spring", stiffness: 420, damping: 26 }}
+                  style={{
+                    position: "absolute",
+                    left: x - 22, top: y - 40,
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                  }}>
+                  {seated ? (
+                    <motion.div
+                      initial={{ scale: 0 }} animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                      style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden",
+                        border: `2.5px solid ${CYAN}`,
+                        boxShadow: `0 0 16px ${CYAN}`, }}>
+                      <img src={seated.avatar} alt={seated.displayName}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={e => { (e.target as HTMLImageElement).src = avatarFallback(seated.username); }} />
+                    </motion.div>
+                  ) : (
+                    <ChairIcon />
+                  )}
+                  <div style={{
+                    background: "rgba(6,14,32,0.92)", border: `1.5px solid ${CYAN}`,
+                    borderRadius: 7, padding: "2px 9px", minWidth: 28, textAlign: "center",
+                    boxShadow: `0 0 8px ${CYAN}50`,
+                  }}>
+                    <span style={{ color: "#fff", fontSize: 12, fontWeight: 900 }}>{num}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+            </AnimatePresence>
+          </div>
+
+          {/* Winner replay buttons */}
+          {phase === "winner" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              style={{ display: "flex", gap: 14, marginTop: 24 }}>
+              <button onClick={resetToLobby}
+                style={{
+                  padding: "14px 40px", borderRadius: 16,
+                  background: `linear-gradient(135deg, ${CYAN}, #0099cc)`,
+                  color: "#000", fontWeight: 900, fontSize: 16,
+                  fontFamily: "'Cairo','Arial',sans-serif", border: "none",
+                  cursor: "pointer", boxShadow: `0 6px 24px ${CYAN}60`,
+                }}>
+                العب مجدداً
+              </button>
+              <button onClick={handleBack}
+                style={{
+                  padding: "14px 28px", borderRadius: 16,
+                  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.55)",
+                  border: "1px solid rgba(255,255,255,0.12)", fontWeight: 700, fontSize: 14,
+                  fontFamily: "'Cairo','Arial',sans-serif", cursor: "pointer",
+                }}>
+                الرئيسية
+              </button>
+            </motion.div>
+          )}
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
