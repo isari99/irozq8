@@ -248,11 +248,11 @@
   to   { transform: rotate(-360deg); }
 }
 .chairs-orbit {
-  animation: chairsWheelOrbit 4s linear infinite;
+  animation: chairsWheelOrbit 6s linear infinite;
 }
 .chairs-counter {
-  animation: chairsCounterOrbit 4s linear infinite;
+  animation: chairsCounterOrbit 6s linear infinite;
 }
 .chairs-orbit-slow {
-  animation: chairsWheelOrbit 8s linear infinite;
+  animation: chairsWheelOrbit 14s linear infinite;
 }
