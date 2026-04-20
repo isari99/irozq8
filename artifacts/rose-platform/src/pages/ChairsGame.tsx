@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Volume2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 // ─── YouTube API ──────────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ async function fetchTwitchPhoto(u: string): Promise<string> {
     const url  = obj?.profileImageURL ?? obj?.logo ?? obj?.profile_image_url;
     if (url) return url.replace("{width}", "150").replace("{height}", "150");
   } catch {}
-  return `https://unavatar.io/twitch/${u}`;
+  return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${u}`;
 }
 
 // ─── Song pool ────────────────────────────────────────────────────────────────
@@ -49,9 +49,10 @@ const SONGS: Song[] = [
   { ytId: "YRadUqAv7i8", start: 22 }, { ytId: "dNQMH3WVMNs", start: 18 },
   { ytId: "vZ0OFwpvIv0", start: 20 }, { ytId: "BQeTM1N2NjQ", start: 30 },
   { ytId: "GUYKNXvwHaM", start: 28 }, { ytId: "qSil6ttEg30", start: 25 },
-  { ytId: "B2LRL03ioXM", start: 32 }, { ytId: "7oMBJEjxu6s", start: 20 },
 ];
-const CLIP_DURATIONS = [12, 15, 18, 22];
+
+// Wheel spin durations (seconds) — chosen randomly each round
+const WHEEL_DURATIONS = [10, 15, 20];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Phase = "lobby" | "spinning" | "selecting" | "elimination" | "winner";
@@ -64,12 +65,10 @@ const CY       = 300;
 const DISC_R   = 222;
 const PLAYER_R = 286;
 const CHAIR_R  = 130;
-const SELECT_S = 20;
+const SELECT_S = 20;   // 20-second chair selection timer
 const CYAN     = "#00d4ff";
 
-// ─── Shared avatar fallback ───────────────────────────────────────────────────
-const avatarFallback = (username: string) =>
-  `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}`;
+const avatarFallback = (u: string) => `https://api.dicebear.com/7.x/pixel-art/svg?seed=${u}`;
 
 // ─── ChairIcon ────────────────────────────────────────────────────────────────
 function ChairIcon() {
@@ -90,28 +89,23 @@ function ChairIcon() {
   );
 }
 
-// ─── Avatar circle ────────────────────────────────────────────────────────────
-function AvatarCircle({ src, size, borderColor, glow, style: extraStyle }:
-  { src: string; size: number; borderColor?: string; glow?: boolean; style?: React.CSSProperties }
-) {
-  const bc = borderColor ?? CYAN;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
-      border: `2.5px solid ${bc}`,
-      boxShadow: glow ? `0 0 14px ${bc}90` : `0 0 6px ${bc}50`,
-      ...extraStyle,
-    }}>
-      <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        onError={e => { (e.target as HTMLImageElement).src = avatarFallback("u"); }} />
-    </div>
-  );
+// ─── Helper: create fresh player div inside wrapper ───────────────────────────
+// YouTube replaces the target div with an iframe; to reuse we always
+// inject a brand-new div into the wrapper before creating each player.
+const YT_WRAPPER_ID = "cg-yt-wrapper";
+function getFreshPlayerDiv(): HTMLDivElement | null {
+  const wrapper = document.getElementById(YT_WRAPPER_ID);
+  if (!wrapper) return null;
+  wrapper.innerHTML = "";                       // remove old iframe if any
+  const div = document.createElement("div");
+  wrapper.appendChild(div);
+  return div;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ChairsGame() {
-  const [, navigate]  = useLocation();
-  const { user }      = useAuth();
+  const [, navigate] = useLocation();
+  const { user }     = useAuth();
 
   const [phase, setPhase]                 = useState<Phase>("lobby");
   const [players, setPlayers]             = useState<Player[]>([]);
@@ -123,38 +117,41 @@ export default function ChairsGame() {
   const [volume, setVolume]               = useState(80);
   const [twitchOk, setTwitchOk]          = useState(false);
 
-  // refs — avoid stale closures
+  // refs to avoid stale closures
   const phaseRef   = useRef<Phase>("lobby");
   const playersRef = useRef<Player[]>([]);
   const chairRef   = useRef<Record<number, Player>>({});
   const volumeRef  = useRef(80);
   volumeRef.current = volume;
 
-  // YouTube refs
-  const ytDivRef   = useRef<HTMLDivElement>(null);
+  // YouTube
   const ytRef      = useRef<any>(null);
   const songIdxRef = useRef(Math.floor(Math.random() * SONGS.length));
+  const failedIds  = useRef<Set<string>>(new Set());
 
   // timers
-  const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clipTimerRef = useRef<ReturnType<typeof setTimeout>  | null>(null);
   const selTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cdTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wsRef        = useRef<WebSocket | null>(null);
-  const connRef      = useRef(false);
+  const cdTimerRef   = useRef<ReturnType<typeof setTimeout>  | null>(null);
 
-  // keep refs in sync
+  // Twitch
+  const wsRef   = useRef<WebSocket | null>(null);
+  const connRef = useRef(false);
+
+  // sync phase ref
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playersRef.current = players; }, [players]);
   useEffect(() => { chairRef.current = chairOccupied; }, [chairOccupied]);
 
-  // ── Load YouTube API on mount ──────────────────────────────────────────────
+  // pre-warm YouTube API
   useEffect(() => {
-    loadYT(); // pre-warm the API
-    return () => { destroyYT(); clearAllTimers(); };
+    loadYT();
+    return () => { stopMusic(); clearAllTimers(); };
   }, []);
 
-  // ── YouTube helpers ────────────────────────────────────────────────────────
-  const destroyYT = () => {
+  // ── YouTube helpers ──────────────────────────────────────────────────────
+  const stopMusic = () => {
+    if (clipTimerRef.current) { clearTimeout(clipTimerRef.current); clipTimerRef.current = null; }
     if (ytRef.current) {
       try { ytRef.current.pauseVideo(); } catch {}
       try { ytRef.current.destroy();    } catch {}
@@ -168,48 +165,65 @@ export default function ChairsGame() {
     if (cdTimerRef.current)   { clearTimeout(cdTimerRef.current);    cdTimerRef.current   = null; }
   };
 
-  // Play a random song via a fresh YT.Player — called once per round
-  const playSong = useCallback((onStop: () => void) => {
-    destroyYT();
-    if (!ytDivRef.current) return;
+  // Pick the next (non-failed) song index
+  const nextSongIdx = (): Song => {
+    const available = SONGS.filter(s => !failedIds.current.has(s.ytId));
+    const pool = available.length > 0 ? available : SONGS; // fallback: try all
+    songIdxRef.current = (songIdxRef.current + 1) % pool.length;
+    return pool[songIdxRef.current];
+  };
 
-    // Rotate through songs (shuffle-like)
-    songIdxRef.current = (songIdxRef.current + 1) % SONGS.length;
-    const s   = SONGS[songIdxRef.current];
-    const dur = CLIP_DURATIONS[Math.floor(Math.random() * CLIP_DURATIONS.length)];
+  // Play a song for exactly `durationSec` seconds, then call onStop
+  // Uses wrapper-div pattern so each player gets a fresh DOM node
+  const playSong = useCallback((durationSec: number, onStop: () => void) => {
+    stopMusic();
+
+    const song      = nextSongIdx();
+    const playerDiv = getFreshPlayerDiv();
+    if (!playerDiv) { onStop(); return; }
 
     loadYT().then(() => {
-      if (!ytDivRef.current) return;
-      ytRef.current = new window.YT.Player(ytDivRef.current, {
+      // Check the phase is still spinning (may have changed while API loaded)
+      if (phaseRef.current !== "spinning") return;
+
+      ytRef.current = new window.YT.Player(playerDiv, {
         height: "1", width: "1",
-        videoId: s.ytId,
+        videoId: song.ytId,
         playerVars: {
-          autoplay: 1, start: s.start,
+          autoplay: 1, start: song.start,
           controls: 0, modestbranding: 1, rel: 0, fs: 0,
           iv_load_policy: 3, disablekb: 1, playsinline: 1,
         },
         events: {
           onReady: (e: any) => {
-            try { e.target.setVolume(volumeRef.current); e.target.playVideo(); } catch {}
-            // Auto-stop after clip duration
+            try {
+              e.target.setVolume(volumeRef.current);
+              e.target.playVideo();
+            } catch {}
+            // Stop music exactly when wheel stops
             clipTimerRef.current = setTimeout(() => {
               try { e.target.pauseVideo(); } catch {}
               onStop();
-            }, dur * 1000);
+            }, durationSec * 1000);
           },
           onError: () => {
-            // Skip bad video immediately
+            // Mark this song as bad, try next song immediately
+            failedIds.current.add(song.ytId);
             clearTimeout(clipTimerRef.current!);
-            onStop();
+            clipTimerRef.current = null;
+            // Retry with a different song (same duration remaining)
+            playSong(durationSec, onStop);
           },
         },
       });
-    });
+    }).catch(() => onStop());
   }, []);
 
-  // ── Game flow ──────────────────────────────────────────────────────────────
+  // ── Game flow ────────────────────────────────────────────────────────────
   const doEliminate = useCallback(() => {
     clearAllTimers();
+    stopMusic();
+
     const cur  = playersRef.current;
     const occ  = chairRef.current;
     const sat  = new Set(Object.values(occ).map(p => p.username));
@@ -237,7 +251,8 @@ export default function ChairsGame() {
   }, []);
 
   const startSelecting = useCallback(() => {
-    setChairOccupied({});  chairRef.current = {};
+    // Music stops before this is called (via onStop in playSong)
+    setChairOccupied({}); chairRef.current = {};
     phaseRef.current = "selecting";
     setPhase("selecting");
 
@@ -253,14 +268,21 @@ export default function ChairsGame() {
     }, 1000);
   }, [doEliminate]);
 
+  // startRound accepts current player list to avoid stale state
   const startRound = useCallback((pl: Player[]) => {
     if (pl.length < 2) return;
     clearAllTimers();
-    setChairOccupied({});  chairRef.current = {};
+    stopMusic();
+    setChairOccupied({}); chairRef.current = {};
     setEliminated(null);
     phaseRef.current = "spinning";
     setPhase("spinning");
-    playSong(() => {
+
+    // Pick random wheel duration: 10, 15, or 20 seconds
+    const dur = WHEEL_DURATIONS[Math.floor(Math.random() * WHEEL_DURATIONS.length)];
+
+    // Start music — it runs for exactly `dur` seconds, then wheel stops
+    playSong(dur, () => {
       if (phaseRef.current === "spinning") startSelecting();
     });
   }, [playSong, startSelecting]);
@@ -272,17 +294,14 @@ export default function ChairsGame() {
     startRound(pl);
   };
 
-  // ── Chat handler ──────────────────────────────────────────────────────────
+  // ── Chat handler ─────────────────────────────────────────────────────────
   const handleChat = useCallback((username: string, text: string) => {
     const msg = text.trim().toLowerCase();
     const ph  = phaseRef.current;
 
     if (msg === "join" && ph === "lobby") {
       if (playersRef.current.some(p => p.username === username)) return;
-      const np: Player = {
-        username, displayName: username,
-        avatar: avatarFallback(username),
-      };
+      const np: Player = { username, displayName: username, avatar: avatarFallback(username) };
       setPlayers(prev => { const n = [...prev, np]; playersRef.current = n; return n; });
       fetchTwitchPhoto(username).then(url =>
         setPlayers(prev => {
@@ -308,7 +327,7 @@ export default function ChairsGame() {
         const n = { ...prev, [num]: p };
         chairRef.current = n;
         if (Object.keys(n).length >= maxChair) {
-          setTimeout(() => doEliminate(), 500);
+          setTimeout(() => doEliminate(), 400);
         }
         return n;
       });
@@ -345,17 +364,16 @@ export default function ChairsGame() {
   }, [user?.username]);
 
   const handleBack = () => {
-    clearAllTimers(); destroyYT();
+    clearAllTimers(); stopMusic();
     wsRef.current?.close();
     navigate("/");
   };
 
   const resetToLobby = () => {
-    clearAllTimers(); destroyYT();
+    clearAllTimers(); stopMusic();
     setPlayers([]); playersRef.current = [];
     setChairOccupied({}); chairRef.current = {};
-    setEliminated(null); setWinner(null);
-    setRoundNum(1);
+    setEliminated(null); setWinner(null); setRoundNum(1);
     phaseRef.current = "lobby"; setPhase("lobby");
   };
 
@@ -383,11 +401,11 @@ export default function ChairsGame() {
     <div className="gradient-bg min-h-screen w-full flex flex-col overflow-hidden relative"
       dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
 
-      {/* Hidden YouTube mount */}
-      <div style={{ position: "fixed", top: -2, left: -2, width: 1, height: 1,
-        overflow: "hidden", zIndex: -10, pointerEvents: "none" }}>
-        <div ref={ytDivRef} />
-      </div>
+      {/* ── Hidden YouTube wrapper — always in DOM, never unmounts ── */}
+      <div id={YT_WRAPPER_ID} style={{
+        position: "fixed", top: -4, left: -4, width: 2, height: 2,
+        overflow: "hidden", zIndex: -10, pointerEvents: "none", opacity: 0,
+      }} />
 
       {/* ── LOBBY ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -396,7 +414,6 @@ export default function ChairsGame() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="flex-1 flex flex-col">
 
-          {/* Header */}
           <header className="relative z-20 flex items-center justify-between px-6 py-4
             border-b border-white/5"
             style={{ background: "rgba(5,2,14,0.92)", backdropFilter: "blur(20px)" }}>
@@ -405,12 +422,10 @@ export default function ChairsGame() {
               <ArrowRight size={16} />
               <span>رجوع</span>
             </button>
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl font-black neon-text-cyan" style={{ color: CYAN }}>
-                🪑 الكراسي الموسيقية
-              </span>
-            </div>
-            {/* Twitch status */}
+            <span className="text-xl font-black" style={{ color: CYAN,
+              textShadow: `0 0 16px ${CYAN}` }}>
+              🪑 الكراسي الموسيقية
+            </span>
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${twitchOk ? "bg-cyan-400" : "bg-white/20"}`} />
               <span className="text-xs font-bold"
@@ -420,12 +435,9 @@ export default function ChairsGame() {
             </div>
           </header>
 
-          {/* Main lobby content */}
           <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 py-8">
-
-            {/* Join instruction card */}
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            {/* Join instruction */}
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.1 }}
               className="text-center"
               style={{
@@ -443,35 +455,30 @@ export default function ChairsGame() {
                 }}>join</span>
                 {" "}في الشات
               </p>
-              <p className="text-base font-bold mt-3" style={{ color: "rgba(255,255,255,0.55)" }}>
-                Type <span style={{ color: CYAN, fontFamily: "monospace", fontWeight: 900 }}>join</span> in the chat to join the musical chairs game
+              <p className="text-base font-bold mt-3"
+                style={{ color: "rgba(255,255,255,0.5)" }}>
+                Type <span style={{ color: CYAN, fontFamily: "monospace", fontWeight: 900 }}>join</span> in chat to play
               </p>
             </motion.div>
 
-            {/* Players grid */}
+            {/* Players */}
             <div style={{
               background: "rgba(0,0,0,0.35)", border: "1.5px solid rgba(0,212,255,0.2)",
               borderRadius: 20, padding: "20px 28px",
               minWidth: 340, maxWidth: 560, width: "100%",
             }}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-black" style={{ color: CYAN }}>
-                  اللاعبون المنضمون
-                </span>
+                <span className="text-sm font-black" style={{ color: CYAN }}>اللاعبون</span>
                 <span className="text-sm font-bold px-3 py-1 rounded-full"
                   style={{ background: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}40` }}>
                   {players.length} لاعب
                 </span>
               </div>
-
               {players.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6">
                   <span className="text-3xl opacity-30">🪑</span>
                   <p className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.35)" }}>
                     في انتظار اللاعبين...
-                  </p>
-                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
-                    Waiting for players...
                   </p>
                 </div>
               ) : (
@@ -480,20 +487,20 @@ export default function ChairsGame() {
                     <motion.div key={p.username}
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: i * 0.05, type: "spring", stiffness: 350, damping: 22 }}
+                      transition={{ delay: i * 0.04, type: "spring", stiffness: 350, damping: 22 }}
                       className="flex flex-col items-center gap-2">
                       <div style={{
                         width: 52, height: 52, borderRadius: "50%", overflow: "hidden",
-                        border: `2.5px solid ${CYAN}`,
-                        boxShadow: `0 0 12px ${CYAN}60`,
+                        border: `2.5px solid ${CYAN}`, boxShadow: `0 0 12px ${CYAN}60`,
                       }}>
                         <img src={p.avatar} alt={p.displayName}
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
                           onError={e => { (e.target as HTMLImageElement).src = avatarFallback(p.username); }} />
                       </div>
-                      <span className="text-xs font-black"
-                        style={{ color: "#fff", maxWidth: 56, overflow: "hidden",
-                          textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span className="text-xs font-black" style={{
+                        color: "#fff", maxWidth: 56, overflow: "hidden",
+                        textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
                         {p.displayName}
                       </span>
                     </motion.div>
@@ -509,8 +516,8 @@ export default function ChairsGame() {
               onClick={handleStart}
               disabled={players.length < 2}
               style={{
-                padding: "18px 72px", borderRadius: 18,
-                fontSize: 20, fontWeight: 900, fontFamily: "'Cairo','Arial',sans-serif",
+                padding: "18px 72px", borderRadius: 18, fontSize: 22, fontWeight: 900,
+                fontFamily: "'Cairo','Arial',sans-serif",
                 background: players.length >= 2
                   ? `linear-gradient(135deg, ${CYAN} 0%, #0099cc 100%)`
                   : "rgba(255,255,255,0.07)",
@@ -520,7 +527,9 @@ export default function ChairsGame() {
                 boxShadow: players.length >= 2 ? `0 8px 32px ${CYAN}60` : "none",
                 transition: "all 0.2s",
               }}>
-              {players.length >= 2 ? `▶ ابدأ اللعبة — ${players.length} لاعبين` : "⌛ انتظر اللاعبين..."}
+              {players.length >= 2
+                ? `▶ العب الآن — ${players.length} لاعبين`
+                : "⌛ انتظر لاعبين..."}
             </motion.button>
           </div>
         </motion.div>
@@ -549,21 +558,17 @@ export default function ChairsGame() {
                 setVolume(v);
                 try { ytRef.current?.setVolume(v); } catch {}
               }}
-              style={{ width: 110, direction: "ltr", accentColor: CYAN, cursor: "pointer" }} />
-            <span style={{ color: CYAN, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
-              مستوى الصوت
-            </span>
+              style={{ width: 100, direction: "ltr", accentColor: CYAN, cursor: "pointer" }} />
           </div>
 
-          {/* Back button — top right */}
-          <button onClick={handleBack}
-            style={{
-              position: "absolute", top: 16, right: 16, zIndex: 30,
-              background: "rgba(8,16,36,0.75)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 14, padding: "7px 16px",
-              color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 800,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-            }}>
+          {/* Back — top right */}
+          <button onClick={handleBack} style={{
+            position: "absolute", top: 16, right: 16, zIndex: 30,
+            background: "rgba(8,16,36,0.75)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 14, padding: "7px 16px",
+            color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 800,
+            cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+          }}>
             <ArrowRight size={13} />
             <span>رجوع</span>
           </button>
@@ -571,33 +576,28 @@ export default function ChairsGame() {
           {/* ── DISC + PLAYERS ─────────────────────────────────────────────── */}
           <div style={{ width: SZ, height: SZ, position: "relative", flexShrink: 0 }}>
 
-            {/* Spinning outer ring — dashed, rotates during spinning phase */}
+            {/* Spinning outer dashed ring */}
             {isSpinning && (
-              <div className="animate-spin-slow"
-                style={{
+              <>
+                <div className="animate-spin-slow" style={{
                   position: "absolute",
                   top: CY - DISC_R - 16, left: CX - DISC_R - 16,
                   width: (DISC_R + 16) * 2, height: (DISC_R + 16) * 2,
-                  borderRadius: "50%",
-                  border: `2px dashed ${CYAN}55`,
+                  borderRadius: "50%", border: `2px dashed ${CYAN}55`,
                   pointerEvents: "none",
                 }} />
+                <div style={{
+                  position: "absolute",
+                  top: CY - DISC_R - 28, left: CX - DISC_R - 28,
+                  width: (DISC_R + 28) * 2, height: (DISC_R + 28) * 2,
+                  borderRadius: "50%", border: `1.5px dashed ${CYAN}28`,
+                  pointerEvents: "none",
+                  animation: "spin-slow 13s linear infinite reverse",
+                }} />
+              </>
             )}
 
-            {/* Second spinning ring (opposite direction) */}
-            {isSpinning && (
-              <div style={{
-                position: "absolute",
-                top: CY - DISC_R - 28, left: CX - DISC_R - 28,
-                width: (DISC_R + 28) * 2, height: (DISC_R + 28) * 2,
-                borderRadius: "50%",
-                border: `1.5px dashed ${CYAN}28`,
-                pointerEvents: "none",
-                animation: "spin-slow 13s linear infinite reverse",
-              }} />
-            )}
-
-            {/* Outer glow halo */}
+            {/* Outer glow */}
             <div style={{
               position: "absolute",
               top: CY - DISC_R - 8, left: CX - DISC_R - 8,
@@ -607,129 +607,105 @@ export default function ChairsGame() {
               pointerEvents: "none",
             }} />
 
-            {/* SVG disc */}
+            {/* SVG */}
             <svg width={SZ} height={SZ} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
               <defs>
-                <pattern id="cgDot" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                <pattern id="cgDot2" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
                   <circle cx="10" cy="10" r="1" fill={`${CYAN}18`} />
                 </pattern>
-                <clipPath id="discMask">
-                  <circle cx={CX} cy={CY} r={DISC_R - 2} />
-                </clipPath>
+                <clipPath id="discClip2"><circle cx={CX} cy={CY} r={DISC_R - 2} /></clipPath>
               </defs>
 
-              {/* Disc fill */}
+              {/* Disc */}
               <circle cx={CX} cy={CY} r={DISC_R} fill="#0c1628" />
+              <rect x={CX-DISC_R} y={CY-DISC_R} width={DISC_R*2} height={DISC_R*2}
+                fill="url(#cgDot2)" clipPath="url(#discClip2)" />
+              <circle cx={CX} cy={CY} r={DISC_R} fill="none" stroke={CYAN} strokeWidth={3} />
 
-              {/* Dot grid */}
-              <rect x={CX - DISC_R} y={CY - DISC_R}
-                width={DISC_R * 2} height={DISC_R * 2}
-                fill="url(#cgDot)" clipPath="url(#discMask)" />
-
-              {/* Disc border */}
-              <circle cx={CX} cy={CY} r={DISC_R}
-                fill="none" stroke={CYAN} strokeWidth={3} />
-
-              {/* ── CENTER CONTENT ── */}
-              {/* Spinning: music note + text */}
+              {/* Center: Spinning */}
               {isSpinning && (
                 <g>
-                  <text x={CX} y={CY - 10} textAnchor="middle" fontSize={72}
-                    fill={CYAN} fontFamily="serif"
-                    style={{ filter: `drop-shadow(0 0 16px ${CYAN})` }}>♫</text>
-                  <text x={CX} y={CY + 48} textAnchor="middle"
-                    fontSize={18} fontWeight="800" fill={CYAN}
-                    fontFamily="Cairo,Arial,sans-serif"
+                  <text x={CX} y={CY-8} textAnchor="middle" fontSize={72} fill={CYAN}
+                    fontFamily="serif" style={{ filter: `drop-shadow(0 0 16px ${CYAN})` }}>♫</text>
+                  <text x={CX} y={CY+48} textAnchor="middle" fontSize={18} fontWeight="800"
+                    fill={CYAN} fontFamily="Cairo,Arial,sans-serif"
                     style={{ filter: `drop-shadow(0 0 8px ${CYAN})` }}>
                     الموسيقى تعمل...
+                  </text>
+                  <text x={CX} y={CY-DISC_R+32} textAnchor="middle"
+                    fontSize={13} fontWeight="700" fill={`${CYAN}90`}
+                    fontFamily="Cairo,Arial,sans-serif">
+                    جولة {roundNum}
                   </text>
                 </g>
               )}
 
-              {/* Selecting: big countdown */}
+              {/* Center: Selecting — big countdown */}
               {isSelecting && (
-                <text x={CX} y={CY + 28} textAnchor="middle"
-                  fontSize={108} fontWeight="900" fill={CYAN}
-                  fontFamily="Cairo,Arial,sans-serif"
-                  style={{ filter: `drop-shadow(0 0 22px ${CYAN})` }}>
-                  {selTimer}
-                </text>
+                <>
+                  <text x={CX} y={CY+36} textAnchor="middle" fontSize={110} fontWeight="900"
+                    fill={selTimer <= 5 ? "#f87171" : CYAN} fontFamily="Cairo,Arial,sans-serif"
+                    style={{ filter: `drop-shadow(0 0 22px ${selTimer <= 5 ? "#f87171" : CYAN})` }}>
+                    {selTimer}
+                  </text>
+                  <text x={CX} y={CY+DISC_R-26} textAnchor="middle"
+                    fontSize={14} fontWeight="800" fill={CYAN}
+                    fontFamily="Cairo,Arial,sans-serif"
+                    style={{ filter: `drop-shadow(0 0 6px ${CYAN})` }}>
+                    اكتب رقم الكرسي
+                  </text>
+                </>
               )}
 
-              {/* Elimination: red cross-out */}
+              {/* Center: Elimination */}
               {phase === "elimination" && eliminated && (
                 <g>
-                  <text x={CX} y={CY - 18} textAnchor="middle"
-                    fontSize={40} fontWeight="900" fill="#f87171"
-                    fontFamily="Cairo,Arial,sans-serif"
+                  <text x={CX} y={CY-16} textAnchor="middle" fontSize={40} fontWeight="900"
+                    fill="#f87171" fontFamily="Cairo,Arial,sans-serif"
                     style={{ filter: "drop-shadow(0 0 10px #f87171)" }}>
                     خرج! ❌
                   </text>
-                  <text x={CX} y={CY + 30} textAnchor="middle"
-                    fontSize={22} fontWeight="700" fill="#fca5a5"
-                    fontFamily="Cairo,Arial,sans-serif">
+                  <text x={CX} y={CY+32} textAnchor="middle" fontSize={22} fontWeight="700"
+                    fill="#fca5a5" fontFamily="Cairo,Arial,sans-serif">
                     {eliminated.displayName}
                   </text>
                 </g>
               )}
 
-              {/* Winner */}
+              {/* Center: Winner */}
               {phase === "winner" && winner && (
                 <g>
-                  <text x={CX} y={CY - 30} textAnchor="middle" fontSize={50}
+                  <text x={CX} y={CY-28} textAnchor="middle" fontSize={52}
                     style={{ filter: `drop-shadow(0 0 18px ${CYAN})` }}>🏆</text>
-                  <text x={CX} y={CY + 16} textAnchor="middle"
-                    fontSize={26} fontWeight="900" fill={CYAN}
-                    fontFamily="Cairo,Arial,sans-serif"
+                  <text x={CX} y={CY+18} textAnchor="middle" fontSize={26} fontWeight="900"
+                    fill={CYAN} fontFamily="Cairo,Arial,sans-serif"
                     style={{ filter: `drop-shadow(0 0 12px ${CYAN})` }}>
-                    الفائز
+                    الفائز!
                   </text>
-                  <text x={CX} y={CY + 50} textAnchor="middle"
-                    fontSize={18} fontWeight="700" fill="#fff"
-                    fontFamily="Cairo,Arial,sans-serif">
+                  <text x={CX} y={CY+52} textAnchor="middle" fontSize={20} fontWeight="700"
+                    fill="#fff" fontFamily="Cairo,Arial,sans-serif">
                     {winner.displayName}
                   </text>
                 </g>
-              )}
-
-              {/* Bottom instruction */}
-              {(isSpinning || isSelecting) && (
-                <text x={CX} y={CY + DISC_R - 26} textAnchor="middle"
-                  fontSize={14} fontWeight="800" fill={CYAN}
-                  fontFamily="Cairo,Arial,sans-serif"
-                  style={{ filter: `drop-shadow(0 0 6px ${CYAN})` }}>
-                  {isSpinning ? "اكتب اقرب كرسي" : "اكتب رقم الكرسي"}
-                </text>
-              )}
-
-              {/* Round badge */}
-              {isSpinning && (
-                <text x={CX} y={CY - DISC_R + 32} textAnchor="middle"
-                  fontSize={13} fontWeight="700" fill={`${CYAN}90`}
-                  fontFamily="Cairo,Arial,sans-serif">
-                  جولة {roundNum}
-                </text>
               )}
             </svg>
 
             {/* ── PLAYERS outside disc ─────────────────────────────────────── */}
             {playerPositions.map(({ player: p, x, y }) => {
-              const seated = isSelecting || phase === "elimination"
+              const seated = (isSelecting || phase === "elimination")
                 ? Object.values(chairOccupied).some(c => c.username === p.username) : false;
               const isOut  = phase === "elimination" && eliminated?.username === p.username;
-              const isWin  = phase === "winner" && winner?.username === p.username;
+              const isWin  = phase === "winner"      && winner?.username     === p.username;
               return (
                 <div key={p.username} style={{
-                  position: "absolute",
-                  left: x - 28, top: y - 38,
+                  position: "absolute", left: x - 28, top: y - 38,
                   width: 56, display: "flex", flexDirection: "column",
                   alignItems: "center", gap: 3,
-                  opacity: isOut ? 0.2 : 1,
-                  transition: "opacity 0.5s",
+                  opacity: isOut ? 0.2 : 1, transition: "opacity 0.5s",
                 }}>
                   <div style={{
                     width: 50, height: 50, borderRadius: "50%", overflow: "hidden",
-                    border: `2.5px solid ${isWin ? "#fbbf24" : seated ? CYAN : CYAN}`,
+                    border: `2.5px solid ${isWin ? "#fbbf24" : CYAN}`,
                     boxShadow: `0 0 ${isWin ? 22 : seated ? 16 : 8}px ${isWin ? "#fbbf24" : CYAN}${seated ? "dd" : "70"}`,
                     transition: "box-shadow 0.4s",
                   }}>
@@ -760,17 +736,16 @@ export default function ChairsGame() {
                   exit={{ scale: 0, opacity: 0 }}
                   transition={{ delay: (num - 1) * 0.05, type: "spring", stiffness: 420, damping: 26 }}
                   style={{
-                    position: "absolute",
-                    left: x - 22, top: y - 40,
+                    position: "absolute", left: x - 22, top: y - 40,
                     display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                   }}>
                   {seated ? (
-                    <motion.div
-                      initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                      style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden",
-                        border: `2.5px solid ${CYAN}`,
-                        boxShadow: `0 0 16px ${CYAN}`, }}>
+                      style={{
+                        width: 40, height: 40, borderRadius: "50%", overflow: "hidden",
+                        border: `2.5px solid ${CYAN}`, boxShadow: `0 0 16px ${CYAN}`,
+                      }}>
                       <img src={seated.avatar} alt={seated.displayName}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         onError={e => { (e.target as HTMLImageElement).src = avatarFallback(seated.username); }} />
@@ -791,29 +766,28 @@ export default function ChairsGame() {
             </AnimatePresence>
           </div>
 
-          {/* Winner replay buttons */}
+          {/* Winner buttons */}
           {phase === "winner" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
               style={{ display: "flex", gap: 14, marginTop: 24 }}>
-              <button onClick={resetToLobby}
-                style={{
-                  padding: "14px 40px", borderRadius: 16,
-                  background: `linear-gradient(135deg, ${CYAN}, #0099cc)`,
-                  color: "#000", fontWeight: 900, fontSize: 16,
-                  fontFamily: "'Cairo','Arial',sans-serif", border: "none",
-                  cursor: "pointer", boxShadow: `0 6px 24px ${CYAN}60`,
-                }}>
+              <button onClick={resetToLobby} style={{
+                padding: "14px 44px", borderRadius: 16,
+                background: `linear-gradient(135deg, ${CYAN}, #0099cc)`,
+                color: "#000", fontWeight: 900, fontSize: 16,
+                fontFamily: "'Cairo','Arial',sans-serif", border: "none",
+                cursor: "pointer", boxShadow: `0 6px 24px ${CYAN}60`,
+              }}>
                 العب مجدداً
               </button>
-              <button onClick={handleBack}
-                style={{
-                  padding: "14px 28px", borderRadius: 16,
-                  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.55)",
-                  border: "1px solid rgba(255,255,255,0.12)", fontWeight: 700, fontSize: 14,
-                  fontFamily: "'Cairo','Arial',sans-serif", cursor: "pointer",
-                }}>
+              <button onClick={handleBack} style={{
+                padding: "14px 28px", borderRadius: 16,
+                background: "rgba(255,255,255,0.07)",
+                color: "rgba(255,255,255,0.55)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                fontWeight: 700, fontSize: 14,
+                fontFamily: "'Cairo','Arial',sans-serif", cursor: "pointer",
+              }}>
                 الرئيسية
               </button>
             </motion.div>
