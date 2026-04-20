@@ -71,11 +71,11 @@ const BROWN_R   = "#2e1606";
 const SELECT_S  = 20;
 
 // ─── Wheel ───────────────────────────────────────────────────────────────────
-const WHEEL_SIZE = 360;
+const WHEEL_SIZE = 460;
 const CX = WHEEL_SIZE / 2;
 const CY = WHEEL_SIZE / 2;
-const PLAYER_R = WHEEL_SIZE / 2 - 42;
-const CHAIR_R  = WHEEL_SIZE / 2 - 82;
+const PLAYER_R = WHEEL_SIZE / 2 - 52;
+const CHAIR_R  = WHEEL_SIZE / 2 - 100;
 
 function GameWheel({ spinning, players, chairCount, chairOccupied, showChairs }: {
   spinning: boolean;
@@ -458,8 +458,7 @@ export default function ChairsGame() {
 
   // ── Header ────────────────────────────────────────────────────────────────
   const Header = ()=>(
-    <header style={{background:`${BROWN_D}f5`,backdropFilter:"blur(16px)",
-      borderBottom:`1px solid ${GOLD}20`}}
+    <header style={{background:BROWN_D, borderBottom:`1px solid ${GOLD}30`}}
       className="flex items-center justify-between px-5 py-3.5 flex-shrink-0 z-20">
       <button onClick={()=>{ clrAll(); stopMusic(); navigate("/"); }}
         className="flex items-center gap-1.5 text-sm opacity-50 hover:opacity-100 transition-opacity"
@@ -508,11 +507,11 @@ export default function ChairsGame() {
 
             {/* Join card */}
             <div className="w-full max-w-md rounded-3xl p-6 text-center"
-              style={{background:`${BROWN_R}90`,border:`2px solid ${GOLD}45`,boxShadow:`0 0 40px ${GOLD}20`}}>
-              <p className="text-3xl font-black mb-2" style={{color:GOLD,letterSpacing:1}}>
-                اكتب <span style={{background:`${GOLD}25`,padding:"0 8px",borderRadius:8}}>join</span> في الشات
+              style={{background:BROWN_R,border:`2px solid ${GOLD}55`,boxShadow:`0 0 40px ${GOLD}22`}}>
+              <p className="text-3xl font-black mb-2" style={{color:GOLD_LT,letterSpacing:1}}>
+                اكتب <span style={{background:`${GOLD}35`,padding:"2px 10px",borderRadius:10,color:"#fff"}}>join</span> في الشات
               </p>
-              <p className="text-base text-white/40">للانضمام إلى لعبة الكراسي الموسيقية 🎵</p>
+              <p className="text-base" style={{color:"rgba(255,255,255,0.65)"}}>للانضمام إلى لعبة الكراسي الموسيقية 🎵</p>
             </div>
 
             {/* Player count */}
@@ -541,16 +540,16 @@ export default function ChairsGame() {
                     initial={{opacity:0,scale:.7}} animate={{opacity:1,scale:1}}
                     transition={{delay:i*.04,type:"spring",stiffness:280}}
                     className="flex flex-col items-center gap-2.5 p-4 rounded-3xl"
-                    style={{background:`${BROWN_M}90`,border:`1.5px solid ${GOLD}30`,
-                      boxShadow:`0 0 16px ${GOLD}12`}}>
-                    <div style={{width:72,height:72,borderRadius:"50%",overflow:"hidden",
-                      border:`3.5px solid ${GOLD}`,boxShadow:`0 0 20px ${GOLD}55`,flexShrink:0}}>
+                    style={{background:BROWN_M,border:`1.5px solid ${GOLD}40`,
+                      boxShadow:`0 0 18px ${GOLD}15`}}>
+                    <div style={{width:76,height:76,borderRadius:"50%",overflow:"hidden",
+                      border:`3.5px solid ${GOLD}`,boxShadow:`0 0 22px ${GOLD}60`,flexShrink:0}}>
                       <img src={p.avatar} alt={p.displayName}
                         style={{width:"100%",height:"100%",objectFit:"cover"}}
                         onError={e=>{(e.target as HTMLImageElement).src=
                           `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`;}}/>
                     </div>
-                    <span className="text-xs font-bold text-center truncate w-full" style={{color:GOLD_LT}}>
+                    <span className="text-sm font-bold text-center truncate w-full" style={{color:GOLD_LT}}>
                       {p.displayName}
                     </span>
                   </motion.div>
@@ -586,17 +585,13 @@ export default function ChairsGame() {
             className="flex-1 flex flex-col items-center justify-center gap-5 px-4 py-4">
 
             <div className="text-center">
-              <p className="text-2xl font-black text-white/75">الجولة {roundNum}</p>
-              <p className="text-sm opacity-40" style={{color:GOLD}}>{players.length} لاعبين — {numChairs} كرسي</p>
+              <p className="text-2xl font-black" style={{color:"#fff"}}>الجولة {roundNum}</p>
+              <p className="text-sm font-bold" style={{color:GOLD}}>{players.length} لاعبين — {numChairs} كرسي</p>
             </div>
 
-            <div className="relative flex items-center justify-center">
+            <div className="flex items-center justify-center">
               <GameWheel spinning={true} players={players}
                 chairCount={numChairs} chairOccupied={{}} showChairs={false}/>
-              {/* Countdown badge */}
-              <div style={{position:"absolute",top:-8,left:-8}}>
-                <Ring sec={clipTimer} total={clipTotal} big/>
-              </div>
             </div>
 
             {/* Now playing */}
