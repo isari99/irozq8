@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Copy, Check, Users, Star, Eye, EyeOff, Play, ChevronRight } from "lucide-react";
+import { ArrowRight, Copy, Check, Users, Eye, EyeOff, Play, ChevronRight } from "lucide-react";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
@@ -104,6 +104,7 @@ export default function ConvinceGame() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const urlCode = params.get("r") ?? "";
+  const [, navigate] = useLocation();
 
   const wsRef = useRef<WebSocket | null>(null);
   const playerIdRef = useRef<string | null>(null);
@@ -208,22 +209,21 @@ export default function ConvinceGame() {
 
   // ─── ENTRY SCREEN ─────────────────────────────────────────────────────────
   if (screen === "entry") return wrap(
-    <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 64, marginBottom: 8 }}>🎤</div>
-      <h1 style={{ fontSize: 38, fontWeight: 900, color: GOLD, textShadow: `0 0 24px ${GOLD}80`, marginBottom: 6 }}>أقنعني</h1>
-      <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 15, marginBottom: 40 }}>اقنع الجميع بإجابتك واحصل على أعلى تقييم!</p>
-      {error && <p style={{ color: "#f87171", marginBottom: 16, fontSize: 14 }}>{error}</p>}
-      <div style={{ display: "flex", gap: 14, justifyContent: "center" }}>
+    <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
+      <button onClick={() => navigate("/")} style={{
+        background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 32, fontWeight: 700,
+      }}><ArrowRight size={16}/>الرئيسية</button>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 64, marginBottom: 8 }}>🎤</div>
+        <h1 style={{ fontSize: 38, fontWeight: 900, color: GOLD, textShadow: `0 0 24px ${GOLD}`, marginBottom: 8 }}>أقنعني</h1>
+        <p style={{ color: "rgba(255,255,255,0.88)", fontSize: 15, marginBottom: 40 }}>اقنع الجميع بإجابتك واحصل على أعلى تقييم!</p>
+        {error && <p style={{ color: "#f87171", marginBottom: 16, fontSize: 14 }}>{error}</p>}
         <button onClick={() => { setError(null); setScreen("host-setup"); }} style={{
-          padding: "16px 32px", borderRadius: 16, fontWeight: 900, fontSize: 16, cursor: "pointer",
+          padding: "18px 56px", borderRadius: 16, fontWeight: 900, fontSize: 18, cursor: "pointer",
           background: `linear-gradient(135deg,${GOLD},#d97706)`, color: "#000", border: "none",
-          boxShadow: `0 6px 24px ${GOLD}60`,
-        }}>أنشئ غرفة</button>
-        <button onClick={() => { setError(null); setScreen("join"); }} style={{
-          padding: "16px 32px", borderRadius: 16, fontWeight: 900, fontSize: 16, cursor: "pointer",
-          background: "rgba(255,255,255,0.1)", color: "#fff",
-          border: "1px solid rgba(255,255,255,0.28)",
-        }}>انضم لغرفة</button>
+          boxShadow: `0 8px 28px ${GOLD}70`,
+        }}>🎤 أنشئ غرفة</button>
       </div>
     </motion.div>
   );
@@ -343,31 +343,35 @@ export default function ConvinceGame() {
     if (phase === "lobby") return (
       <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", padding: 0 }}>
         {/* Header */}
-        <div style={{ background: "rgba(5,2,14,0.92)", borderBottom: `1px solid ${GOLD}33`, padding: "14px 20px",
+        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}55`, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 22 }}>🎤</span>
-            <span style={{ color: GOLD, fontWeight: 900, fontSize: 18 }}>أقنعني</span>
+          <button onClick={() => navigate("/")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+          }}><ArrowRight size={14}/>رجوع</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>🎤</span>
+            <span style={{ color: GOLD, fontWeight: 900, fontSize: 17, textShadow: `0 0 12px ${GOLD}` }}>أقنعني</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>كود الغرفة:</span>
-            <span style={{ color: GOLD, fontWeight: 900, fontSize: 20, letterSpacing: "0.12em" }}>{gameState.code}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: 600 }}>كود:</span>
+            <span style={{ color: GOLD, fontWeight: 900, fontSize: 18, letterSpacing: "0.12em" }}>{gameState.code}</span>
             <button onClick={copyLink} style={{
-              background: copied ? `${GOLD}22` : "rgba(255,255,255,0.1)", border: `1px solid ${copied ? GOLD : "rgba(255,255,255,0.25)"}`,
-              borderRadius: 8, padding: "6px 12px", color: copied ? GOLD : "#fff",
-              fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-            }}>{copied ? <Check size={12}/> : <Copy size={12}/>}{copied ? "تم النسخ" : "نسخ الرابط"}</button>
+              background: copied ? `${GOLD}30` : "rgba(255,255,255,0.12)", border: `1px solid ${copied ? GOLD : "rgba(255,255,255,0.3)"}`,
+              borderRadius: 8, padding: "5px 10px", color: copied ? GOLD : "#fff",
+              fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+            }}>{copied ? <Check size={12}/> : <Copy size={12}/>}{copied ? "تم" : "نسخ"}</button>
           </div>
         </div>
 
-        <div style={{ maxWidth: 560, margin: "0 auto", padding: "32px 16px" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, marginBottom: 8 }}>
-              <Users size={16} style={{ display: "inline", verticalAlign: "middle", marginLeft: 4 }}/>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "28px 16px" }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+              <Users size={15} style={{ display: "inline", verticalAlign: "middle", marginLeft: 5 }}/>
               {players.length} لاعب في الغرفة
             </div>
             {amHost && (
-              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13 }}>أرسل الرابط للاعبين ثم ابدأ عندما يكونوا مستعدين</p>
+              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>أرسل الرابط للاعبين ثم ابدأ عندما يكونوا مستعدين</p>
             )}
           </div>
 
@@ -376,19 +380,20 @@ export default function ConvinceGame() {
             {players.map(p => (
               <div key={p.id} style={{
                 display: "flex", alignItems: "center", gap: 10,
-                background: "rgba(255,255,255,0.07)", border: `1px solid ${p.color}33`,
+                background: "rgba(255,255,255,0.1)", border: `1.5px solid ${p.color}66`,
                 borderRadius: 14, padding: "12px 14px",
-                boxShadow: p.id === myId ? `0 0 16px ${p.color}44` : "none",
+                boxShadow: p.id === myId ? `0 0 18px ${p.color}55` : "none",
               }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
-                  background: p.color + "22", border: `2.5px solid ${p.color}`,
+                  background: p.color + "33", border: `2.5px solid ${p.color}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 20, fontWeight: 900, color: p.color,
+                  textShadow: `0 0 8px ${p.color}`,
                 }}>{initials(p.name)}</div>
                 <div>
-                  <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>{p.name}</div>
-                  {p.isHost && <div style={{ color: GOLD, fontSize: 11 }}>هوست 👑</div>}
+                  <div style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>{p.name}</div>
+                  {p.isHost && <div style={{ color: GOLD, fontSize: 11, fontWeight: 700 }}>هوست 👑</div>}
                 </div>
               </div>
             ))}
@@ -398,12 +403,12 @@ export default function ConvinceGame() {
             <button onClick={startGame} disabled={players.length < 2} style={{
               width: "100%", padding: "18px", borderRadius: 18, fontWeight: 900, fontSize: 18, cursor: "pointer",
               background: players.length >= 2 ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.08)",
-              color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.3)", border: "none",
+              color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.4)", border: "none",
               boxShadow: players.length >= 2 ? `0 8px 32px ${GOLD}60` : "none",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
             }}><Play size={20}/>ابدأ اللعبة</button>
           ) : (
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600 }}>
               في انتظار الهوست لبدء اللعبة...
             </div>
           )}
@@ -414,8 +419,18 @@ export default function ConvinceGame() {
     // ── Answering ──
     if (phase === "answering") return (
       <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+        {/* Back header */}
+        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button onClick={() => navigate("/")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+          }}><ArrowRight size={14}/>رجوع</button>
+          <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
+          <div style={{ width: 60 }}/>
+        </div>
         {/* Timer bar */}
-        <div style={{ height: 6, background: "rgba(255,255,255,0.1)" }}>
+        <div style={{ height: 6, background: "rgba(255,255,255,0.12)" }}>
           <motion.div animate={{ width: `${timerPct}%` }} transition={{ duration: 0.5 }}
             style={{ height: "100%", background: remaining <= 5 ? "#ef4444" : GOLD, transition: "background 0.5s" }}/>
         </div>
@@ -435,11 +450,11 @@ export default function ConvinceGame() {
 
           {/* Question */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            style={{ background: "rgba(255,255,255,0.06)", border: `2px solid ${GOLD}44`, borderRadius: 20,
-              padding: "28px 24px", marginBottom: 32, textAlign: "center",
-              boxShadow: `0 0 40px ${GOLD}20` }}>
+            style={{ background: "rgba(255,255,255,0.09)", border: `2px solid ${GOLD}66`, borderRadius: 20,
+              padding: "28px 24px", marginBottom: 28, textAlign: "center",
+              boxShadow: `0 0 40px ${GOLD}25` }}>
             <div style={{ fontSize: 28, marginBottom: 10 }}>🎤</div>
-            <p style={{ fontSize: 22, fontWeight: 800, color: "#fff", lineHeight: 1.5 }}>{gameState.question}</p>
+            <p style={{ fontSize: 22, fontWeight: 800, color: "#fff", lineHeight: 1.5, textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}>{gameState.question}</p>
           </motion.div>
 
           {/* Answer input */}
@@ -450,21 +465,22 @@ export default function ConvinceGame() {
                 rows={4}
                 style={{
                   width: "100%", padding: "16px", borderRadius: 14, resize: "vertical",
-                  background: "rgba(255,255,255,0.08)", border: `1.5px solid ${GOLD}44`, color: "#fff",
+                  background: "rgba(255,255,255,0.1)", border: `1.5px solid ${GOLD}66`, color: "#fff",
                   fontSize: 16, fontWeight: 600, outline: "none", boxSizing: "border-box",
                   fontFamily: "'Cairo','Arial',sans-serif", lineHeight: 1.6,
                   ...(gs.hideWriting ? { WebkitTextSecurity: "disc" as any, textSecurity: "disc" } : {}),
                 }}/>
               {gs.hideWriting && (
-                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 6 }}>
+                <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 6, fontWeight: 600 }}>
                   🔒 وضع إخفاء الكتابة مفعّل — إجابتك مخفية عن الكاميرا
                 </p>
               )}
               <button onClick={submitAnswer} disabled={!answerText.trim()} style={{
                 width: "100%", marginTop: 14, padding: "16px", borderRadius: 14,
-                background: answerText.trim() ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.08)",
-                color: answerText.trim() ? "#000" : "rgba(255,255,255,0.3)",
-                fontWeight: 900, fontSize: 17, border: "none", cursor: "pointer",
+                background: answerText.trim() ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.1)",
+                color: answerText.trim() ? "#000" : "rgba(255,255,255,0.45)",
+                fontWeight: 900, fontSize: 17, border: answerText.trim() ? "none" : "1px solid rgba(255,255,255,0.15)",
+                cursor: answerText.trim() ? "pointer" : "not-allowed",
                 boxShadow: answerText.trim() ? `0 6px 24px ${GOLD}50` : "none",
               }}>أرسل الإجابة</button>
             </div>
@@ -472,8 +488,8 @@ export default function ConvinceGame() {
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               style={{ textAlign: "center", padding: 32 }}>
               <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
-              <p style={{ color: GOLD, fontWeight: 800, fontSize: 18 }}>تم إرسال إجابتك!</p>
-              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginTop: 8 }}>في انتظار باقي اللاعبين...</p>
+              <p style={{ color: GOLD, fontWeight: 800, fontSize: 18, textShadow: `0 0 16px ${GOLD}` }}>تم إرسال إجابتك!</p>
+              <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, marginTop: 8, fontWeight: 600 }}>في انتظار باقي اللاعبين...</p>
             </motion.div>
           )}
         </div>
@@ -483,11 +499,20 @@ export default function ConvinceGame() {
     // ── Revealing (host selects who to show) ──
     if (phase === "revealing") return (
       <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto", padding: "40px 16px" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button onClick={() => navigate("/")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+          }}><ArrowRight size={14}/>رجوع</button>
+          <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
+          <div style={{ width: 60 }}/>
+        </div>
+        <div style={{ maxWidth: 600, margin: "0 auto", padding: "32px 16px" }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ fontSize: 32, marginBottom: 10 }}>🎛️</div>
-            <h2 style={{ fontSize: 24, fontWeight: 900, color: "#fff", marginBottom: 8 }}>مرحلة العرض</h2>
-            <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 14 }}>
+            <h2 style={{ fontSize: 24, fontWeight: 900, color: "#fff", marginBottom: 8, textShadow: "0 0 20px rgba(255,255,255,0.3)" }}>مرحلة العرض</h2>
+            <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: 600 }}>
               {amHost ? "اختر لاعبًا لعرض إجابته على الجميع" : "الهوست يختار من يعرض إجابته..."}
             </p>
           </div>
@@ -557,7 +582,16 @@ export default function ConvinceGame() {
 
       return (
         <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
-          <div style={{ maxWidth: 600, margin: "0 auto", padding: "40px 16px" }}>
+          <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+            display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <button onClick={() => navigate("/")} style={{
+              background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+            }}><ArrowRight size={14}/>رجوع</button>
+            <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
+            <div style={{ width: 60 }}/>
+          </div>
+          <div style={{ maxWidth: 600, margin: "0 auto", padding: "32px 16px" }}>
 
             {/* Player being rated */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -570,7 +604,7 @@ export default function ConvinceGame() {
                 boxShadow: `0 0 32px ${currentReview.color}55`,
               }}>{initials(currentReview.name)}</div>
               <h3 style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 4 }}>{currentReview.name}</h3>
-              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13 }}>
+              <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: 600 }}>
                 {currentReview.ratingsCount} / {currentReview.totalRaters} قيّموا
               </p>
             </motion.div>
@@ -619,11 +653,20 @@ export default function ConvinceGame() {
     // ── Leaderboard ──
     if (phase === "leaderboard") return (
       <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
-        <div style={{ maxWidth: 520, margin: "0 auto", padding: "40px 16px" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button onClick={() => navigate("/")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+          }}><ArrowRight size={14}/>رجوع</button>
+          <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
+          <div style={{ width: 60 }}/>
+        </div>
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "32px 16px" }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>📊</div>
-            <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff" }}>لوحة الترتيب</h2>
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginTop: 4 }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff", textShadow: "0 0 20px rgba(255,255,255,0.3)" }}>لوحة الترتيب</h2>
+            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginTop: 6, fontWeight: 600 }}>
               هدف الفوز: {gs.targetScore} نقطة
             </p>
           </div>
@@ -635,23 +678,24 @@ export default function ConvinceGame() {
                 transition={{ delay: idx * 0.06 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 12, padding: "14px 18px",
-                  background: p.id === myId ? `${GOLD}15` : "rgba(255,255,255,0.06)",
-                  border: `1.5px solid ${p.id === myId ? GOLD + "55" : p.color + "33"}`,
+                  background: p.id === myId ? `${GOLD}20` : "rgba(255,255,255,0.09)",
+                  border: `1.5px solid ${p.id === myId ? GOLD + "77" : p.color + "55"}`,
                   borderRadius: 14,
                 }}>
-                <span style={{ fontSize: 20, fontWeight: 900, color: idx === 0 ? "#ffd700" : idx === 1 ? "#c0c0c0" : idx === 2 ? "#cd7f32" : "rgba(255,255,255,0.4)", minWidth: 28, textAlign: "center" }}>
+                <span style={{ fontSize: 20, fontWeight: 900, color: idx === 0 ? "#ffd700" : idx === 1 ? "#c0c0c0" : idx === 2 ? "#cd7f32" : "rgba(255,255,255,0.65)", minWidth: 28, textAlign: "center" }}>
                   {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx+1}`}
                 </span>
                 <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-                  background: p.color + "22", border: `2px solid ${p.color}`,
+                  background: p.color + "33", border: `2px solid ${p.color}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 16, fontWeight: 900, color: p.color }}>
+                  fontSize: 16, fontWeight: 900, color: p.color,
+                  textShadow: `0 0 8px ${p.color}` }}>
                   {initials(p.name)}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>{p.name}</div>
+                  <div style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>{p.name}</div>
                 </div>
-                <div style={{ color: GOLD, fontSize: 22, fontWeight: 900 }}>{p.score}</div>
+                <div style={{ color: GOLD, fontSize: 22, fontWeight: 900, textShadow: `0 0 10px ${GOLD}` }}>{p.score}</div>
               </motion.div>
             ))}
           </div>
@@ -665,7 +709,7 @@ export default function ConvinceGame() {
             }}><ChevronRight size={20}/>{gameState.reviewQueueLength > 0 ? "عرض اللاعب التالي" : "الجولة التالية"}</button>
           )}
           {!amHost && (
-            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 14 }}>في انتظار الهوست...</p>
+            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600 }}>في انتظار الهوست...</p>
           )}
         </div>
       </div>
@@ -674,7 +718,16 @@ export default function ConvinceGame() {
     // ── Winner ──
     if (phase === "winner" && gameState.winner) return (
       <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
-        <div style={{ maxWidth: 520, margin: "0 auto", padding: "60px 16px", textAlign: "center" }}>
+        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button onClick={() => navigate("/")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+          }}><ArrowRight size={14}/>رجوع</button>
+          <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
+          <div style={{ width: 60 }}/>
+        </div>
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "40px 16px", textAlign: "center" }}>
           <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}>
             <div style={{ fontSize: 80, marginBottom: 16 }}>🏆</div>
@@ -692,13 +745,13 @@ export default function ConvinceGame() {
           </motion.div>
 
           <div style={{ marginTop: 24, marginBottom: 40 }}>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 16 }}>النتائج النهائية</p>
+            <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 16, fontWeight: 700 }}>النتائج النهائية</p>
             {[...players].sort((a,b) => b.score - a.score).map((p, i) => (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "10px 16px", background: i===0 ? `${GOLD}15` : "rgba(255,255,255,0.04)",
-                borderRadius: 12, marginBottom: 6, border: i===0 ? `1px solid ${GOLD}44` : "1px solid rgba(255,255,255,0.06)" }}>
-                <span style={{ color: "#fff", fontWeight: 700 }}>{p.name}</span>
-                <span style={{ color: GOLD, fontWeight: 900, fontSize: 18 }}>{p.score}</span>
+                padding: "12px 18px", background: i===0 ? `${GOLD}20` : "rgba(255,255,255,0.08)",
+                borderRadius: 12, marginBottom: 6, border: i===0 ? `1.5px solid ${GOLD}66` : "1px solid rgba(255,255,255,0.12)" }}>
+                <span style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{p.name}</span>
+                <span style={{ color: GOLD, fontWeight: 900, fontSize: 18, textShadow: `0 0 10px ${GOLD}` }}>{p.score}</span>
               </div>
             ))}
           </div>
@@ -711,7 +764,7 @@ export default function ConvinceGame() {
             }}>🔁 لعب مرة أخرى</button>
           )}
           {!amHost && (
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>في انتظار الهوست لإعادة اللعبة...</p>
+            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600 }}>في انتظار الهوست لإعادة اللعبة...</p>
           )}
         </div>
       </div>

@@ -436,7 +436,7 @@ export default function ChairsGame() {
           <header className="flex items-center justify-between px-6 py-4 border-b border-white/5"
             style={{ background: "rgba(5,2,14,0.92)", backdropFilter: "blur(20px)" }}>
             <button onClick={handleBack}
-              className="flex items-center gap-2 text-white/40 hover:text-cyan-400 transition-colors text-sm font-bold">
+              className="flex items-center gap-2 text-white/80 hover:text-cyan-400 transition-colors text-sm font-bold">
               <ArrowRight size={16}/><span>رجوع</span>
             </button>
             <span className="text-xl font-black" style={{ color: CYAN, textShadow: `0 0 16px ${CYAN}` }}>
@@ -468,8 +468,9 @@ export default function ChairsGame() {
             </motion.div>
 
             {/* Players grid */}
-            <div style={{ background: "rgba(0,0,0,0.35)", border: "1.5px solid rgba(0,212,255,0.2)",
-              borderRadius: 20, padding: "20px 28px", minWidth: 340, maxWidth: 560, width: "100%" }}>
+            <div style={{ background: "rgba(0,0,0,0.55)", border: "2px solid rgba(0,212,255,0.4)",
+              borderRadius: 20, padding: "20px 28px", minWidth: 340, maxWidth: 560, width: "100%",
+              boxShadow: "0 0 30px rgba(0,212,255,0.08)" }}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-black" style={{ color: CYAN }}>اللاعبون</span>
                 <span className="text-sm font-bold px-3 py-1 rounded-full"
@@ -479,8 +480,8 @@ export default function ChairsGame() {
               </div>
               {players.length === 0
                 ? <div className="flex flex-col items-center gap-2 py-6">
-                    <span className="text-3xl opacity-30">🪑</span>
-                    <p className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.35)" }}>في انتظار اللاعبين...</p>
+                    <span className="text-3xl opacity-50">🪑</span>
+                    <p className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.7)" }}>في انتظار اللاعبين...</p>
                   </div>
                 : <div className="flex flex-wrap gap-3 justify-center">
                     {players.map((p, i) => (
