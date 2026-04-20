@@ -55,12 +55,12 @@ interface ClaimAnim {
 }
 
 // ─── Geometry ─────────────────────────────────────────────────────────────────
-const SZ       = 600;
-const CX       = 300;
-const CY       = 300;
-const DISC_R   = 222;
-const PLAYER_R = 286;   // avatar ring radius (outside disc)
-const CHAIR_R  = 130;   // chair ring radius  (inside disc)
+const SZ       = 680;
+const CX       = 340;
+const CY       = 340;
+const DISC_R   = 252;
+const PLAYER_R = 310;   // avatar ring radius (outside disc)
+const CHAIR_R  = 148;   // chair ring radius  (inside disc)
 const AVA_R    = 25;    // half of 50px avatar (used for centering)
 const SELECT_S = 20;
 const CYAN     = "#00d4ff";
@@ -156,7 +156,7 @@ export default function ChairsGame() {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       return;
     }
-    const SPEED = 1.4; // degrees per frame ≈ 84°/s @ 60fps
+    const SPEED = 0.65; // degrees per frame ≈ 39°/s @ 60fps (slow & smooth)
     const step = () => {
       rotRef.current = (rotRef.current + SPEED) % 360;
       setRotAngle(rotRef.current);
@@ -623,31 +623,14 @@ export default function ChairsGame() {
                 <clipPath id="cg-clip"><circle cx={CX} cy={CY} r={DISC_R - 2}/></clipPath>
               </defs>
 
-              {/* Rotating disc body — group transforms with rotAngle */}
+              {/* Rotating disc body — clean circle, no dividers */}
               <g transform={`rotate(${rotAngle}, ${CX}, ${CY})`}>
                 <circle cx={CX} cy={CY} r={DISC_R} fill="#0c1628"/>
                 <rect x={CX-DISC_R} y={CY-DISC_R} width={DISC_R*2} height={DISC_R*2}
                   fill="url(#cg-dot)" clipPath="url(#cg-clip)"/>
-                {/* Visible radial spokes so spinning is obvious */}
-                {[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => {
-                  const a = deg * Math.PI / 180;
-                  return (
-                    <line key={deg}
-                      x1={CX + 48 * Math.cos(a)} y1={CY + 48 * Math.sin(a)}
-                      x2={CX + (DISC_R - 6) * Math.cos(a)} y2={CY + (DISC_R - 6) * Math.sin(a)}
-                      stroke={`${CYAN}22`} strokeWidth={1.5}/>
-                  );
-                })}
-                {/* Bold marks every 90° */}
-                {[0,90,180,270].map(deg => {
-                  const a = deg * Math.PI / 180;
-                  return (
-                    <line key={`b${deg}`}
-                      x1={CX + 32 * Math.cos(a)} y1={CY + 32 * Math.sin(a)}
-                      x2={CX + (DISC_R - 4) * Math.cos(a)} y2={CY + (DISC_R - 4) * Math.sin(a)}
-                      stroke={`${CYAN}55`} strokeWidth={2.5}/>
-                  );
-                })}
+                {/* Subtle inner glow arc to hint rotation without hard lines */}
+                <circle cx={CX} cy={CY} r={DISC_R - 18}
+                  fill="none" stroke={`${CYAN}0a`} strokeWidth={16}/>
               </g>
               {/* Static outer border — doesn't rotate */}
               <circle cx={CX} cy={CY} r={DISC_R} fill="none" stroke={CYAN} strokeWidth={3}/>
@@ -713,11 +696,15 @@ export default function ChairsGame() {
                   opacity: isOut ? 0.15 : hasClaimed ? 0.3 : 1,
                   transition: "opacity 0.5s",
                 }}>
-                  <div style={{
-                    width: 50, height: 50, borderRadius: "50%", overflow: "hidden",
-                    border: `2.5px solid ${isWin ? "#fbbf24" : CYAN}`,
-                    boxShadow: `0 0 ${isWin ? 22 : 8}px ${isWin ? "#fbbf24" : CYAN}70`,
-                  }}>
+                  <div
+                    className={isSpinning && !hasClaimed && !isOut ? "cg-spin-glow" : ""}
+                    style={{
+                      width: 50, height: 50, borderRadius: "50%", overflow: "hidden",
+                      border: `2.5px solid ${isWin ? "#fbbf24" : CYAN}`,
+                      ...(isSpinning && !hasClaimed && !isOut
+                        ? {}
+                        : { boxShadow: `0 0 ${isWin ? 22 : 8}px ${isWin ? "#fbbf24" : CYAN}70` }),
+                    }}>
                     <img src={p.avatar} alt={p.displayName}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       onError={e => { (e.target as HTMLImageElement).src = avatarFallback(p.username); }}/>

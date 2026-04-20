@@ -245,6 +245,15 @@
   left: 150%;
 }
 
+/* Chairs Game – player glow pulse while spinning */
+@keyframes cg-spin-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0,212,255,0.45), 0 0 18px rgba(0,212,255,0.12); }
+  50%       { box-shadow: 0 0 24px rgba(0,212,255,1),   0 0 48px rgba(0,212,255,0.38); }
+}
+.cg-spin-glow {
+  animation: cg-spin-glow 1.8s ease-in-out infinite;
+}
+
 /* Chairs Game – wheel orbit */
 @keyframes chairsWheelOrbit {
   from { transform: rotate(0deg); }
