@@ -154,17 +154,17 @@ function GameWheel({ spinning, players, chairCount, chairOccupied, showChairs, f
       {/* Slow decorative halo */}
       <div className={spinning ? "chairs-orbit-slow" : ""}
         style={{ position: "absolute", inset: 8, borderRadius: "50%",
-          background: `conic-gradient(transparent,${GOLD}20,transparent,${GOLD}15,transparent,${GOLD}20,transparent)` }} />
+          background: `conic-gradient(transparent,${GOLD}38,transparent,${GOLD}28,transparent,${GOLD}38,transparent)` }} />
 
       {/* Main disc */}
       <div style={{
         position: "absolute", inset: 14, borderRadius: "50%",
-        background: `radial-gradient(circle at 38% 32%, #3a1e06 0%, ${BROWN_R} 40%, ${BROWN_D} 75%)`,
-        boxShadow: `inset 0 0 50px rgba(0,0,0,0.7)`,
-        border: `2px solid ${GOLD}30`,
+        background: `radial-gradient(circle at 40% 35%, #5a2e0a 0%, #3a1a06 38%, #1c0b02 78%)`,
+        boxShadow: `inset 0 0 36px rgba(0,0,0,0.55)`,
+        border: `2px solid ${GOLD}55`,
       }}>
         {/* dot grid */}
-        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: .08, borderRadius: "50%" }}>
+        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: .13, borderRadius: "50%" }}>
           <defs>
             <pattern id="cgd2" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
               <circle cx="9" cy="9" r="1.5" fill={GOLD} />
@@ -172,8 +172,8 @@ function GameWheel({ spinning, players, chairCount, chairOccupied, showChairs, f
           </defs>
           <rect width="100%" height="100%" fill="url(#cgd2)" />
         </svg>
-        <div style={{ position: "absolute", inset: 20, borderRadius: "50%", border: `1px solid ${GOLD}20` }} />
-        <div style={{ position: "absolute", inset: 42, borderRadius: "50%", border: `1px solid ${GOLD}12` }} />
+        <div style={{ position: "absolute", inset: 20, borderRadius: "50%", border: `1.5px solid ${GOLD}38` }} />
+        <div style={{ position: "absolute", inset: 42, borderRadius: "50%", border: `1px solid ${GOLD}25` }} />
       </div>
 
       {/* Orbiting player photos ring */}
@@ -615,7 +615,7 @@ export default function ChairsGame() {
                 </span>{" "}
                 في الشات
               </p>
-              <p style={{ fontSize: 15, color: "rgba(255,255,255,0.75)", fontWeight: 600 }}>
+              <p style={{ fontSize: 15, color: WHITE, fontWeight: 600 }}>
                 للانضمام إلى لعبة الكراسي الموسيقية 🎵
               </p>
             </div>
@@ -635,12 +635,12 @@ export default function ChairsGame() {
             {/* Player grid */}
             {players.length === 0 ? (
               <div className="w-full max-w-md flex flex-col items-center py-14 rounded-2xl"
-                style={{ border: `1.5px dashed ${GOLD_D}40` }}>
-                <span style={{ fontSize: 56, opacity: 0.2 }}>🪑</span>
-                <p style={{ color: GOLD, fontWeight: 700, fontSize: 15, opacity: 0.6, marginTop: 8 }}>
+                style={{ border: `1.5px dashed ${GOLD_D}70`, background: `${BROWN_M}80` }}>
+                <span style={{ fontSize: 56 }}>🪑</span>
+                <p style={{ color: GOLD, fontWeight: 800, fontSize: 17, marginTop: 10 }}>
                   لم ينضم أحد بعد...
                 </p>
-                <p style={{ color: WHITE, fontWeight: 600, fontSize: 13, opacity: 0.4, marginTop: 4 }}>
+                <p style={{ color: WHITE, fontWeight: 600, fontSize: 14, marginTop: 5 }}>
                   اطلب من المشاهدين يكتبون join
                 </p>
               </div>
@@ -680,7 +680,7 @@ export default function ChairsGame() {
                   background: players.length >= 2
                     ? `linear-gradient(135deg, #fbbf24, ${GOLD}, #92530a)`
                     : "rgba(255,255,255,0.05)",
-                  color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.25)",
+                  color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.55)",
                   boxShadow: players.length >= 2 ? `0 0 40px ${GOLD}55` : "none",
                   border: `2px solid ${players.length >= 2 ? GOLD : "rgba(255,255,255,0.08)"}`,
                   cursor: players.length >= 2 ? "pointer" : "not-allowed",
@@ -748,7 +748,7 @@ export default function ChairsGame() {
 
             {/* Unseated players */}
             <div className="w-full max-w-md">
-              <p style={{ fontWeight: 700, fontSize: 13, color: "rgba(255,255,255,0.5)", textAlign: "center", marginBottom: 8 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, color: WHITE, textAlign: "center", marginBottom: 8 }}>
                 لم يختاروا بعد:
               </p>
               <div className="flex flex-wrap justify-center gap-2">
@@ -787,7 +787,7 @@ export default function ChairsGame() {
                 <motion.span animate={{ scale: [1, 1.18, 1] }} transition={{ duration: 1.1, repeat: Infinity }}
                   style={{ fontSize: 64 }}>💥</motion.span>
                 <div className="flex flex-col items-center gap-3 text-center">
-                  <p style={{ fontWeight: 700, fontSize: 22, color: "rgba(255,255,255,0.6)" }}>تم إقصاء</p>
+                  <p style={{ fontWeight: 800, fontSize: 22, color: WHITE }}>تم إقصاء</p>
                   <div style={{ position: "relative" }}>
                     <img src={eliminated.avatar} alt={eliminated.displayName}
                       style={{ width: 120, height: 120, borderRadius: 22, objectFit: "cover",
@@ -801,7 +801,7 @@ export default function ChairsGame() {
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
                   <Ring sec={cdTimer} total={5} />
-                  <p style={{ fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: WHITE }}>
                     الجولة القادمة تبدأ تلقائياً
                   </p>
                 </div>
@@ -849,8 +849,8 @@ export default function ChairsGame() {
               style={{ fontSize: 80 }}>🏆</motion.span>
             {winner && (
               <div className="flex flex-col items-center gap-5 text-center">
-                <p style={{ fontWeight: 700, fontSize: 20, color: "rgba(255,255,255,0.5)" }}>
-                  الفائز بلعبة الكراسي الموسيقية
+                <p style={{ fontWeight: 800, fontSize: 20, color: WHITE }}>
+                  الفائز بلعبة الكراسي الموسيقية 🏆
                 </p>
                 <div style={{ position: "relative" }}>
                   <motion.div animate={{ rotate: 360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
@@ -864,7 +864,7 @@ export default function ChairsGame() {
                 <h2 style={{ fontWeight: 900, fontSize: 40, color: GOLD, textShadow: `0 0 32px ${GOLD}, 0 0 64px ${GOLD_D}` }}>
                   {winner.displayName}
                 </h2>
-                <p style={{ fontWeight: 700, fontSize: 16, color: "rgba(255,255,255,0.5)" }}>
+                <p style={{ fontWeight: 800, fontSize: 16, color: GOLD }}>
                   🎉 بطل لعبة الكراسي الموسيقية 🎉
                 </p>
               </div>
