@@ -287,20 +287,22 @@ const ROUND_OPTIONS = [5, 10, 15, 20, 25];
 const PLAYED_KEY = "rose_song_played_ids";
 
 // ─── Builds a smart queue, excluding recently-played songs across reloads ─────
-function buildSmartQueue(count: number): GameClip[] {
+// `excludeYoutubeIds` — set of IDs known to be unavailable (auto-filled at runtime)
+function buildSmartQueue(count: number, excludeYoutubeIds: Set<string> = new Set()): GameClip[] {
   let playedIds: Set<number> = new Set();
   try {
     const raw = localStorage.getItem(PLAYED_KEY);
     if (raw) playedIds = new Set(JSON.parse(raw) as number[]);
   } catch {}
 
-  let pool = SONGS.filter(s => !playedIds.has(s.id));
+  // Exclude both already-played IDs and known-failed YouTube IDs
+  let pool = SONGS.filter(s => !playedIds.has(s.id) && !excludeYoutubeIds.has(s.youtubeId));
 
-  // If not enough unplayed songs remain, reset and use all songs
+  // If not enough valid songs remain, reset played history (keep failed exclusions)
   if (pool.length < count) {
     localStorage.removeItem(PLAYED_KEY);
     playedIds = new Set();
-    pool = [...SONGS];
+    pool = SONGS.filter(s => !excludeYoutubeIds.has(s.youtubeId));
   }
 
   const queue = buildGameQueue(pool, count);
@@ -357,7 +359,7 @@ export default function SongGame() {
   const [team2Name, setTeam2Name] = useState("الفريق الثاني");
   const [totalRounds, setTotalRounds] = useState(10);
 
-  // Game state
+  // Game state — team1Score / team2Score = independent win counters per team
   const [team1Score, setTeam1Score] = useState(0);
   const [team2Score, setTeam2Score] = useState(0);
   const [currentRound, setCurrentRound] = useState(0);
@@ -386,6 +388,10 @@ export default function SongGame() {
   const clipWatchRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Ref so timer callback can read clip without stale closure
   const activeClipRef = useRef<GameClip>({ song: SONGS[0], clip: SONGS[0].clips[0] });
+  // Ref for current game queue (avoids stale closures in callbacks)
+  const gameClipsRef = useRef<GameClip[]>([]);
+  // Set of YouTube IDs that failed to load — skip them automatically
+  const failedSongIds = useRef<Set<string>>(new Set());
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const currentGC: GameClip = gameClips[currentGameIndex] ?? { song: SONGS[0], clip: SONGS[0].clips[0] };
@@ -495,7 +501,18 @@ export default function SongGame() {
             else if (e.data === S?.PAUSED)
               setAudioState(prev => prev === "stopped" ? "stopped" : "paused");
           },
-          onError: () => setAudioState("error"),
+          onError: (e: any) => {
+            // Error codes 100, 101, 150 = video unavailable / embedding blocked
+            // Mark as failed and skip automatically so it never plays again
+            const fatal = e?.data === 100 || e?.data === 101 || e?.data === 150;
+            if (fatal) {
+              failedSongIds.current.add(gc.song.youtubeId);
+              // Auto-skip after short delay so the UI doesn't freeze
+              setTimeout(() => skipToNextSong(), 800);
+            } else {
+              setAudioState("error");
+            }
+          },
         },
       });
     }).catch(() => setAudioState("error"));
@@ -529,10 +546,27 @@ export default function SongGame() {
     } catch (_) {}
   };
 
+  // Keep gameClipsRef in sync so error-skip callbacks have up-to-date data
+  useEffect(() => { gameClipsRef.current = gameClips; }, [gameClips]);
+
+  // Auto-skip to next song (called when YouTube reports a fatal load error)
+  const skipToNextSong = useCallback(() => {
+    destroyPlayer();
+    setCurrentGameIndex(i => {
+      const next = i + 1;
+      if (gameClipsRef.current[next]) activeClipRef.current = gameClipsRef.current[next];
+      return next;
+    });
+    setAudioState("loading");
+  }, [destroyPlayer]);
+
   // ── Game flow ─────────────────────────────────────────────────────────────
   const startGame = () => {
-    // Smart shuffle: unique songs, no consecutive same artist, random clip per song
-    const queue = buildSmartQueue(totalRounds);
+    // Build queue large enough for the longest possible game (both teams race to target)
+    // Pass known-failed YouTube IDs so they are excluded from the new queue
+    const queueSize = Math.min(totalRounds * 2, SONGS.length);
+    const queue = buildSmartQueue(queueSize, failedSongIds.current);
+    gameClipsRef.current = queue;
     setGameClips(queue);
     setCurrentGameIndex(0);
     activeClipRef.current = queue[0];
@@ -573,21 +607,32 @@ export default function SongGame() {
 
   const awardPoint = (team: 1 | 2) => {
     const pts = doubleActive ? 2 : 1;
-    if (team === 1) setTeam1Score(s => s + pts);
-    else setTeam2Score(s => s + pts);
-    const next = currentRound + 1;
-    setCurrentRound(next);
+
+    // Compute new scores before setting state so we can check win condition immediately
+    const newScore1 = team === 1 ? team1Score + pts : team1Score;
+    const newScore2 = team === 2 ? team2Score + pts : team2Score;
+
+    if (team === 1) setTeam1Score(newScore1);
+    else setTeam2Score(newScore2);
+
+    setCurrentRound(r => r + 1);
     setDoubleActive(false);
     setShowAnswer(false);
     stopTimer();
     destroyPlayer();
     setCurrentGameIndex(i => {
-      const next2 = i + 1;
-      if (gameClips[next2]) activeClipRef.current = gameClips[next2];
-      return next2;
+      const next = i + 1;
+      if (gameClipsRef.current[next]) activeClipRef.current = gameClipsRef.current[next];
+      return next;
     });
-    if (next >= totalRounds) setPhase("ended");
-    else { setCurrentTurn(t => t === 1 ? 2 : 1); setPhase("control"); }
+
+    // End game the moment EITHER team reaches the target — no summing of both scores
+    if (newScore1 >= totalRounds || newScore2 >= totalRounds) {
+      setPhase("ended");
+    } else {
+      setCurrentTurn(t => t === 1 ? 2 : 1);
+      setPhase("control");
+    }
   };
 
   const resetFull = () => {
