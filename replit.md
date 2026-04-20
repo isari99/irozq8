@@ -10,10 +10,16 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Type**: React + Vite web app
 - **Preview**: `/` (root path)
 - **Stack**: React, TypeScript, Tailwind CSS, Framer Motion, Wouter
-- **Purpose**: Interactive streaming gaming platform with 3 games:
-  - **لعبة الأغاني** (Song Game): Team-based song guessing with host control panel, double points (×2), answer reveal, skip, and manual scoring
-  - **لعبة XO** (Tic Tac Toe): Classic XO game between two teams/players with score tracking
-  - **عجلة الحرب** (Wheel of War): Luck-based elimination wheel with random shot counts (1-7)
+- **Purpose**: Interactive streaming gaming platform with 9 games:
+  - **لعبة الأغاني** (Song Game): Team-based song guessing with host control panel
+  - **لعبة XO** (Tic Tac Toe): Classic XO game via Twitch chat
+  - **عجلة الشخصنة** (Wheel Game): Luck-based elimination via Twitch chat
+  - **لعبة الأسئلة** (Quiz Game): Twitch chat quiz with teams
+  - **حرب الفواكه** (Fruits Game): Vote-based elimination via Twitch chat
+  - **برا السالفة** (Imposter Game): Web multiplayer, rooms via WS, word deduction
+  - **السلم والثعبان** (Snakes Game): Twitch chat board game
+  - **الكراسي الموسيقية** (Chairs Game): Musical chairs via Twitch chat with spinning wheel
+  - **أقنعني** (Convince Game): Web multiplayer, players write answers + rate each other 1-10, first to target score wins
 - **Design**: Dark purple/neon theme (pink #e040fb + cyan #00e5ff), Arabic RTL UI, Cairo font, Framer Motion animations
 - **Logo**: `public/rose-logo.png` (cyberpunk character)
 

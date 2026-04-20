@@ -108,6 +108,19 @@ const games = [
     emoji: "🪑",
     heroImage: "/chairs-hero.png",
   },
+  {
+    id: "convince-game",
+    title: "أقنعني",
+    description: "اقنع الجميع بإجابتك واحصل على أعلى تقييم!",
+    icon: CircleDot,
+    color: "from-amber-500 to-orange-600",
+    borderColor: "border-amber-500/40",
+    glowColor: "shadow-amber-500/30",
+    neonColor: "#f59e0b",
+    path: "/convince-game",
+    emoji: "🎤",
+    heroImage: "/convince-hero.png",
+  },
 ];
 
 export default function Home() {
