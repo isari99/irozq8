@@ -64,40 +64,44 @@ type Phase = "lobby" | "spinning" | "selecting" | "elimination" | "winner";
 interface Player { username: string; displayName: string; avatar: string }
 interface FlyAnim { id: number; player: Player; fx: number; fy: number; tx: number; ty: number }
 
-// ─── Light theme palette ──────────────────────────────────────────────────────
-const AMB    = "#f59e0b";   // amber — primary accent
-const AMB_D  = "#b45309";   // dark amber
-const AMB_L  = "#fef3c7";   // light amber
-const BG     = "#fffbf0";   // warm white page background
-const CARD   = "#ffffff";   // card white
-const CARD2  = "#fff8e7";   // slightly warm card
-const BRDR   = "#fde68a";   // warm border
-const TXT    = "#1c1917";   // stone-900
-const TXT_M  = "#78716c";   // stone-500
-const RED    = "#ef4444";
-const GREEN  = "#16a34a";
-const SELECT_S = 20;
+// ─── Palette — vivid gradient theme (NOT white, NOT muted dark) ───────────────
+const AMB      = "#fbbf24";  // vivid amber
+const AMB_D    = "#d97706";  // dark amber
+const AMB_L    = "#fef3c7";  // light amber
+const PINK     = "#e879f9";  // vivid pink
+const CYAN     = "#22d3ee";  // vivid cyan
+const WHITE    = "#ffffff";
+const TXT_M    = "rgba(255,255,255,0.80)";
+const GLASS    = "rgba(255,255,255,0.11)";
+const GLASS_B  = "rgba(255,255,255,0.20)";
+const RED      = "#f87171";
+const GREEN    = "#4ade80";
+
+// Page gradient — rich vivid purple-indigo (like XO but warmer)
+const PAGE_BG  = "linear-gradient(145deg, #1e1b4b 0%, #312e81 40%, #4c1d95 70%, #1e1b4b 100%)";
+
+const SELECT_S  = 20;
 
 // ─── Wheel geometry ───────────────────────────────────────────────────────────
-const TOTAL    = 520;       // full canvas size (includes chairs)
-const CX       = TOTAL / 2; // 260
+const TOTAL    = 560;
+const CX       = TOTAL / 2;   // 280
 const CY       = TOTAL / 2;
-const DISC_R   = 140;       // visible wheel disc radius
-const PLAYER_R = 158;       // player avatar orbit (just outside disc)
-const CHAIR_R  = 222;       // chair positions (outside player orbit)
+const DISC_R   = 158;          // bigger disc
+const PLAYER_R = 175;          // player orbit
+const CHAIR_R  = 248;          // chairs outside player orbit
 
 // ─── Confetti ─────────────────────────────────────────────────────────────────
-const CC = [AMB, "#f97316", "#22c55e", "#3b82f6", "#ec4899", "#8b5cf6"];
+const CC = [AMB, PINK, CYAN, "#4ade80", "#f87171", "#a78bfa"];
 function Confetti() {
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 50, overflow: "hidden" }}>
-      {Array.from({ length: 60 }).map((_, i) => (
+      {Array.from({ length: 70 }).map((_, i) => (
         <motion.div key={i}
           style={{ position: "absolute", borderRadius: 3,
             width: Math.random() * 10 + 5, height: Math.random() * 10 + 5,
             left: `${Math.random() * 100}%`, top: -16,
             background: CC[i % CC.length] }}
-          animate={{ y: ["0vh", "110vh"], rotate: [0, (Math.random() > .5 ? 1 : -1) * 720], opacity: [1, 0.9, 0] }}
+          animate={{ y: ["0vh", "112vh"], rotate: [0, (Math.random() > .5 ? 1 : -1) * 720], opacity: [1, 0.9, 0] }}
           transition={{ duration: Math.random() * 2.5 + 1.5, delay: Math.random() * 1.5, ease: "linear" }} />
       ))}
     </div>
@@ -110,57 +114,54 @@ function Ring({ sec, total }: { sec: number; total: number }) {
   const warn = sec <= 5;
   return (
     <svg width="56" height="56" viewBox="0 0 56 56">
-      <circle cx="28" cy="28" r={r} fill="none" stroke={`${AMB}30`} strokeWidth="4" />
+      <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="4" />
       <circle cx="28" cy="28" r={r} fill="none"
         stroke={warn ? RED : AMB} strokeWidth="4"
         strokeDasharray={`${circ * (sec / total)} ${circ}`} strokeLinecap="round"
         style={{ transform: "rotate(-90deg)", transformOrigin: "center", transition: "stroke-dasharray 0.85s linear" }} />
-      <text x="28" y="33" textAnchor="middle" fontSize="14" fontWeight="900"
-        fill={warn ? RED : AMB_D}>{sec}</text>
+      <text x="28" y="34" textAnchor="middle" fontSize="15" fontWeight="900"
+        fill={warn ? RED : AMB}>{sec}</text>
     </svg>
   );
 }
 
-// ─── Chair Tile ───────────────────────────────────────────────────────────────
-function ChairTile({ num, player, size = 52 }: { num: number; player?: Player; size?: number }) {
+// ─── Chair Tile — NO background box, just icon + number below ────────────────
+function ChairTile({ num, player, iconSize = 48 }: { num: number; player?: Player; iconSize?: number }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-      {/* Number badge — ABOVE chair */}
-      <div style={{
-        background: player ? AMB : AMB_D, color: CARD,
-        fontWeight: 900, fontSize: 13, lineHeight: "20px",
-        padding: "0 8px", borderRadius: 10, minWidth: 24, textAlign: "center",
-        boxShadow: `0 2px 6px ${AMB}50`,
-      }}>{num}</div>
-
-      {/* Chair tile */}
-      <motion.div
-        animate={player
-          ? { boxShadow: [`0 0 0px ${AMB}40`, `0 0 14px ${AMB}90`, `0 0 0px ${AMB}40`] }
-          : { boxShadow: ["0 2px 8px rgba(0,0,0,0.08)", "0 2px 8px rgba(0,0,0,0.08)"] }}
-        transition={{ duration: 0.75, repeat: Infinity }}
-        style={{
-          width: size, height: size, borderRadius: 14, overflow: "hidden",
-          border: `2.5px solid ${player ? AMB : BRDR}`,
-          background: player ? AMB_L : CARD,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-        {player ? (
-          <motion.img initial={{ scale: 0 }} animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 400, damping: 22 }}
+      {/* Chair icon or player photo — NO card/box background */}
+      {player ? (
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 380, damping: 22 }}>
+          <motion.img
             src={player.avatar} alt={player.displayName}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            animate={{ boxShadow: [`0 0 8px ${AMB}80`, `0 0 22px ${AMB}`, `0 0 8px ${AMB}80`] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+            style={{ width: iconSize, height: iconSize, borderRadius: "50%",
+              objectFit: "cover", border: `3px solid ${AMB}`,
+              display: "block" }}
             onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${player.username}`; }} />
-        ) : (
-          <span style={{ fontSize: size * 0.52 }}>🪑</span>
-        )}
-      </motion.div>
+        </motion.div>
+      ) : (
+        <span style={{ fontSize: iconSize, lineHeight: 1, display: "block",
+          filter: "drop-shadow(0 2px 8px rgba(251,191,36,0.5))" }}>🪑</span>
+      )}
 
-      {/* Name under chair if occupied */}
+      {/* Number BELOW chair — big, bold, readable */}
+      <span style={{
+        fontSize: 15, fontWeight: 900, color: player ? AMB : WHITE,
+        textShadow: player
+          ? `0 0 12px ${AMB}, 0 2px 4px rgba(0,0,0,0.8)`
+          : `0 2px 8px rgba(0,0,0,0.8)`,
+        lineHeight: 1,
+      }}>{num}</span>
+
+      {/* Name when occupied */}
       {player && (
         <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          style={{ fontSize: 9, color: AMB_D, fontWeight: 800,
-            maxWidth: size + 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          style={{ fontSize: 8, color: AMB_L, fontWeight: 800,
+            maxWidth: iconSize + 8, overflow: "hidden", textOverflow: "ellipsis",
+            whiteSpace: "nowrap", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>
           {player.displayName}
         </motion.span>
       )}
@@ -170,10 +171,8 @@ function ChairTile({ num, player, size = 52 }: { num: number; player?: Player; s
 
 // ─── Game Wheel ───────────────────────────────────────────────────────────────
 function GameWheel({ spinning, players, chairCount, chairOccupied, flyAnims }: {
-  spinning: boolean;
-  players: Player[];
-  chairCount: number;
-  chairOccupied: Record<number, Player>;
+  spinning: boolean; players: Player[];
+  chairCount: number; chairOccupied: Record<number, Player>;
   flyAnims: FlyAnim[];
 }) {
   const chairPos = Array.from({ length: chairCount }, (_, i) => {
@@ -182,61 +181,66 @@ function GameWheel({ spinning, players, chairCount, chairOccupied, flyAnims }: {
   });
 
   return (
-    <div style={{ width: TOTAL, height: TOTAL, position: "relative", flexShrink: 0, maxWidth: "100%" }}>
+    <div style={{ width: TOTAL, height: TOTAL, position: "relative", flexShrink: 0,
+      maxWidth: "100%", maxHeight: "100%" }}>
 
-      {/* Disc shadow ring */}
-      <div style={{
-        position: "absolute",
-        left: CX - DISC_R - 12, top: CY - DISC_R - 12,
-        width: (DISC_R + 12) * 2, height: (DISC_R + 12) * 2,
-        borderRadius: "50%",
-        boxShadow: spinning
-          ? `0 0 0 5px ${AMB}, 0 0 32px ${AMB}80, 0 8px 32px rgba(0,0,0,0.15)`
-          : `0 0 0 4px ${BRDR}, 0 6px 24px rgba(0,0,0,0.10)`,
-        transition: "box-shadow 0.5s",
-        background: "transparent",
-      }} />
-
-      {/* Outer spinning ring */}
+      {/* Outer ambient glow */}
       <motion.div
-        animate={{ rotate: spinning ? 360 : 0 }}
-        transition={spinning ? { duration: 3, repeat: Infinity, ease: "linear" } : { duration: 0.4 }}
-        style={{
-          position: "absolute",
-          left: CX - DISC_R - 8, top: CY - DISC_R - 8,
-          width: (DISC_R + 8) * 2, height: (DISC_R + 8) * 2,
-          borderRadius: "50%",
-          background: spinning
-            ? `conic-gradient(${AMB}, #f97316, #fbbf24, ${AMB}, #f97316, #fbbf24, ${AMB})`
-            : `conic-gradient(${BRDR}, #fde68a, ${BRDR})`,
-          filter: "blur(0px)",
+        animate={spinning ? {
+          boxShadow: [
+            `0 0 40px ${AMB}60, 0 0 80px ${PINK}30`,
+            `0 0 60px ${AMB}90, 0 0 120px ${PINK}50`,
+            `0 0 40px ${AMB}60, 0 0 80px ${PINK}30`,
+          ]
+        } : {
+          boxShadow: [`0 0 20px ${AMB}40, 0 0 40px rgba(0,0,0,0.3)`,
+                      `0 0 30px ${AMB}60, 0 0 40px rgba(0,0,0,0.3)`,
+                      `0 0 20px ${AMB}40, 0 0 40px rgba(0,0,0,0.3)`]
+        }}
+        transition={{ duration: 1.6, repeat: Infinity }}
+        style={{ position: "absolute",
+          left: CX - DISC_R - 10, top: CY - DISC_R - 10,
+          width: (DISC_R + 10) * 2, height: (DISC_R + 10) * 2,
+          borderRadius: "50%", border: `4px solid ${AMB}`,
         }} />
 
-      {/* Disc body — light warm white */}
+      {/* Spinning outer color ring */}
+      <motion.div
+        animate={{ rotate: spinning ? 360 : 0 }}
+        transition={spinning ? { duration: 2.8, repeat: Infinity, ease: "linear" } : { duration: 0.6 }}
+        style={{
+          position: "absolute",
+          left: CX - DISC_R - 6, top: CY - DISC_R - 6,
+          width: (DISC_R + 6) * 2, height: (DISC_R + 6) * 2,
+          borderRadius: "50%",
+          background: `conic-gradient(${AMB}, ${PINK}, ${CYAN}, ${AMB}, ${PINK}, ${CYAN}, ${AMB})`,
+        }} />
+
+      {/* Disc body — golden radial gradient, vibrant */}
       <div style={{
         position: "absolute",
         left: CX - DISC_R, top: CY - DISC_R,
         width: DISC_R * 2, height: DISC_R * 2,
         borderRadius: "50%",
-        background: `radial-gradient(circle at 38% 32%, #fffef8 0%, #fff8e1 60%, #fef3c7 100%)`,
-        boxShadow: "inset 0 2px 12px rgba(245,158,11,0.12), inset 0 -2px 8px rgba(0,0,0,0.06)",
-        border: `3px solid ${CARD}`,
+        background: `radial-gradient(circle at 38% 32%, #fef9c3 0%, #fde68a 35%, ${AMB} 65%, ${AMB_D} 100%)`,
+        boxShadow: "inset 0 2px 16px rgba(255,255,255,0.4), inset 0 -4px 16px rgba(0,0,0,0.15)",
+        border: `3px solid rgba(255,255,255,0.6)`,
         zIndex: 2,
       }}>
         {/* Inner decorative rings */}
-        <div style={{ position: "absolute", inset: 18, borderRadius: "50%",
-          border: `1.5px solid ${AMB}30` }} />
-        <div style={{ position: "absolute", inset: 38, borderRadius: "50%",
-          border: `1px solid ${AMB}20` }} />
-        {/* Dot grid */}
+        <div style={{ position: "absolute", inset: 20, borderRadius: "50%",
+          border: "1.5px solid rgba(255,255,255,0.35)" }} />
+        <div style={{ position: "absolute", inset: 44, borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.20)" }} />
+        {/* Subtle dot grid */}
         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
-          borderRadius: "50%", opacity: 0.12 }}>
+          borderRadius: "50%", opacity: 0.15 }}>
           <defs>
-            <pattern id="cgL" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
-              <circle cx="8" cy="8" r="1.5" fill={AMB_D} />
+            <pattern id="cg2" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
+              <circle cx="9" cy="9" r="1.5" fill={AMB_D} />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#cgL)" />
+          <rect width="100%" height="100%" fill="url(#cg2)" />
         </svg>
       </div>
 
@@ -249,15 +253,13 @@ function GameWheel({ spinning, players, chairCount, chairOccupied, flyAnims }: {
           const py  = CY + PLAYER_R * Math.sin(rad);
           const sat = Object.values(chairOccupied).some(x => x.username === p.username);
           return (
-            <div key={p.username} style={{ position: "absolute", left: px - 22, top: py - 22,
-              width: 44, height: 44 }}>
-              <div className={spinning ? "chairs-counter" : ""}
-                style={{ width: "100%", height: "100%" }}>
+            <div key={p.username} style={{ position: "absolute", left: px - 22, top: py - 22, width: 44, height: 44 }}>
+              <div className={spinning ? "chairs-counter" : ""} style={{ width: "100%", height: "100%" }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: "50%", overflow: "hidden",
-                  border: `3px solid ${sat ? AMB : AMB_D}`,
-                  boxShadow: `0 0 ${sat ? 12 : 6}px ${sat ? AMB : AMB_D}80`,
-                  opacity: !spinning && sat ? 0.25 : 1,
+                  border: `3px solid ${sat ? AMB : "rgba(255,255,255,0.7)"}`,
+                  boxShadow: `0 0 ${sat ? 14 : 8}px ${sat ? AMB : "rgba(255,255,255,0.5)"}`,
+                  opacity: !spinning && sat ? 0.22 : 1,
                   transition: "opacity 0.4s",
                 }}>
                   <img src={p.avatar} alt={p.displayName}
@@ -270,25 +272,25 @@ function GameWheel({ spinning, players, chairCount, chairOccupied, flyAnims }: {
         })}
       </div>
 
-      {/* Center: spinning music icon */}
-      <div style={{ position: "absolute", left: CX - 28, top: CY - 28, width: 56, height: 56,
+      {/* Center icon — no unnecessary text */}
+      <div style={{ position: "absolute", left: CX - 30, top: CY - 30, width: 60, height: 60,
         zIndex: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {spinning ? (
-          <motion.span animate={{ scale: [1, 1.3, 1], rotate: [0, 15, -15, 0] }}
-            transition={{ duration: 0.85, repeat: Infinity }}
-            style={{ fontSize: 36 }}>🎵</motion.span>
+          <motion.span animate={{ scale: [1, 1.35, 1], rotate: [0, 18, -18, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+            style={{ fontSize: 38, filter: "drop-shadow(0 0 12px rgba(251,191,36,0.9))" }}>🎵</motion.span>
         ) : (
-          <span style={{ fontSize: 30 }}>🪑</span>
+          <span style={{ fontSize: 28, opacity: 0.5 }}>🪑</span>
         )}
       </div>
 
-      {/* Chairs — arranged OUTSIDE the wheel */}
+      {/* Chairs — floating around wheel, NO box background */}
       {chairPos.map(({ num, x, y }) => (
         <motion.div key={num}
           initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: (num - 1) * 0.05, type: "spring", stiffness: 360, damping: 22 }}
-          style={{ position: "absolute", left: x - 32, top: y - 48, zIndex: 5 }}>
-          <ChairTile num={num} player={chairOccupied[num]} size={50} />
+          style={{ position: "absolute", left: x - 30, top: y - 44, zIndex: 5 }}>
+          <ChairTile num={num} player={chairOccupied[num]} iconSize={46} />
         </motion.div>
       ))}
 
@@ -296,50 +298,63 @@ function GameWheel({ spinning, players, chairCount, chairOccupied, flyAnims }: {
       {flyAnims.map(a => (
         <motion.div key={a.id}
           initial={{ x: a.fx - 22, y: a.fy - 22, scale: 1, opacity: 1 }}
-          animate={{ x: a.tx - 32, y: a.ty - 38, scale: 0.8, opacity: 0 }}
+          animate={{ x: a.tx - 30, y: a.ty - 34, scale: 0.85, opacity: 0 }}
           transition={{ duration: 0.5, ease: "easeInOut" }}
           style={{ position: "absolute", left: 0, top: 0, width: 44, height: 44,
             pointerEvents: "none", zIndex: 20 }}>
-          <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden",
-            border: `3px solid ${AMB}`, boxShadow: `0 0 12px ${AMB}` }}>
-            <img src={a.player.avatar}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${a.player.username}`; }} />
-          </div>
+          <img src={a.player.avatar}
+            style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover",
+              border: `3px solid ${AMB}`, boxShadow: `0 0 12px ${AMB}` }}
+            onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${a.player.username}`; }} />
         </motion.div>
       ))}
 
-      {/* Top pointer diamond */}
-      <div style={{ position: "absolute", top: CY - DISC_R - 18, left: CX - 7, zIndex: 6 }}>
-        <div style={{ width: 14, height: 14, background: AMB, transform: "rotate(45deg)",
-          borderRadius: 3, boxShadow: `0 2px 8px ${AMB}80` }} />
+      {/* Top pointer */}
+      <div style={{ position: "absolute", top: CY - DISC_R - 20, left: CX - 8, zIndex: 6 }}>
+        <div style={{ width: 16, height: 16, background: AMB, transform: "rotate(45deg)",
+          borderRadius: 4, boxShadow: `0 0 16px ${AMB}` }} />
       </div>
     </div>
   );
 }
+
+// ─── Glass card helper ────────────────────────────────────────────────────────
+const glassStyle = (extra?: React.CSSProperties): React.CSSProperties => ({
+  background: GLASS, border: `1.5px solid ${GLASS_B}`,
+  borderRadius: 20, backdropFilter: "blur(0px)",
+  boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+  ...extra,
+});
 
 // ─── Volume bar ───────────────────────────────────────────────────────────────
 function VolumeBar({ vol, onChange }: { vol: number; onChange: (v: number) => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <button onClick={() => onChange(Math.max(0, vol - 20))}
-        style={{ color: AMB_D, background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }}>
-        <VolumeX size={15} />
+        style={{ color: AMB, background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }}>
+        <VolumeX size={16} />
       </button>
       <div style={{ display: "flex", gap: 3, alignItems: "flex-end" }}>
         {[20, 40, 60, 80, 100].map(s => (
           <motion.div key={s} onClick={() => onChange(s)}
-            animate={{ background: vol >= s ? AMB : BRDR }}
-            style={{ width: 5, height: 5 + (s / 100) * 14, borderRadius: 3, cursor: "pointer" }} />
+            animate={{ background: vol >= s ? AMB : "rgba(255,255,255,0.25)" }}
+            style={{ width: 6, height: 6 + (s / 100) * 16, borderRadius: 3, cursor: "pointer" }} />
         ))}
       </div>
       <button onClick={() => onChange(Math.min(100, vol + 20))}
-        style={{ color: AMB_D, background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }}>
-        <Volume2 size={15} />
+        style={{ color: AMB, background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }}>
+        <Volume2 size={16} />
       </button>
     </div>
   );
 }
+
+// ─── Primary button ───────────────────────────────────────────────────────────
+const btnPrimary: React.CSSProperties = {
+  background: `linear-gradient(135deg, #fbbf24, ${AMB}, ${AMB_D})`,
+  color: "#1a1a1a", fontWeight: 900, border: "none", cursor: "pointer",
+  boxShadow: `0 6px 28px ${AMB}60, 0 2px 8px rgba(0,0,0,0.3)`,
+};
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ChairsGame() {
@@ -404,7 +419,7 @@ export default function ChairsGame() {
     prevChairRef.current = { ...chairOccupied };
   }, [chairOccupied]);
 
-  // YouTube
+  // YouTube setup
   useEffect(() => {
     loadYT().then(() => {
       if (!ytDivRef.current || ytRef.current) return;
@@ -453,8 +468,7 @@ export default function ChairsGame() {
       setWinner(rem[0] ?? null); setPlayers(rem);
       phaseRef.current = "winner"; setPhase("winner");
     } else {
-      setPlayers(rem); setRoundNum(r => r + 1);
-      setFlyAnims([]);
+      setPlayers(rem); setRoundNum(r => r + 1); setFlyAnims([]);
       setTimeout(() => startSpin(rem), 150);
     }
   };
@@ -545,35 +559,48 @@ export default function ChairsGame() {
 
   const isPlaying = phase !== "lobby";
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="h-screen flex flex-col overflow-hidden" dir="rtl"
-      style={{ background: BG, fontFamily: "'Cairo','Inter',sans-serif" }}>
+      style={{ background: PAGE_BG, fontFamily: "'Cairo','Inter',sans-serif" }}>
+
+      {/* Ambient glows */}
+      <div style={{ position: "absolute", top: -80, right: -80, width: 350, height: 350,
+        borderRadius: "50%", opacity: 0.18, pointerEvents: "none",
+        background: `radial-gradient(circle, ${PINK}, transparent)`, filter: "blur(60px)" }} />
+      <div style={{ position: "absolute", bottom: -80, left: -80, width: 350, height: 350,
+        borderRadius: "50%", opacity: 0.14, pointerEvents: "none",
+        background: `radial-gradient(circle, ${CYAN}, transparent)`, filter: "blur(60px)" }} />
+      <div style={{ position: "absolute", top: "40%", left: "50%", transform: "translate(-50%,-50%)",
+        width: 500, height: 500, borderRadius: "50%", opacity: 0.08, pointerEvents: "none",
+        background: `radial-gradient(circle, ${AMB}, transparent)`, filter: "blur(80px)" }} />
 
       {/* Hidden YT */}
-      <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }}>
+      <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }}>
         <div ref={ytDivRef} />
       </div>
 
       {/* ── Header ────────────────────────────────────────────────────────────── */}
-      <header style={{ background: CARD, borderBottom: `2px solid ${BRDR}`,
-        boxShadow: "0 2px 12px rgba(245,158,11,0.10)" }}
+      <header style={{ ...glassStyle({ borderRadius: 0, borderLeft: "none", borderRight: "none",
+        borderTop: "none", borderBottom: `1px solid ${GLASS_B}` }) }}
         className="flex items-center justify-between px-5 py-3 flex-shrink-0 z-20">
         <button onClick={() => { clrAll(); stopMusic(); navigate("/"); }}
           className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
-          style={{ color: AMB_D, fontWeight: 700, fontSize: 14 }}>
+          style={{ color: AMB, fontWeight: 700, fontSize: 14 }}>
           <ArrowRight size={15} /> رجوع
         </button>
         <div className="flex items-center gap-2">
           <span style={{ fontSize: 20 }}>🪑</span>
-          <span style={{ fontWeight: 900, fontSize: 17, color: AMB_D }}>
+          <span style={{ fontWeight: 900, fontSize: 17, color: WHITE,
+            textShadow: `0 0 20px ${AMB}` }}>
             لعبة الكراسي{roundNum > 1 ? ` — الجولة ${roundNum}` : ""}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
           style={{
-            border: `1.5px solid ${connected ? AMB : "#e5e7eb"}`,
-            background: connected ? AMB_L : "#f9fafb",
-            color: connected ? AMB_D : TXT_M,
+            border: `1.5px solid ${connected ? AMB + "70" : "rgba(255,255,255,0.15)"}`,
+            background: connected ? `${AMB}15` : "rgba(255,255,255,0.05)",
+            color: connected ? AMB : TXT_M,
           }}>
           {connected ? <Wifi size={11} /> : <WifiOff size={11} />}
           <span style={{ fontWeight: 700, fontSize: 11 }}>
@@ -582,23 +609,24 @@ export default function ChairsGame() {
         </div>
       </header>
 
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* LOBBY                                                                  */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* ══════════════ LOBBY ══════════════════════════════════════════════════ */}
       {!isPlaying && (
-        <main className="flex-1 overflow-y-auto flex flex-col items-center px-4 py-6 gap-5">
+        <motion.main key="lobby"
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -16 }}
+          className="flex-1 overflow-y-auto flex flex-col items-center px-4 py-6 gap-5">
 
           {/* Big join instruction */}
           <div className="text-center">
-            <h1 style={{ fontSize: 42, fontWeight: 900, color: TXT, lineHeight: 1.2 }}>
+            <h1 style={{ fontSize: 44, fontWeight: 900, color: WHITE, lineHeight: 1.2,
+              textShadow: "0 2px 16px rgba(0,0,0,0.5)" }}>
               اكتب{" "}
-              <span style={{ color: AMB, background: AMB_L, padding: "2px 14px", borderRadius: 12,
-                border: `2px solid ${BRDR}` }}>
+              <span style={{ color: AMB, textShadow: `0 0 24px ${AMB}, 0 0 48px ${AMB_D}` }}>
                 join
-              </span>{" "}
-              في الشات
+              </span>
+              {" "}في الشات
             </h1>
-            <p style={{ fontSize: 16, color: TXT_M, fontWeight: 600, marginTop: 10 }}>
+            <p style={{ fontSize: 15, color: TXT_M, fontWeight: 600, marginTop: 8 }}>
               join in chat to join the musical chairs game 🎵
             </p>
           </div>
@@ -607,10 +635,10 @@ export default function ChairsGame() {
           <div className="w-full max-w-md flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users size={16} color={AMB} />
-              <span style={{ fontWeight: 800, fontSize: 15, color: TXT }}>players joined</span>
+              <span style={{ fontWeight: 800, fontSize: 15, color: WHITE }}>players joined</span>
             </div>
-            <span style={{ fontWeight: 900, fontSize: 14, padding: "4px 14px", borderRadius: 20,
-              background: AMB_L, color: AMB_D, border: `1.5px solid ${BRDR}` }}>
+            <span style={{ fontWeight: 900, fontSize: 13, padding: "4px 14px", borderRadius: 20,
+              background: `${AMB}20`, color: AMB, border: `1.5px solid ${AMB}50` }}>
               {players.length} لاعب
             </span>
           </div>
@@ -618,10 +646,11 @@ export default function ChairsGame() {
           {/* Empty state or player grid */}
           {players.length === 0 ? (
             <div className="w-full max-w-md flex flex-col items-center py-12 rounded-2xl"
-              style={{ border: `2px dashed ${BRDR}`, background: CARD }}>
-              <motion.span animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }}
-                style={{ fontSize: 52 }}>🪑</motion.span>
-              <p style={{ color: AMB_D, fontWeight: 800, fontSize: 18, marginTop: 12 }}>
+              style={glassStyle({ border: `2px dashed ${GLASS_B}` })}>
+              <motion.span animate={{ y: [0, -10, 0] }} transition={{ duration: 2, repeat: Infinity }}
+                style={{ fontSize: 54, filter: "drop-shadow(0 4px 12px rgba(251,191,36,0.6))" }}>🪑</motion.span>
+              <p style={{ color: AMB, fontWeight: 800, fontSize: 18, marginTop: 14,
+                textShadow: `0 0 16px ${AMB}` }}>
                 waiting for players...
               </p>
               <p style={{ color: TXT_M, fontWeight: 600, fontSize: 14, marginTop: 6 }}>
@@ -635,16 +664,16 @@ export default function ChairsGame() {
                   initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 22 }}
                   className="flex flex-col items-center gap-2 p-3 rounded-2xl"
-                  style={{ background: CARD, border: `2px solid ${BRDR}`,
-                    boxShadow: "0 2px 12px rgba(245,158,11,0.10)" }}>
-                  <div style={{ width: 68, height: 68, borderRadius: "50%", overflow: "hidden",
-                    border: `3px solid ${AMB}`, boxShadow: `0 0 14px ${AMB}50` }}>
+                  style={glassStyle()}>
+                  <div style={{ width: 66, height: 66, borderRadius: "50%", overflow: "hidden",
+                    border: `3px solid ${AMB}`, boxShadow: `0 0 18px ${AMB}60` }}>
                     <img src={p.avatar} alt={p.displayName}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
                   </div>
-                  <span style={{ fontWeight: 800, fontSize: 13, color: TXT, textAlign: "center",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: WHITE, textAlign: "center",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%",
+                    textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
                     {p.displayName}
                   </span>
                 </motion.div>
@@ -660,45 +689,37 @@ export default function ChairsGame() {
               whileHover={players.length >= 2 ? { scale: 1.02, y: -2 } : {}}
               whileTap={players.length >= 2 ? { scale: 0.97 } : {}}
               style={{
-                width: "100%", padding: "18px 0", borderRadius: 18,
-                fontWeight: 900, fontSize: 20,
-                background: players.length >= 2
-                  ? `linear-gradient(135deg, #fbbf24, ${AMB}, ${AMB_D})`
-                  : "#f3f4f6",
-                color: players.length >= 2 ? CARD : "#9ca3af",
-                boxShadow: players.length >= 2
-                  ? `0 6px 28px ${AMB}60, 0 2px 8px rgba(0,0,0,0.12)`
-                  : "none",
-                border: `2px solid ${players.length >= 2 ? AMB : "#e5e7eb"}`,
-                cursor: players.length >= 2 ? "pointer" : "not-allowed",
+                width: "100%", padding: "18px 0", borderRadius: 18, fontSize: 20,
+                ...(players.length >= 2 ? btnPrimary : {
+                  background: "rgba(255,255,255,0.07)",
+                  color: "rgba(255,255,255,0.35)", fontWeight: 900,
+                  border: "1.5px solid rgba(255,255,255,0.10)", cursor: "not-allowed",
+                }),
               }}>
               {players.length >= 2
                 ? `▶  Play Now — ${players.length} لاعبين`
                 : "waiting for players..."}
             </motion.button>
           </div>
-        </main>
+        </motion.main>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* PLAY SCREEN — single screen, wheel always visible                     */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* ══════════════ PLAY SCREEN — all phases on one screen ════════════════ */}
       {isPlaying && (
-        <main className="flex-1 overflow-y-auto flex flex-col items-center px-4 py-3 gap-3">
+        <main className="flex-1 overflow-y-auto flex flex-col items-center px-3 py-3 gap-2">
 
-          {/* ── Status bar (changes by phase, no transitions) ── */}
-          <div className="w-full max-w-xl">
+          {/* Status bar */}
+          <div className="w-full" style={{ maxWidth: TOTAL }}>
 
             {/* SPINNING */}
             {phase === "spinning" && (
               <div className="flex items-center justify-between px-4 py-3 rounded-2xl"
-                style={{ background: CARD, border: `2px solid ${BRDR}`,
-                  boxShadow: "0 2px 12px rgba(245,158,11,0.12)" }}>
+                style={glassStyle()}>
                 <div>
-                  <p style={{ fontWeight: 900, fontSize: 18, color: TXT }}>
+                  <p style={{ fontWeight: 900, fontSize: 17, color: WHITE }}>
                     🎵 الجولة {roundNum} — العجلة تدور!
                   </p>
-                  <p style={{ fontWeight: 600, fontSize: 13, color: TXT_M, marginTop: 2 }}>
+                  <p style={{ fontWeight: 600, fontSize: 12, color: TXT_M, marginTop: 2 }}>
                     {players.length} لاعبين — {numChairs} كراسي
                   </p>
                 </div>
@@ -706,10 +727,10 @@ export default function ChairsGame() {
                   <div className="flex flex-col items-end gap-1.5">
                     <div className="flex items-center gap-1.5">
                       <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.7, repeat: Infinity }}>
-                        <Music2 size={14} color={AMB} />
+                        <Music2 size={13} color={AMB} />
                       </motion.div>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: AMB_D }}>
-                        {currentSong.title}
+                      <span style={{ fontWeight: 700, fontSize: 12, color: AMB }}>
+                        {currentSong.title} — {currentSong.artist}
                       </span>
                     </div>
                     <VolumeBar vol={volume} onChange={changeVolume} />
@@ -721,41 +742,47 @@ export default function ChairsGame() {
             {/* SELECTING */}
             {phase === "selecting" && (
               <div className="flex items-center justify-between px-4 py-3 rounded-2xl"
-                style={{ background: CARD, border: `2px solid ${AMB}`,
-                  boxShadow: `0 4px 20px ${AMB}30` }}>
+                style={{ ...glassStyle(), border: `1.5px solid ${AMB}80`,
+                  boxShadow: `0 4px 24px ${AMB}35` }}>
                 <div>
-                  <p style={{ fontWeight: 900, fontSize: 18, color: TXT }}>
+                  <p style={{ fontWeight: 900, fontSize: 17, color: WHITE }}>
                     🪑 اختر كرسيك!
                   </p>
-                  <p style={{ fontWeight: 600, fontSize: 13, color: TXT_M, marginTop: 2 }}>
+                  <p style={{ fontWeight: 600, fontSize: 12, color: TXT_M, marginTop: 2 }}>
                     اكتب رقم الكرسي في الشات (1–{numChairs})
                   </p>
                 </div>
-                <Ring sec={selTimer} total={SELECT_S} />
+                <div className="flex items-center gap-3">
+                  <Ring sec={selTimer} total={SELECT_S} />
+                  <motion.button onClick={() => { clrAll(); doEliminate(); }}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
+                    style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 14,
+                      fontSize: 13, fontWeight: 900 }}>
+                    ❌ انهِ الاختيار
+                  </motion.button>
+                </div>
               </div>
             )}
 
             {/* ELIMINATION */}
             {phase === "elimination" && eliminated && (
-              <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              <motion.div initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                 className="flex items-center gap-4 px-4 py-3 rounded-2xl"
-                style={{ background: "#fef2f2", border: `2px solid ${RED}60`,
-                  boxShadow: `0 4px 20px ${RED}25` }}>
-                <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.9, repeat: Infinity }}
+                style={{ background: "rgba(239,68,68,0.15)", border: `1.5px solid ${RED}60`,
+                  boxShadow: `0 4px 24px rgba(239,68,68,0.30)` }}>
+                <motion.span animate={{ scale: [1, 1.22, 1] }} transition={{ duration: 0.9, repeat: Infinity }}
                   style={{ fontSize: 36 }}>💥</motion.span>
-                <div className="flex items-center gap-3 flex-1">
-                  <img src={eliminated.avatar} alt={eliminated.displayName}
-                    style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover",
-                      border: `3px solid ${RED}`, boxShadow: `0 0 18px ${RED}60` }}
-                    onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${eliminated.username}`; }} />
-                  <div>
-                    <p style={{ fontWeight: 900, fontSize: 18, color: RED }}>
-                      {eliminated.displayName}
-                    </p>
-                    <p style={{ fontWeight: 600, fontSize: 13, color: TXT_M }}>
-                      تم إقصاؤه! الجولة التالية تبدأ تلقائياً
-                    </p>
-                  </div>
+                <img src={eliminated.avatar} alt={eliminated.displayName}
+                  style={{ width: 54, height: 54, borderRadius: 14, objectFit: "cover",
+                    border: `3px solid ${RED}`, boxShadow: `0 0 18px ${RED}70` }}
+                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${eliminated.username}`; }} />
+                <div className="flex-1">
+                  <p style={{ fontWeight: 900, fontSize: 18, color: RED, textShadow: `0 0 16px ${RED}` }}>
+                    {eliminated.displayName}
+                  </p>
+                  <p style={{ fontWeight: 600, fontSize: 12, color: TXT_M, marginTop: 2 }}>
+                    تم إقصاؤه! الجولة التالية تبدأ تلقائياً
+                  </p>
                 </div>
                 <Ring sec={cdTimer} total={5} />
               </motion.div>
@@ -763,28 +790,27 @@ export default function ChairsGame() {
 
             {/* WINNER */}
             {phase === "winner" && winner && (
-              <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center gap-4 px-4 py-4 rounded-2xl"
-                style={{ background: "#f0fdf4", border: `2px solid ${GREEN}60`,
-                  boxShadow: `0 4px 24px ${GREEN}30` }}>
+              <motion.div initial={{ scale: 0.82, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="flex items-center gap-4 px-4 py-3 rounded-2xl"
+                style={{ background: "rgba(74,222,128,0.12)", border: `1.5px solid ${GREEN}60`,
+                  boxShadow: `0 4px 24px rgba(74,222,128,0.25)` }}>
                 <Confetti />
-                <motion.span animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }}
-                  style={{ fontSize: 42 }}>🏆</motion.span>
+                <motion.span animate={{ y: [0, -10, 0] }} transition={{ duration: 1.4, repeat: Infinity }}
+                  style={{ fontSize: 40 }}>🏆</motion.span>
                 <div className="flex items-center gap-3 flex-1">
                   <div style={{ position: "relative" }}>
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
                       style={{ position: "absolute", inset: -4, borderRadius: "50%",
-                        background: `conic-gradient(${AMB},#22c55e,#3b82f6,${AMB})`, filter: "blur(3px)" }} />
+                        background: `conic-gradient(${AMB},${PINK},${CYAN},${AMB})`, filter: "blur(3px)" }} />
                     <img src={winner.avatar} alt={winner.displayName}
-                      style={{ position: "relative", width: 64, height: 64, borderRadius: "50%",
+                      style={{ position: "relative", width: 60, height: 60, borderRadius: "50%",
                         objectFit: "cover", border: `3px solid ${AMB}` }}
                       onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${winner.username}`; }} />
                   </div>
                   <div>
-                    <p style={{ fontWeight: 900, fontSize: 22, color: GREEN }}>
-                      {winner.displayName}
-                    </p>
-                    <p style={{ fontWeight: 700, fontSize: 13, color: TXT_M }}>
+                    <p style={{ fontWeight: 900, fontSize: 20, color: GREEN,
+                      textShadow: `0 0 16px ${GREEN}` }}>{winner.displayName}</p>
+                    <p style={{ fontWeight: 600, fontSize: 12, color: TXT_M, marginTop: 1 }}>
                       🎉 الفائز بلعبة الكراسي الموسيقية!
                     </p>
                   </div>
@@ -792,25 +818,24 @@ export default function ChairsGame() {
                 <div className="flex flex-col gap-2">
                   <motion.button onClick={doRestart} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
                     className="flex items-center gap-1.5"
-                    style={{ padding: "10px 18px", borderRadius: 14, fontWeight: 800, fontSize: 14,
-                      background: `linear-gradient(135deg, #fbbf24, ${AMB})`, color: CARD,
-                      boxShadow: `0 4px 14px ${AMB}50`, border: "none", cursor: "pointer" }}>
+                    style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 14, fontSize: 14 }}>
                     <RotateCcw size={13} /> العب مجدداً
                   </motion.button>
-                  <motion.button onClick={() => navigate("/")} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
+                  <motion.button onClick={() => navigate("/")} whileHover={{ scale: 1.05 }}
                     className="flex items-center gap-1.5 justify-center"
-                    style={{ padding: "8px 18px", borderRadius: 14, fontWeight: 700, fontSize: 13,
-                      background: CARD, color: TXT_M, border: `1.5px solid ${BRDR}`, cursor: "pointer" }}>
-                    <ArrowRight size={13} /> الرئيسية
+                    style={{ padding: "8px 18px", borderRadius: 14, fontWeight: 700, fontSize: 12,
+                      background: "rgba(255,255,255,0.08)", color: TXT_M,
+                      border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer" }}>
+                    <ArrowRight size={12} /> الرئيسية
                   </motion.button>
                 </div>
               </motion.div>
             )}
           </div>
 
-          {/* ── Wheel — always visible during play ── */}
+          {/* ── THE WHEEL — always center, main element ── */}
           <div style={{ display: "flex", justifyContent: "center", width: "100%",
-            maxWidth: TOTAL, margin: "0 auto" }}>
+            maxWidth: TOTAL, flexShrink: 0 }}>
             <GameWheel
               spinning={phase === "spinning"}
               players={players}
@@ -820,44 +845,32 @@ export default function ChairsGame() {
             />
           </div>
 
-          {/* ── Unseated players (selecting phase) ── */}
+          {/* Unseated players (selecting phase) */}
           {phase === "selecting" && (
-            <div className="w-full max-w-xl">
-              <div className="flex flex-wrap justify-center gap-2 mb-3">
-                {players.filter(p => !Object.values(chairOccupied).some(x => x.username === p.username)).map(p => (
-                  <div key={p.username} className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
-                    style={{ background: CARD, border: `1.5px solid ${BRDR}`,
-                      boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                    <img src={p.avatar} alt={p.displayName}
-                      style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover",
-                        border: `2px solid ${AMB}` }}
-                      onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-                    <span style={{ fontWeight: 700, fontSize: 13, color: TXT }}>{p.displayName}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-center">
-                <motion.button onClick={() => { clrAll(); doEliminate(); }}
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  style={{ padding: "12px 32px", borderRadius: 16, fontWeight: 900, fontSize: 15,
-                    background: `linear-gradient(135deg, #fbbf24, ${AMB}, ${AMB_D})`,
-                    color: CARD, boxShadow: `0 4px 18px ${AMB}50`, border: "none", cursor: "pointer" }}>
-                  ❌ انتهى الاختيار — تحديد الخاسر
-                </motion.button>
-              </div>
+            <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+              {players.filter(p => !Object.values(chairOccupied).some(x => x.username === p.username)).map(p => (
+                <div key={p.username} className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+                  style={glassStyle({ borderRadius: 14 })}>
+                  <img src={p.avatar} alt={p.displayName}
+                    style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover",
+                      border: `2px solid ${AMB}` }}
+                    onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
+                  <span style={{ fontWeight: 700, fontSize: 13, color: WHITE }}>{p.displayName}</span>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* ── Remaining players during elimination ── */}
+          {/* Remaining players (elimination) */}
           {phase === "elimination" && (
             <div className="flex flex-wrap justify-center gap-2 max-w-sm">
               {players.filter(p => p.username !== eliminated?.username).map(p => (
                 <div key={p.username} className="flex flex-col items-center gap-1">
                   <img src={p.avatar} alt={p.displayName}
-                    style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover",
-                      border: `2.5px solid ${AMB}`, boxShadow: `0 0 10px ${AMB}40` }}
+                    style={{ width: 42, height: 42, borderRadius: 12, objectFit: "cover",
+                      border: `2.5px solid ${AMB}`, boxShadow: `0 0 10px ${AMB}50` }}
                     onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.username}`; }} />
-                  <span style={{ fontSize: 10, color: AMB_D, fontWeight: 700, maxWidth: 44,
+                  <span style={{ fontSize: 10, color: AMB, fontWeight: 700, maxWidth: 44,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {p.displayName}
                   </span>
