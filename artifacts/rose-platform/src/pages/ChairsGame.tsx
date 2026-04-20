@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTwitchAvatar, fallbackAvatar as avatarFallback } from "@/lib/twitchUser";
+import { parseChatLine } from "@/lib/twitchChat";
 
 // ─── YouTube API ──────────────────────────────────────────────────────────────
 declare global {
@@ -298,14 +299,14 @@ export default function ChairsGame() {
   };
 
   // ── Chat handler ───────────────────────────────────────────────────────────
-  const handleChat = useCallback((username: string, text: string) => {
+  const handleChat = useCallback((username: string, text: string, displayName = username) => {
     const msg = text.trim().toLowerCase();
     const ph  = phaseRef.current;
 
     // ── Join lobby ──
     if (msg === "join" && ph === "lobby") {
       if (playersRef.current.some(p => p.username === username)) return;
-      const np: Player = { username, displayName: username, avatar: avatarFallback(username) };
+      const np: Player = { username, displayName, avatar: avatarFallback(username) };
       setPlayers(prev => { const n = [...prev, np]; playersRef.current = n; return n; });
       fetchTwitchAvatar(username).then(avatar =>
         setPlayers(prev => {
@@ -363,14 +364,15 @@ export default function ChairsGame() {
     ws.onopen = () => {
       ws.send("PASS SCHMOOPIIE");
       ws.send(`NICK justinfan${Math.floor(Math.random() * 89999) + 10001}`);
+      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
       ws.send(`JOIN #${channel.toLowerCase()}`);
     };
     ws.onmessage = e => {
       for (const line of (e.data as string).split("\r\n").filter(Boolean)) {
         if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); continue; }
         if (line.includes("366") || line.includes("ROOMSTATE")) { setTwitchOk(true); continue; }
-        const m = line.match(/^(?:@[^ ]+ )?:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
-        if (m) handleChat(m[1], m[2].trim());
+        const cm = parseChatLine(line);
+        if (cm) handleChat(cm.username, cm.text, cm.displayName);
       }
     };
     ws.onclose = () => setTwitchOk(false);

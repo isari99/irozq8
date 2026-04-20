@@ -40,6 +40,24 @@ async function getAppToken(): Promise<string | null> {
   }
 }
 
+async function getTwitchUserFromIvr(username: string): Promise<TwitchUser> {
+  try {
+    const res = await fetch(`https://api.ivr.fi/v2/twitch/user/by-login/${username}`, {
+      headers: { "User-Agent": "RosePlatform/1.0" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return { avatarUrl: null, displayName: username };
+    const data: any = await res.json();
+    if (!data || !data.login) return { avatarUrl: null, displayName: username };
+    return {
+      avatarUrl: data.logo ?? null,
+      displayName: data.displayName ?? username,
+    };
+  } catch {
+    return { avatarUrl: null, displayName: username };
+  }
+}
+
 export async function getTwitchUser(username: string): Promise<TwitchUser> {
   const lower = username.toLowerCase();
 
@@ -51,7 +69,9 @@ export async function getTwitchUser(username: string): Promise<TwitchUser> {
   const token = await getAppToken();
   const clientId = process.env.TWITCH_CLIENT_ID;
   if (!token || !clientId) {
-    return { avatarUrl: null, displayName: username };
+    const result = await getTwitchUserFromIvr(lower);
+    userCache.set(lower, { data: result, fetchedAt: Date.now() });
+    return result;
   }
 
   try {

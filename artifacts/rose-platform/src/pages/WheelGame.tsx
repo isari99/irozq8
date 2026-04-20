@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { fetchTwitchAvatar, fallbackAvatar } from "@/lib/twitchUser";
+import { parseChatLine } from "@/lib/twitchChat";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence, useAnimate } from "framer-motion";
 import { ArrowRight, Wifi, WifiOff, Users, Play, RefreshCw, Tv2 } from "lucide-react";
@@ -471,6 +472,7 @@ export default function WheelGame() {
     ws.onopen = () => {
       ws.send("PASS SCHMOOPIIE");
       ws.send(`NICK justinfan${Math.floor(Math.random() * 89999) + 10000}`);
+      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
       ws.send(`JOIN #${ch}`);
     };
     ws.onmessage = e => {
@@ -478,8 +480,8 @@ export default function WheelGame() {
       for (const line of lines) {
         if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); continue; }
         if (line.includes("366") || line.includes("ROOMSTATE")) { setTwitchConnected(true); continue; }
-        const m = line.match(/^(?:@[^ ]+ )?:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)$/);
-        if (m) handleChatMsg(m[1], m[2].trim());
+        const cm = parseChatLine(line);
+        if (cm) handleChatMsg(cm.username, cm.text, cm.displayName);
       }
     };
     ws.onclose = () => setTwitchConnected(false);
@@ -492,7 +494,7 @@ export default function WheelGame() {
   }
 
   // ── Chat handler ───────────────────────────────────────────────────────────
-  const handleChatMsg = useCallback((username: string, text: string) => {
+  const handleChatMsg = useCallback((username: string, text: string, displayName = username) => {
     const msg = text.trim().toLowerCase();
     const ph = phaseRef.current;
     const sh = shooterRef.current;
@@ -502,14 +504,14 @@ export default function WheelGame() {
       if (playersRef.current.find(p => p.username === username)) return;
       const num = playersRef.current.length + 1;
       const np = {
-        username, displayName: username,
+        username, displayName,
         avatar: fallbackAvatar(username),
         number: num, alive: true, hits: 0, revivedCount: 0, usedRevive: false,
       };
       const next = [...playersRef.current, np];
       playersRef.current = next;
       setPlayers(next);
-      setJoinMsg(username);
+      setJoinMsg(displayName);
       setTimeout(() => setJoinMsg(""), 2400);
       fetchTwitchAvatar(username).then(avatar =>
         setPlayers(prev => prev.map(p => p.username === username ? { ...p, avatar } : p))
