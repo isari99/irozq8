@@ -237,3 +237,22 @@
 .btn-shimmer:hover::after {
   left: 150%;
 }
+
+/* Chairs Game – wheel orbit */
+@keyframes chairsWheelOrbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes chairsCounterOrbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+.chairs-orbit {
+  animation: chairsWheelOrbit 4s linear infinite;
+}
+.chairs-counter {
+  animation: chairsCounterOrbit 4s linear infinite;
+}
+.chairs-orbit-slow {
+  animation: chairsWheelOrbit 8s linear infinite;
+}
