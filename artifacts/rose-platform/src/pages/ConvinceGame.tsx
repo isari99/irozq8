@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearch, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Copy, Check, Users, Eye, EyeOff, Play, ChevronRight } from "lucide-react";
+import { ArrowRight, Copy, Check, Users, Eye, EyeOff, Play, ChevronRight, Link2 } from "lucide-react";
+import { fetchTwitchAvatar, fallbackAvatar } from "../lib/twitchUser";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
@@ -132,6 +133,7 @@ export default function ConvinceGame() {
   const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [settings, setSettings] = useState({ timerSecs: 30, targetScore: 50, hideWriting: false });
+  const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
 
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
@@ -167,6 +169,19 @@ export default function ConvinceGame() {
     };
     return () => ws.close();
   }, []);
+
+  // ── Fetch Twitch avatars for players when they join ──
+  useEffect(() => {
+    if (!gameState) return;
+    gameState.players.forEach(p => {
+      if (!avatarMap[p.id]) {
+        fetchTwitchAvatar(p.name).then(url => {
+          setAvatarMap(prev => ({ ...prev, [p.id]: url }));
+        });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState?.players.map(p => p.id).join(",")]);
 
   const myId = playerIdRef.current;
   const me = gameState?.players.find(p => p.id === myId);
@@ -367,50 +382,98 @@ export default function ConvinceGame() {
             <span style={{ fontSize: 18 }}>🎤</span>
             <span style={{ color: GOLD, fontWeight: 900, fontSize: 17, textShadow: `0 0 12px ${GOLD}` }}>أقنعني</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: 600 }}>كود:</span>
-            <span style={{ color: GOLD, fontWeight: 900, fontSize: 18, letterSpacing: "0.12em" }}>{gameState.code}</span>
-            <button onClick={copyLink} style={{
-              background: copied ? `${GOLD}30` : "rgba(255,255,255,0.12)", border: `1px solid ${copied ? GOLD : "rgba(255,255,255,0.3)"}`,
-              borderRadius: 8, padding: "5px 10px", color: copied ? GOLD : "#fff",
-              fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
-            }}>{copied ? <Check size={12}/> : <Copy size={12}/>}{copied ? "تم" : "نسخ"}</button>
-          </div>
+          <div style={{ width: 60 }}/>
         </div>
 
-        <div style={{ maxWidth: 560, margin: "0 auto", padding: "28px 16px" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
-              <Users size={15} style={{ display: "inline", verticalAlign: "middle", marginLeft: 5 }}/>
-              {players.length} لاعب في الغرفة
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "24px 16px" }}>
+
+          {/* ── Invite card ── */}
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            style={{ background: `linear-gradient(135deg,rgba(245,158,11,0.12),rgba(124,58,237,0.12))`,
+              border: `1.5px solid ${GOLD}55`, borderRadius: 18, padding: "18px 20px",
+              marginBottom: 24, position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Link2 size={16} color={GOLD}/>
+              <span style={{ color: GOLD, fontWeight: 800, fontSize: 14 }}>رابط الدعوة</span>
+              <span style={{ marginRight: "auto", background: `${GOLD}22`, border: `1px solid ${GOLD}55`,
+                borderRadius: 20, padding: "2px 12px", color: GOLD, fontSize: 13, fontWeight: 900,
+                letterSpacing: "0.1em" }}>{gameState.code}</span>
             </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ flex: 1, background: "rgba(255,255,255,0.07)", borderRadius: 10,
+                padding: "9px 12px", fontSize: 12, color: "rgba(255,255,255,0.55)",
+                overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", direction: "ltr" }}>
+                {window.location.origin + window.location.pathname}?r={gameState.code}
+              </div>
+              <button onClick={copyLink} style={{
+                flexShrink: 0, background: copied ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.12)",
+                border: `1px solid ${copied ? GOLD : "rgba(255,255,255,0.25)"}`,
+                borderRadius: 10, padding: "9px 16px", color: copied ? "#000" : "#fff",
+                fontSize: 13, fontWeight: 800, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s",
+              }}>
+                {copied ? <Check size={14}/> : <Copy size={14}/>}
+                {copied ? "تم النسخ!" : "نسخ الرابط"}
+              </button>
+            </div>
+          </motion.div>
+
+          {/* ── Players count ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <Users size={15} color={GOLD}/>
+            <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 15, fontWeight: 700 }}>
+              {players.length} {players.length === 1 ? "لاعب" : "لاعبين"} في الغرفة
+            </span>
             {amHost && (
-              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>أرسل الرابط للاعبين ثم ابدأ عندما يكونوا مستعدين</p>
+              <span style={{ marginRight: "auto", color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
+                ابدأ عندما يكون الجميع مستعداً
+              </span>
             )}
           </div>
 
-          {/* Players grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 28 }}>
-            {players.map(p => (
-              <div key={p.id} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                background: "rgba(255,255,255,0.1)", border: `1.5px solid ${p.color}66`,
-                borderRadius: 14, padding: "12px 14px",
-                boxShadow: p.id === myId ? `0 0 18px ${p.color}55` : "none",
-              }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
-                  background: p.color + "33", border: `2.5px solid ${p.color}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 20, fontWeight: 900, color: p.color,
-                  textShadow: `0 0 8px ${p.color}`,
-                }}>{initials(p.name)}</div>
-                <div>
-                  <div style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>{p.name}</div>
-                  {p.isHost && <div style={{ color: GOLD, fontSize: 11, fontWeight: 700 }}>هوست 👑</div>}
-                </div>
-              </div>
-            ))}
+          {/* ── Players grid ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+            {players.map(p => {
+              const avatar = avatarMap[p.id];
+              const isMe = p.id === myId;
+              return (
+                <motion.div key={p.id}
+                  initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    background: isMe ? `${p.color}18` : "rgba(255,255,255,0.07)",
+                    border: `1.5px solid ${isMe ? p.color : p.color + "44"}`,
+                    borderRadius: 14, padding: "12px 14px",
+                    boxShadow: isMe ? `0 0 20px ${p.color}40` : "none",
+                  }}>
+                  {/* Avatar */}
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+                    border: `2.5px solid ${p.color}`, overflow: "hidden", position: "relative",
+                    boxShadow: `0 0 10px ${p.color}55` }}>
+                    {avatar ? (
+                      <img src={avatar} alt={p.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(p.name); }}/>
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", background: p.color + "33",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 20, fontWeight: 900, color: p.color }}>
+                        {initials(p.name)}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#fff", fontWeight: 800, fontSize: 14,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name}
+                      {isMe && <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, marginRight: 4 }}>(أنت)</span>}
+                    </div>
+                    {p.isHost && <div style={{ color: GOLD, fontSize: 11, fontWeight: 700 }}>هوست 👑</div>}
+                    {p.disconnected && <div style={{ color: "#f87171", fontSize: 11 }}>انقطع الاتصال</div>}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
           {amHost ? (
@@ -420,10 +483,13 @@ export default function ConvinceGame() {
               color: players.length >= 2 ? "#000" : "rgba(255,255,255,0.4)", border: "none",
               boxShadow: players.length >= 2 ? `0 8px 32px ${GOLD}60` : "none",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              transition: "all 0.3s",
             }}><Play size={20}/>ابدأ اللعبة</button>
           ) : (
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600 }}>
-              في انتظار الهوست لبدء اللعبة...
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600,
+              padding: "16px", background: "rgba(255,255,255,0.05)", borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.1)" }}>
+              ⏳ في انتظار الهوست لبدء اللعبة...
             </div>
           )}
         </div>
