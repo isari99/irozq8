@@ -14,6 +14,18 @@ const GOLD = "#f59e0b";
 const GOLD2 = "#fbbf24";
 const DARK = "#0d0a00";
 
+// ─── Glow background orbs (outside component to avoid re-mount) ───────────────
+function ConvinceGlowOrbs() {
+  return <>
+    <div style={{ position: "fixed", top: "-10%", left: "-5%", width: 560, height: 560, borderRadius: "50%",
+      background: `radial-gradient(circle,${GOLD}45,transparent)`, filter: "blur(110px)",
+      pointerEvents: "none", zIndex: 0, opacity: 0.55 }} />
+    <div style={{ position: "fixed", bottom: "-10%", right: "-5%", width: 480, height: 480, borderRadius: "50%",
+      background: "radial-gradient(circle,#7c3aed55,transparent)", filter: "blur(90px)",
+      pointerEvents: "none", zIndex: 0, opacity: 0.45 }} />
+  </>;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ConvincePlayer {
   id: string; name: string; color: string; score: number;
@@ -202,8 +214,9 @@ export default function ConvinceGame() {
   // ─── Shared wrapper ───────────────────────────────────────────────────────
   const wrap = (children: React.ReactNode, maxW = 520) => (
     <div className="min-h-screen gradient-bg flex flex-col items-center justify-center p-4" dir="rtl"
-      style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
-      <div style={{ width: "100%", maxWidth: maxW }}>{children}</div>
+      style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+      <ConvinceGlowOrbs />
+      <div style={{ width: "100%", maxWidth: maxW, position: "relative" }}>{children}</div>
     </div>
   );
 
@@ -341,7 +354,8 @@ export default function ConvinceGame() {
 
     // ── Lobby ──
     if (phase === "lobby") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", padding: 0 }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", padding: 0, position: "relative" }}>
+        <ConvinceGlowOrbs />
         {/* Header */}
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}55`, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -418,7 +432,8 @@ export default function ConvinceGame() {
 
     // ── Answering ──
     if (phase === "answering") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+        <ConvinceGlowOrbs />
         {/* Back header */}
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -498,7 +513,8 @@ export default function ConvinceGame() {
 
     // ── Revealing (host selects who to show) ──
     if (phase === "revealing") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+        <ConvinceGlowOrbs />
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
@@ -581,7 +597,8 @@ export default function ConvinceGame() {
       const alreadyRated = currentReview.myRating !== null || myRating > 0;
 
       return (
-        <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+        <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+          <ConvinceGlowOrbs />
           <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
             display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <button onClick={() => navigate("/")} style={{
@@ -652,7 +669,8 @@ export default function ConvinceGame() {
 
     // ── Leaderboard ──
     if (phase === "leaderboard") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+        <ConvinceGlowOrbs />
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
@@ -717,7 +735,8 @@ export default function ConvinceGame() {
 
     // ── Winner ──
     if (phase === "winner" && gameState.winner) return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+        <ConvinceGlowOrbs />
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{

@@ -419,7 +419,15 @@ export default function ChairsGame() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="gradient-bg min-h-screen w-full flex flex-col items-center overflow-hidden"
-      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
+      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+
+      {/* Background glow orbs */}
+      <div style={{ position: "fixed", top: "-10%", right: "-5%", width: 600, height: 600, borderRadius: "50%",
+        background: `radial-gradient(circle,${CYAN}40,transparent)`, filter: "blur(110px)",
+        pointerEvents: "none", zIndex: 0, opacity: 0.55 }} />
+      <div style={{ position: "fixed", bottom: "-10%", left: "-5%", width: 500, height: 500, borderRadius: "50%",
+        background: "radial-gradient(circle,#7c3aed55,transparent)", filter: "blur(90px)",
+        pointerEvents: "none", zIndex: 0, opacity: 0.45 }} />
 
       {/* Permanent YouTube wrapper — never unmounts */}
       <div id={YT_WRAPPER_ID} style={{
@@ -433,8 +441,8 @@ export default function ChairsGame() {
         <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="w-full flex-1 flex flex-col">
 
-          <header className="flex items-center justify-between px-6 py-4 border-b border-white/5"
-            style={{ background: "rgba(5,2,14,0.92)", backdropFilter: "blur(20px)" }}>
+          <header className="flex items-center justify-between px-6 py-4 border-b border-white/10"
+            style={{ background: "rgba(5,2,14,0.97)" }}>
             <button onClick={handleBack}
               className="flex items-center gap-2 text-white/80 hover:text-cyan-400 transition-colors text-sm font-bold">
               <ArrowRight size={16}/><span>رجوع</span>
@@ -538,8 +546,8 @@ export default function ChairsGame() {
             position: "absolute", top: 0, left: 0, right: 0, height: 56,
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "0 20px",
-            background: "rgba(5,2,14,0.92)", borderBottom: "1px solid rgba(0,212,255,0.32)",
-            backdropFilter: "blur(16px)", zIndex: 30,
+            background: "rgba(5,2,14,0.97)", borderBottom: "1px solid rgba(0,212,255,0.35)",
+            zIndex: 30,
           }}>
             {/* Volume */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

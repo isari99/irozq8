@@ -131,9 +131,9 @@
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(13,6,28,0.78) 0%, transparent 70%),
-    radial-gradient(ellipse 70% 50% at 70% 80%, rgba(6,13,28,0.70) 0%, transparent 70%),
-    linear-gradient(180deg, rgba(10,6,20,0.60) 0%, rgba(10,6,20,0.50) 50%, rgba(10,6,20,0.68) 100%);
+    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(13,6,28,0.38) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 50% at 70% 80%, rgba(6,13,28,0.32) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(10,6,20,0.28) 0%, rgba(10,6,20,0.20) 50%, rgba(10,6,20,0.30) 100%);
   pointer-events: none;
   z-index: 3;
 }
