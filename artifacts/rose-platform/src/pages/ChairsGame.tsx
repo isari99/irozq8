@@ -65,9 +65,9 @@ const AVA_R    = 25;    // half of 50px avatar (used for centering)
 const SELECT_S = 20;
 const CYAN     = "#00d4ff";
 
-// pre-compute a player's outer-ring position (center of avatar)
-function playerPos(idx: number, total: number) {
-  const a = (idx / total) * 2 * Math.PI - Math.PI / 2;
+// pre-compute a player's outer-ring position — rotDeg spins all players together
+function playerPos(idx: number, total: number, rotDeg = 0) {
+  const a = (idx / total) * 2 * Math.PI - Math.PI / 2 + (rotDeg * Math.PI / 180);
   return { x: CX + PLAYER_R * Math.cos(a), y: CY + PLAYER_R * Math.sin(a) };
 }
 // pre-compute a chair's position (center)
@@ -119,6 +119,11 @@ export default function ChairsGame() {
   const [roundNum, setRoundNum]           = useState(1);
   const [volume, setVolume]               = useState(80);
   const [twitchOk, setTwitchOk]          = useState(false);
+  const [rotAngle, setRotAngle]           = useState(0);
+
+  // RAF rotation
+  const rotRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
 
   // stale-closure refs
   const phaseRef    = useRef<Phase>("lobby");
@@ -144,6 +149,22 @@ export default function ChairsGame() {
   useEffect(() => { phaseRef.current   = phase;         }, [phase]);
   useEffect(() => { playersRef.current = players;       }, [players]);
   useEffect(() => { chairRef.current   = chairOccupied; }, [chairOccupied]);
+
+  // RAF: spin the wheel while music plays
+  useEffect(() => {
+    if (phase !== "spinning") {
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      return;
+    }
+    const SPEED = 1.4; // degrees per frame ≈ 84°/s @ 60fps
+    const step = () => {
+      rotRef.current = (rotRef.current + SPEED) % 360;
+      setRotAngle(rotRef.current);
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
+  }, [phase]);
 
   // pre-warm YouTube API on mount
   useEffect(() => {
@@ -311,7 +332,8 @@ export default function ChairsGame() {
       const p = cur[pIdx];
 
       // Compute animation: outer-ring position → chair position (relative to disc container)
-      const from = playerPos(pIdx, cur.length);
+      // Use rotRef.current (not state) to get the exact stopped angle for this event
+      const from = playerPos(pIdx, cur.length, rotRef.current);
       const to   = chairPos(num - 1, numChairs);
       const anim: ClaimAnim = {
         chairNum: num, player: p,
@@ -367,6 +389,8 @@ export default function ChairsGame() {
   };
   const resetToLobby = () => {
     clearAllTimers(); stopMusic();
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    rotRef.current = 0; setRotAngle(0);
     setPlayers([]); playersRef.current = [];
     setChairOccupied({}); chairRef.current = {};
     setClaimAnims([]); setEliminated(null); setWinner(null); setRoundNum(1);
@@ -381,7 +405,7 @@ export default function ChairsGame() {
   }));
 
   const playerPositions = players.map((p, i) => ({
-    player: p, ...playerPos(i, players.length),
+    player: p, ...playerPos(i, players.length, rotAngle),
   }));
 
   const isSpinning  = phase === "spinning";
@@ -563,24 +587,22 @@ export default function ChairsGame() {
           {/* ── DISC CONTAINER ────────────────────────────────────────────── */}
           <div style={{ position: "relative", width: SZ, height: SZ, flexShrink: 0 }}>
 
-            {/* Outer spinning rings — only while music plays */}
-            {isSpinning && (
-              <>
-                <div className="animate-spin-slow" style={{
-                  position: "absolute",
-                  top:  CY - DISC_R - 16, left: CX - DISC_R - 16,
-                  width: (DISC_R + 16) * 2, height: (DISC_R + 16) * 2,
-                  borderRadius: "50%", border: `2px dashed ${CYAN}55`, pointerEvents: "none",
-                }}/>
-                <div style={{
-                  position: "absolute",
-                  top:  CY - DISC_R - 28, left: CX - DISC_R - 28,
-                  width: (DISC_R + 28) * 2, height: (DISC_R + 28) * 2,
-                  borderRadius: "50%", border: `1.5px dashed ${CYAN}28`, pointerEvents: "none",
-                  animation: "spin-slow 13s linear infinite reverse",
-                }}/>
-              </>
-            )}
+            {/* Outer spinning rings — always visible, animate only while music plays */}
+            <div className={isSpinning ? "animate-spin-slow" : ""} style={{
+              position: "absolute",
+              top:  CY - DISC_R - 16, left: CX - DISC_R - 16,
+              width: (DISC_R + 16) * 2, height: (DISC_R + 16) * 2,
+              borderRadius: "50%", border: `2px dashed ${CYAN}${isSpinning ? "66" : "33"}`,
+              pointerEvents: "none", transition: "border-color 0.8s",
+            }}/>
+            <div style={{
+              position: "absolute",
+              top:  CY - DISC_R - 28, left: CX - DISC_R - 28,
+              width: (DISC_R + 28) * 2, height: (DISC_R + 28) * 2,
+              borderRadius: "50%", border: `1.5px dashed ${CYAN}${isSpinning ? "33" : "18"}`,
+              pointerEvents: "none", transition: "border-color 0.8s",
+              animation: isSpinning ? "spin-slow 13s linear infinite reverse" : "none",
+            }}/>
 
             {/* Glow halo — always visible */}
             <div style={{
@@ -601,10 +623,33 @@ export default function ChairsGame() {
                 <clipPath id="cg-clip"><circle cx={CX} cy={CY} r={DISC_R - 2}/></clipPath>
               </defs>
 
-              {/* Disc body */}
-              <circle cx={CX} cy={CY} r={DISC_R} fill="#0c1628"/>
-              <rect x={CX-DISC_R} y={CY-DISC_R} width={DISC_R*2} height={DISC_R*2}
-                fill="url(#cg-dot)" clipPath="url(#cg-clip)"/>
+              {/* Rotating disc body — group transforms with rotAngle */}
+              <g transform={`rotate(${rotAngle}, ${CX}, ${CY})`}>
+                <circle cx={CX} cy={CY} r={DISC_R} fill="#0c1628"/>
+                <rect x={CX-DISC_R} y={CY-DISC_R} width={DISC_R*2} height={DISC_R*2}
+                  fill="url(#cg-dot)" clipPath="url(#cg-clip)"/>
+                {/* Visible radial spokes so spinning is obvious */}
+                {[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => {
+                  const a = deg * Math.PI / 180;
+                  return (
+                    <line key={deg}
+                      x1={CX + 48 * Math.cos(a)} y1={CY + 48 * Math.sin(a)}
+                      x2={CX + (DISC_R - 6) * Math.cos(a)} y2={CY + (DISC_R - 6) * Math.sin(a)}
+                      stroke={`${CYAN}22`} strokeWidth={1.5}/>
+                  );
+                })}
+                {/* Bold marks every 90° */}
+                {[0,90,180,270].map(deg => {
+                  const a = deg * Math.PI / 180;
+                  return (
+                    <line key={`b${deg}`}
+                      x1={CX + 32 * Math.cos(a)} y1={CY + 32 * Math.sin(a)}
+                      x2={CX + (DISC_R - 4) * Math.cos(a)} y2={CY + (DISC_R - 4) * Math.sin(a)}
+                      stroke={`${CYAN}55`} strokeWidth={2.5}/>
+                  );
+                })}
+              </g>
+              {/* Static outer border — doesn't rotate */}
               <circle cx={CX} cy={CY} r={DISC_R} fill="none" stroke={CYAN} strokeWidth={3}/>
 
               {/* Center: Spinning */}
