@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { fetchTwitchAvatar, fallbackAvatar } from "@/lib/twitchUser";
 import { flushSync } from "react-dom";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -411,7 +412,7 @@ export default function SnakesGame() {
       const color = PLAYER_COLORS[playersRef.current.length % PLAYER_COLORS.length];
       const p: Player = {
         username, displayName: username,
-        avatar: `https://unavatar.io/twitch/${username}`,
+        avatar: fallbackAvatar(username),
         position: 0, color,
       };
       const next = [...playersRef.current, p];
@@ -419,6 +420,9 @@ export default function SnakesGame() {
       setPlayers(next);
       setJoinMsg(`${username} انضم!`);
       setTimeout(() => setJoinMsg(""), 2500);
+      fetchTwitchAvatar(username).then(avatar =>
+        setPlayers(prev => prev.map(pl => pl.username === username ? { ...pl, avatar } : pl))
+      );
       return;
     }
 

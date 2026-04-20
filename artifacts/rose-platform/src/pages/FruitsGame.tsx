@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { fetchTwitchAvatar, fallbackAvatar } from "@/lib/twitchUser";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Wifi, WifiOff, X, Play } from "lucide-react";
@@ -148,17 +149,17 @@ export default function FruitsGame() {
       const color = COLORS[allPlayersRef.current.length % COLORS.length];
       const newPlayer: Player = {
         username, displayName: username,
-        avatar: `https://unavatar.io/twitch/${username}`,
+        avatar: fallbackAvatar(username),
         color,
       };
-      setAllPlayers(prev => {
-        if (prev.some(p => p.username === username)) return prev;
-        const next = [...prev, newPlayer];
-        allPlayersRef.current = next;
-        return next;
-      });
+      const next = [...allPlayersRef.current, newPlayer];
+      allPlayersRef.current = next;
+      setAllPlayers(next);
       setJoinMsg(`${username} انضم! 🍉`);
       setTimeout(() => setJoinMsg(""), 2500);
+      fetchTwitchAvatar(username).then(avatar =>
+        setAllPlayers(prev => prev.map(p => p.username === username ? { ...p, avatar } : p))
+      );
       return;
     }
 

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { fetchTwitchAvatar, fallbackAvatar } from "@/lib/twitchUser";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence, useAnimate } from "framer-motion";
 import { ArrowRight, Wifi, WifiOff, Users, Play, RefreshCw, Tv2 } from "lucide-react";
@@ -498,22 +499,21 @@ export default function WheelGame() {
     const pl = playersRef.current;
 
     if (msg === "join" && ph === "joining") {
-      setPlayers(prev => {
-        if (prev.find(p => p.username === username)) return prev;
-        const num = prev.length + 1;
-        const next = [
-          ...prev,
-          {
-            username, displayName: username,
-            avatar: `https://unavatar.io/twitch/${username}`,
-            number: num, alive: true, hits: 0, revivedCount: 0, usedRevive: false,
-          },
-        ];
-        playersRef.current = next;
-        setJoinMsg(username);
-        setTimeout(() => setJoinMsg(""), 2400);
-        return next;
-      });
+      if (playersRef.current.find(p => p.username === username)) return;
+      const num = playersRef.current.length + 1;
+      const np = {
+        username, displayName: username,
+        avatar: fallbackAvatar(username),
+        number: num, alive: true, hits: 0, revivedCount: 0, usedRevive: false,
+      };
+      const next = [...playersRef.current, np];
+      playersRef.current = next;
+      setPlayers(next);
+      setJoinMsg(username);
+      setTimeout(() => setJoinMsg(""), 2400);
+      fetchTwitchAvatar(username).then(avatar =>
+        setPlayers(prev => prev.map(p => p.username === username ? { ...p, avatar } : p))
+      );
       return;
     }
 

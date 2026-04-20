@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchTwitchAvatar, fallbackAvatar as avatarFallback } from "@/lib/twitchUser";
 
 // ─── YouTube API ──────────────────────────────────────────────────────────────
 declare global {
@@ -22,18 +23,6 @@ function loadYT(): Promise<void> {
     }
   });
   return _ytPromise;
-}
-
-// ─── Twitch photo ─────────────────────────────────────────────────────────────
-async function fetchTwitchPhoto(u: string): Promise<string> {
-  try {
-    const res  = await fetch(`https://api.ivr.fi/v2/twitch/user?login=${u}`);
-    const data = await res.json();
-    const obj  = Array.isArray(data) ? data[0] : data?.data?.[0];
-    const url  = obj?.profileImageURL ?? obj?.logo ?? obj?.profile_image_url;
-    if (url) return url.replace("{width}", "150").replace("{height}", "150");
-  } catch {}
-  return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${u}`;
 }
 
 // ─── Song pool ────────────────────────────────────────────────────────────────
@@ -75,8 +64,6 @@ const CHAIR_R  = 130;   // chair ring radius  (inside disc)
 const AVA_R    = 25;    // half of 50px avatar (used for centering)
 const SELECT_S = 20;
 const CYAN     = "#00d4ff";
-
-const avatarFallback = (u: string) => `https://api.dicebear.com/7.x/pixel-art/svg?seed=${u}`;
 
 // pre-compute a player's outer-ring position (center of avatar)
 function playerPos(idx: number, total: number) {
@@ -299,9 +286,9 @@ export default function ChairsGame() {
       if (playersRef.current.some(p => p.username === username)) return;
       const np: Player = { username, displayName: username, avatar: avatarFallback(username) };
       setPlayers(prev => { const n = [...prev, np]; playersRef.current = n; return n; });
-      fetchTwitchPhoto(username).then(url =>
+      fetchTwitchAvatar(username).then(avatar =>
         setPlayers(prev => {
-          const n = prev.map(p => p.username === username ? { ...p, avatar: url } : p);
+          const n = prev.map(p => p.username === username ? { ...p, avatar } : p);
           playersRef.current = n; return n;
         })
       );

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { fetchTwitchAvatar, fallbackAvatar } from "@/lib/twitchUser";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Wifi, WifiOff, Users, Play, RotateCcw, Tv2 } from "lucide-react";
@@ -173,7 +174,7 @@ export default function XOGame() {
       if (!slot) return;
       const newPlayer: XOPlayer = {
         username, displayName: username,
-        avatar: `https://unavatar.io/twitch/${username}`,
+        avatar: fallbackAvatar(username),
         mark: slot,
       };
       setPlayers(prev => {
@@ -183,6 +184,15 @@ export default function XOGame() {
       });
       setJoinMsg(`${username} انضم كـ ${slot}`);
       setTimeout(() => setJoinMsg(""), 2500);
+      fetchTwitchAvatar(username).then(avatar =>
+        setPlayers(prev => {
+          const cur = prev[slot];
+          if (!cur || cur.username !== username) return prev;
+          const next = { ...prev, [slot]: { ...cur, avatar } };
+          playersRef.current = next;
+          return next;
+        })
+      );
       return;
     }
 

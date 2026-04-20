@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
+import { fetchTwitchAvatar, fallbackAvatar } from "@/lib/twitchUser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface QuestionResult { username: string; answer: number; correct: boolean; points: number; rank: number; }
@@ -33,24 +34,23 @@ const CAT_COLOR: Record<string, string> = {
 const ROUND_OPTIONS = [10, 15, 20, 25, 30];
 const TIME_OPTIONS = [15, 20, 30];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const twitchAvatar = (username: string) =>
-  `https://unavatar.io/twitch/${username}`;
-
-const fallbackAvatar = (username: string) =>
-  `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}`;
-
-// ─── Player Avatar (small) ────────────────────────────────────────────────────
-const PlayerAvatar = ({ username, size = 32 }: { username: string; size?: number }) => (
-  <img
-    src={twitchAvatar(username)}
-    alt={username}
-    width={size} height={size}
-    className="rounded-full object-cover flex-shrink-0"
-    style={{ width: size, height: size }}
-    onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(username); }}
-  />
-);
+// ─── Player Avatar (stateful — fetches real Twitch photo) ────────────────────
+const PlayerAvatar = ({
+  username, size = 32, imgClassName,
+}: { username: string; size?: number; imgClassName?: string }) => {
+  const [src, setSrc] = useState(() => fallbackAvatar(username));
+  useEffect(() => { fetchTwitchAvatar(username).then(setSrc); }, [username]);
+  return (
+    <img
+      src={src}
+      alt={username}
+      width={size} height={size}
+      className={imgClassName ?? "rounded-full object-cover flex-shrink-0"}
+      style={imgClassName ? undefined : { width: size, height: size }}
+      onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(username); }}
+    />
+  );
+};
 
 // ─── Leaderboard Sidebar ──────────────────────────────────────────────────────
 const LeaderboardSidebar = ({ entries }: { entries: LeaderboardEntry[] }) => (
@@ -599,9 +599,7 @@ export default function QuizGame() {
                       className="flex flex-col items-center gap-2">
                       <div className="w-16 h-16 rounded-2xl overflow-hidden border-2"
                         style={{ borderColor: "#c0c0c0", boxShadow: "0 0 20px rgba(192,192,192,0.3)" }}>
-                        <img src={twitchAvatar(leaderboard[1].username)}
-                          alt={leaderboard[1].username} className="w-full h-full object-cover"
-                          onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(leaderboard[1].username); }} />
+                        <PlayerAvatar username={leaderboard[1].username} imgClassName="w-full h-full object-cover" />
                       </div>
                       <p className="text-xs font-bold text-gray-300 truncate max-w-[72px]">{leaderboard[1].username}</p>
                       <div className="h-24 w-24 rounded-t-2xl flex flex-col items-center justify-end pb-3 gap-0.5"
@@ -625,9 +623,7 @@ export default function QuizGame() {
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-xl">👑</div>
                         <div className="w-20 h-20 rounded-2xl overflow-hidden border-4"
                           style={{ borderColor: "#ffd600", boxShadow: "0 0 35px rgba(255,214,0,0.55)" }}>
-                          <img src={twitchAvatar(leaderboard[0].username)}
-                            alt={leaderboard[0].username} className="w-full h-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(leaderboard[0].username); }} />
+                          <PlayerAvatar username={leaderboard[0].username} imgClassName="w-full h-full object-cover" />
                         </div>
                       </motion.div>
                       <p className="text-sm font-bold text-yellow-300 truncate max-w-[88px]">{leaderboard[0].username}</p>
@@ -646,9 +642,7 @@ export default function QuizGame() {
                       className="flex flex-col items-center gap-2">
                       <div className="w-14 h-14 rounded-2xl overflow-hidden border-2"
                         style={{ borderColor: "#cd7f32", boxShadow: "0 0 16px rgba(205,127,50,0.3)" }}>
-                        <img src={twitchAvatar(leaderboard[2].username)}
-                          alt={leaderboard[2].username} className="w-full h-full object-cover"
-                          onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(leaderboard[2].username); }} />
+                        <PlayerAvatar username={leaderboard[2].username} imgClassName="w-full h-full object-cover" />
                       </div>
                       <p className="text-xs font-bold text-orange-300 truncate max-w-[64px]">{leaderboard[2].username}</p>
                       <div className="h-16 w-20 rounded-t-2xl flex flex-col items-center justify-end pb-3 gap-0.5"
