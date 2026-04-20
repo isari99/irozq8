@@ -150,9 +150,167 @@ const SONGS: Song[] = [
   { id: 44, title: "مشتاق ليك",              artist: "نانسي عجرم",      youtubeId: "EWv3jQnUy5Y", clips: makeClips(218) },
   { id: 45, title: "تيجي ننبسط",             artist: "نانسي عجرم",      youtubeId: "O-QgbPczoqM", clips: makeClips(220) },
   { id: 46, title: "شيل عيونك عني",          artist: "نانسي عجرم",      youtubeId: "153qzppIdds", clips: makeClips(215) },
+
+  // ── عراقي / خليجي جديد ────────────────────────────────────────────────────
+  { id: 47, title: "ديرتين وكأنها ديرة",     artist: "لوحة",             youtubeId: "VcfTjLHVFmM", clips: makeClips(250) },
+  { id: 48, title: "إذا عندك قلب ثاني",      artist: "قيس هشام",         youtubeId: "F_N1_sp_a3A", clips: makeClips(240) },
+  { id: 49, title: "ميت اني",                artist: "صباح محمود",        youtubeId: "iXeRU3F5CK8", clips: makeClips(245) },
+  { id: 50, title: "ناري",                   artist: "احمد ستار",         youtubeId: "tIWr1MO3uVo", clips: makeClips(240) },
+  { id: 51, title: "هذا دمعك",               artist: "تيسير السفير",      youtubeId: "FDsjIWTzJwE", clips: makeClips(250) },
+  { id: 52, title: "تعبني الفراق",           artist: "بسام مهدي",         youtubeId: "JZaF8PO3B0o", clips: makeClips(245) },
+  { id: 53, title: "سلم",                    artist: "سامر احمد",         youtubeId: "zNHhi-r3EFA", clips: makeClips(240) },
+  { id: 54, title: "عامل ايه في حياتك",      artist: "عامر منيب",         youtubeId: "_NdDVeAXAX0", clips: makeClips(248) },
+  { id: 55, title: "الله يسهلك",             artist: "علي صابر",          youtubeId: "Pd4XwhjAwyo", clips: makeClips(242) },
+  { id: 56, title: "تعب الشوق",              artist: "جوزيف عطية",        youtubeId: "pDvsyefO1FM", clips: makeClips(250) },
+  { id: 57, title: "شمسويلك",                artist: "قيس هشام",          youtubeId: "YGy1lIibTp4", clips: makeClips(238) },
+  // ── فضل شاكر ──────────────────────────────────────────────────────────────
+  { id: 58, title: "يا غايب",                artist: "فضل شاكر",          youtubeId: "qSil6ttEg30", clips: makeClips(260) },
+  { id: 59, title: "وغلبني",                 artist: "فضل شاكر",          youtubeId: "GUYKNXvwHaM", clips: makeClips(258) },
+  { id: 60, title: "فين لياليك",             artist: "فضل شاكر",          youtubeId: "z9EdO2xapug", clips: makeClips(252) },
+  { id: 61, title: "لو على قلبي",            artist: "فضل شاكر",          youtubeId: "2wZ9OrZyvPo", clips: makeClips(255) },
+  { id: 62, title: "كيفك ع فراقي",           artist: "فضل شاكر",          youtubeId: "m5IWI6xFRms", clips: makeClips(248) },
+  // ── لبناني / مصري جديد ────────────────────────────────────────────────────
+  { id: 63, title: "بعشق روحك",              artist: "مروان خوري",        youtubeId: "0hs8mLODmsc", clips: makeClips(258) },
+  { id: 64, title: "قابلتك امتى",            artist: "احمد بتشان",        youtubeId: "Dzbded6Hlb4", clips: makeClips(242) },
+  { id: 65, title: "خليني ذكرى",             artist: "وائل جسار",         youtubeId: "J8RtlJIDhdA", clips: makeClips(260) },
+  { id: 66, title: "جن جنوني",               artist: "عاصي الحلاني",      youtubeId: "l0kMuiywRDE", clips: makeClips(265) },
+  // ── خليجي متنوع ───────────────────────────────────────────────────────────
+  { id: 67, title: "شالطاري",                artist: "سلطان خليفه",       youtubeId: "_F8AXTS26Ro", clips: makeClips(245) },
+  { id: 68, title: "رفوف الذكريات",          artist: "ماجد المهندس",      youtubeId: "Oci__HXYnOs", clips: makeClips(268) },
+  { id: 69, title: "إن خذاك الوقت",          artist: "جابر الكاسر",       youtubeId: "CNK_jmUM_1c", clips: makeClips(252) },
+  { id: 70, title: "المحبه",                 artist: "عباس إبراهيم",      youtubeId: "xn4q19AvSU8", clips: makeClips(248) },
+  { id: 71, title: "ما أرضى عليه",           artist: "جابر الكاسر",       youtubeId: "6B-1DfS-cMM", clips: makeClips(255) },
+  { id: 72, title: "احتاج لك",               artist: "راشد الماجد",       youtubeId: "5JCnfvN2BiY", clips: makeClips(262) },
+  { id: 73, title: "جوايا هتعيش",            artist: "رامي صبري",         youtubeId: "LOkzW46zuZc", clips: makeClips(250) },
+  { id: 74, title: "جرح الهوى",              artist: "عباس إبراهيم",      youtubeId: "-y3xJgMISzU", clips: makeClips(245) },
+  { id: 75, title: "جيت على بالي",           artist: "عامر منيب",         youtubeId: "ZmcmQmsy76s", clips: makeClips(252) },
+  { id: 76, title: "انا مصمم",               artist: "بهاء سلطان",        youtubeId: "v0GF5QiaTpU", clips: makeClips(248) },
+  { id: 77, title: "كان موضوع",              artist: "تامر عاشور",        youtubeId: "e7QhpEPf0jY", clips: makeClips(258) },
+  { id: 78, title: "معقوله",                 artist: "علي صابر",           youtubeId: "J0SS6_vSy4w", clips: makeClips(242) },
+  { id: 79, title: "انا بلياك",              artist: "ماجد المهندس",      youtubeId: "Pz59wizOqLw", clips: makeClips(265) },
+  { id: 80, title: "منت فاهم",               artist: "عباس إبراهيم",      youtubeId: "SO8acgLRrGc", clips: makeClips(248) },
+  // ── مصري شعبي / حديث ─────────────────────────────────────────────────────
+  { id: 81, title: "قلت مش هتسبني",          artist: "اميمة طالب",        youtubeId: "TMzgaA-ZFF0", clips: makeClips(238) },
+  { id: 82, title: "عم المجال كله",          artist: "محمود الليثي",      youtubeId: "9hEvD5rbzj0", clips: makeClips(235) },
+  { id: 83, title: "بتبعد ليه",              artist: "حمزاوي",            youtubeId: "0aJ-vCuz6A4", clips: makeClips(240) },
+  { id: 84, title: "انا البطل يا وحوش",      artist: "محمود الليثي",      youtubeId: "oexYI9IGKkM", clips: makeClips(235) },
+  { id: 85, title: "طير انت",                artist: "ايفان ناجي",        youtubeId: "upypFsfKX4E", clips: makeClips(245) },
+  { id: 86, title: "اني وانته",              artist: "هبة مسعود",         youtubeId: "I3AIcKYfvtI", clips: makeClips(248) },
+  { id: 87, title: "ياهوى",                  artist: "هيثم شاكر",         youtubeId: "Gwo6Zq4yxfc", clips: makeClips(262) },
+  { id: 88, title: "باشا باشا",              artist: "عماد باشا",         youtubeId: "hlT-2p6mizA", clips: makeClips(238) },
+  { id: 89, title: "ثلاث دقات",              artist: "ابو ويسرا",         youtubeId: "ejvpVhvKesM", clips: makeClips(242) },
+  { id: 90, title: "هيجيلي موجوع",           artist: "تامر عاشور",        youtubeId: "0a3oQGKhp24", clips: makeClips(255) },
+  // ── احمد سعد ─────────────────────────────────────────────────────────────
+  { id: 91, title: "اختياراتي",              artist: "احمد سعد",          youtubeId: "D9JxlYg1XVI", clips: makeClips(248) },
+  { id: 92, title: "اليوم الحلو ده",          artist: "احمد سعد",          youtubeId: "Kb4fRYjtuF0", clips: makeClips(252) },
+  { id: 93, title: "وسع وسع",                artist: "احمد سعد",          youtubeId: "aKCL3I5iQ18", clips: makeClips(242) },
+  // ── حسين الجسمي (إضافات) ─────────────────────────────────────────────────
+  { id: 94, title: "لا تقارني",              artist: "حسين الجسمي",       youtubeId: "xkdINrv0sIE", clips: makeClips(258) },
+  { id: 95, title: "بلغ حبيبك",              artist: "حسين الجسمي",       youtubeId: "pyQwaJpkPUw", clips: makeClips(265) },
+  { id: 96, title: "بالبنط العريض",           artist: "حسين الجسمي",       youtubeId: "M3sxUE4eIac", clips: makeClips(255) },
+  // ── خليجي متنوع ───────────────────────────────────────────────────────────
+  { id: 97, title: "غلط عمري",               artist: "حسام الرسام",       youtubeId: "uZSLEtqxNc4", clips: makeClips(250) },
+  { id: 98, title: "انا صوتك",               artist: "فؤاد عبدالواحد",    youtubeId: "6dlkfQvSyyI", clips: makeClips(258) },
+  { id: 99, title: "تجيبك الأيام",           artist: "غازي الأمير",       youtubeId: "_gMZCvW8zHU", clips: makeClips(248) },
+  { id: 100, title: "عشق",                   artist: "فيصل عبدالكريم",    youtubeId: "pp49q7uh8f8", clips: makeClips(252) },
+  { id: 101, title: "لا ترجع بقرارك",        artist: "جعفر الغزال",       youtubeId: "V9fL7aljFD8", clips: makeClips(245) },
+  // ── خالد الحنين ──────────────────────────────────────────────────────────
+  { id: 102, title: "انته بدمي",             artist: "خالد الحنين",       youtubeId: "giDZSy8ZsxU", clips: makeClips(258) },
+  // ── خالد عبدالرحمن ───────────────────────────────────────────────────────
+  { id: 103, title: "وشلون مغليك",           artist: "خالد عبدالرحمن",    youtubeId: "Ehmk-iBGZWU", clips: makeClips(262) },
+  { id: 104, title: "عيني انا بعينها",       artist: "خالد عبدالرحمن",    youtubeId: "sEQcW0S-Bbs", clips: makeClips(258) },
+  { id: 105, title: "حدي نظر",               artist: "خالد عبدالرحمن",    youtubeId: "XLKu7zwg8hg", clips: makeClips(252) },
+  { id: 106, title: "صدقيني",                artist: "خالد عبدالرحمن",    youtubeId: "ILPgX_2B14Y", clips: makeClips(255) },
+  { id: 107, title: "تقوى الهجر",            artist: "خالد عبدالرحمن",    youtubeId: "XWYgdu9lKrE", clips: makeClips(248) },
+  // ── متنوع خليجي ──────────────────────────────────────────────────────────
+  { id: 108, title: "وحشتيني",               artist: "عمر العمر",          youtubeId: "I5CTljrYcWA", clips: makeClips(250) },
+  // ── عبادي الجوهر ─────────────────────────────────────────────────────────
+  { id: 109, title: "قالو ترى",              artist: "عبادي الجوهر",      youtubeId: "daTrHQWom0g", clips: makeClips(265) },
+  { id: 110, title: "عيونك",                 artist: "عبادي الجوهر",      youtubeId: "h0T2iOZA-LI", clips: makeClips(258) },
+  // ── متنوع ────────────────────────────────────────────────────────────────
+  { id: 111, title: "ياما حاولت الفراق",     artist: "عبدالعزيز الضويحي", youtubeId: "1WIvjbjbL-g", clips: makeClips(255) },
+  // ── علي عبدالله ──────────────────────────────────────────────────────────
+  { id: 112, title: "مسير الوقت",            artist: "علي عبدالله",        youtubeId: "ePgQ09cvPQ8", clips: makeClips(248) },
+  { id: 113, title: "غارت عيوني",            artist: "علي عبدالله",        youtubeId: "rq-64-xgaQo", clips: makeClips(252) },
+  // ── راشد الماجد (إضافات) ─────────────────────────────────────────────────
+  { id: 114, title: "بترجعين",               artist: "راشد الماجد",        youtubeId: "IhsjqzhkfTA", clips: makeClips(258) },
+  { id: 115, title: "اللي لقا احبابه",       artist: "راشد الماجد",        youtubeId: "42O51bcJyq0", clips: makeClips(262) },
+  { id: 116, title: "ولهان",                 artist: "راشد الماجد",        youtubeId: "01C6_7CfQx4", clips: makeClips(255) },
+  { id: 117, title: "اكثر شخص بالدنيا",      artist: "راشد الماجد",        youtubeId: "M4RZ3Z8MFcg", clips: makeClips(258) },
+  { id: 118, title: "عظيم احساسي",           artist: "راشد الماجد",        youtubeId: "ZmhijyrzW08", clips: makeClips(252) },
+  { id: 119, title: "سارق القلب",            artist: "راشد الماجد",        youtubeId: "xzhYtn8841Q", clips: makeClips(255) },
+  { id: 120, title: "لربما",                 artist: "راشد الماجد",        youtubeId: "PyNjx-zL-bY", clips: makeClips(248) },
+  { id: 121, title: "ياكل عمري",             artist: "راشد الماجد",        youtubeId: "B8w0eUMFxGs", clips: makeClips(260) },
+  { id: 122, title: "الأسد",                 artist: "راشد الماجد",        youtubeId: "2cngcHQvmNg", clips: makeClips(252) },
+  { id: 123, title: "يا محمد",               artist: "راشد الماجد",        youtubeId: "sSTGfpmGZLk", clips: makeClips(258) },
+  { id: 124, title: "انا السما",             artist: "راشد الماجد",        youtubeId: "1_ee4CADtGM", clips: makeClips(255) },
+  { id: 125, title: "تحدونا",                artist: "راشد الماجد",        youtubeId: "B09Yb9XtZJ4", clips: makeClips(248) },
+  // ── نوال ─────────────────────────────────────────────────────────────────
+  { id: 126, title: "القلوب الساهيه",        artist: "نوال",               youtubeId: "0XwIPLmxcNk", clips: makeClips(252) },
+  { id: 127, title: "يالي ماحبيت عمري الا منك", artist: "نوال",           youtubeId: "q0bU9j0DoMs", clips: makeClips(258) },
+  { id: 128, title: "اكو مثلك",              artist: "نوال",               youtubeId: "G_606bhkF3U", clips: makeClips(248) },
+  { id: 129, title: "انت طيب",               artist: "نوال",               youtubeId: "ejS6q0Ezf0w", clips: makeClips(245) },
+  { id: 130, title: "لقيت روحي",             artist: "نوال",               youtubeId: "UboxiJuyLW8", clips: makeClips(252) },
+  // ── خليجي متنوع ──────────────────────────────────────────────────────────
+  { id: 131, title: "وعرفتك",                artist: "ماجد المهندس",       youtubeId: "x0nkYuceo6c", clips: makeClips(265) },
+  { id: 132, title: "مكتوب ما ارتاح",        artist: "احمد المصلاوي",     youtubeId: "kcWxws1SAE4", clips: makeClips(250) },
+  { id: 133, title: "ما احبك بعد روح",       artist: "كاظم الساهر",        youtubeId: "bHAH-P45SEA", clips: makeClips(258) },
+  // ── يوسف العماني ─────────────────────────────────────────────────────────
+  { id: 134, title: "يعشقني",                artist: "يوسف العماني",       youtubeId: "KPrRwlrxzFY", clips: makeClips(252) },
+  { id: 135, title: "مجنون",                 artist: "يوسف العماني",       youtubeId: "1JhDg3JlFCw", clips: makeClips(248) },
+  // ── عمرو دياب (إضافة) ────────────────────────────────────────────────────
+  { id: 136, title: "ياجمل عيون",            artist: "عمرو دياب",          youtubeId: "9Bp0S8BS7O4", clips: makeClips(258) },
+  // ── عايض ─────────────────────────────────────────────────────────────────
+  { id: 137, title: "والله مايرمش",          artist: "عايض",               youtubeId: "VRAnpjOjPMY", clips: makeClips(248) },
+  // ── احمد ستار (إضافة) ────────────────────────────────────────────────────
+  { id: 138, title: "انت حبيبي",             artist: "احمد ستار",          youtubeId: "GjhZOaU6cNk", clips: makeClips(242) },
+  // ── متنوع ────────────────────────────────────────────────────────────────
+  { id: 139, title: "والله حرام",            artist: "حبيب علي",           youtubeId: "zgjLvDK_v1Q", clips: makeClips(245) },
+  { id: 140, title: "بحضني اتخيلك مرات",     artist: "محمد عبد الجبار",    youtubeId: "88TvNquej0I", clips: makeClips(248) },
+  { id: 141, title: "هامة طويق",             artist: "علي بن محمد",        youtubeId: "4NQ1-3bgOkY", clips: makeClips(252) },
+  // ── محمد شاكر ────────────────────────────────────────────────────────────
+  { id: 142, title: "يا حياتي",              artist: "محمد شاكر",          youtubeId: "baa-ioULFdY", clips: makeClips(245) },
+  // ── شيرين / لميس ─────────────────────────────────────────────────────────
+  { id: 143, title: "الوتر الحساس",          artist: "شيرين",              youtubeId: "KZYqugtbcG0", clips: makeClips(258) },
+  { id: 144, title: "مسيطرة",                artist: "لميس كان",           youtubeId: "EAo6BmLNBEI", clips: makeClips(245) },
+  // ── كرار صلاح ────────────────────────────────────────────────────────────
+  { id: 145, title: "تعبني حبيبي",           artist: "كرار صلاح",          youtubeId: "Gq6kkQ7NIv4", clips: makeClips(248) },
+  // ── صلاح / اصيل / اصالة ──────────────────────────────────────────────────
+  { id: 146, title: "ياعم جيتك لحد بيتك",   artist: "صلاح",               youtubeId: "GqEjN9lmeP4", clips: makeClips(240) },
+  { id: 147, title: "سر الحياة",             artist: "اصيل هميم",          youtubeId: "uVxij4NespQ", clips: makeClips(252) },
+  { id: 148, title: "سواها قلبي",            artist: "اصالة",              youtubeId: "uNozy89Wbh0", clips: makeClips(258) },
 ];
 
 const ROUND_OPTIONS = [5, 10, 15, 20, 25];
+
+// ─── LocalStorage key for played song IDs ─────────────────────────────────────
+const PLAYED_KEY = "rose_song_played_ids";
+
+// ─── Builds a smart queue, excluding recently-played songs across reloads ─────
+function buildSmartQueue(count: number): GameClip[] {
+  let playedIds: Set<number> = new Set();
+  try {
+    const raw = localStorage.getItem(PLAYED_KEY);
+    if (raw) playedIds = new Set(JSON.parse(raw) as number[]);
+  } catch {}
+
+  let pool = SONGS.filter(s => !playedIds.has(s.id));
+
+  // If not enough unplayed songs remain, reset and use all songs
+  if (pool.length < count) {
+    localStorage.removeItem(PLAYED_KEY);
+    playedIds = new Set();
+    pool = [...SONGS];
+  }
+
+  const queue = buildGameQueue(pool, count);
+
+  // Persist the IDs of songs selected in this session
+  const newPlayed = new Set([...playedIds, ...queue.map(gc => gc.song.id)]);
+  try { localStorage.setItem(PLAYED_KEY, JSON.stringify([...newPlayed])); } catch {}
+
+  return queue;
+}
 const TIMER_BASE = 60;
 const EXTRA_TIME = 60;
 
@@ -374,7 +532,7 @@ export default function SongGame() {
   // ── Game flow ─────────────────────────────────────────────────────────────
   const startGame = () => {
     // Smart shuffle: unique songs, no consecutive same artist, random clip per song
-    const queue = buildGameQueue(SONGS, totalRounds);
+    const queue = buildSmartQueue(totalRounds);
     setGameClips(queue);
     setCurrentGameIndex(0);
     activeClipRef.current = queue[0];
