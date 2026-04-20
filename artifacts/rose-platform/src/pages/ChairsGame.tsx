@@ -535,7 +535,7 @@ export default function ChairsGame() {
             position: "absolute", top: 0, left: 0, right: 0, height: 56,
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "0 20px",
-            background: "rgba(5,2,14,0.85)", borderBottom: "1px solid rgba(0,212,255,0.12)",
+            background: "rgba(5,2,14,0.92)", borderBottom: "1px solid rgba(0,212,255,0.32)",
             backdropFilter: "blur(16px)", zIndex: 30,
           }}>
             {/* Volume */}
@@ -575,9 +575,9 @@ export default function ChairsGame() {
 
             {/* Back */}
             <button onClick={handleBack} style={{
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 12, padding: "6px 14px", color: "rgba(255,255,255,0.4)",
-              fontSize: 12, fontWeight: 800, cursor: "pointer",
+              background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.28)",
+              borderRadius: 12, padding: "6px 14px", color: "#ffffff",
+              fontSize: 13, fontWeight: 800, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 5,
             }}>
               <ArrowRight size={12}/><span>رجوع</span>
@@ -592,14 +592,14 @@ export default function ChairsGame() {
               position: "absolute",
               top:  CY - DISC_R - 16, left: CX - DISC_R - 16,
               width: (DISC_R + 16) * 2, height: (DISC_R + 16) * 2,
-              borderRadius: "50%", border: `2px dashed ${CYAN}${isSpinning ? "66" : "33"}`,
+              borderRadius: "50%", border: `2px dashed ${CYAN}${isSpinning ? "bb" : "55"}`,
               pointerEvents: "none", transition: "border-color 0.8s",
             }}/>
             <div style={{
               position: "absolute",
               top:  CY - DISC_R - 28, left: CX - DISC_R - 28,
               width: (DISC_R + 28) * 2, height: (DISC_R + 28) * 2,
-              borderRadius: "50%", border: `1.5px dashed ${CYAN}${isSpinning ? "33" : "18"}`,
+              borderRadius: "50%", border: `1.5px dashed ${CYAN}${isSpinning ? "77" : "33"}`,
               pointerEvents: "none", transition: "border-color 0.8s",
               animation: isSpinning ? "spin-slow 13s linear infinite reverse" : "none",
             }}/>
@@ -610,7 +610,7 @@ export default function ChairsGame() {
               top:  CY - DISC_R - 8, left: CX - DISC_R - 8,
               width: (DISC_R + 8) * 2, height: (DISC_R + 8) * 2,
               borderRadius: "50%",
-              boxShadow: `0 0 40px ${CYAN}35, 0 0 80px ${CYAN}15`,
+              boxShadow: `0 0 52px ${CYAN}66, 0 0 100px ${CYAN}30`,
               pointerEvents: "none",
             }}/>
 
@@ -630,7 +630,7 @@ export default function ChairsGame() {
                   fill="url(#cg-dot)" clipPath="url(#cg-clip)"/>
                 {/* Subtle inner glow arc to hint rotation without hard lines */}
                 <circle cx={CX} cy={CY} r={DISC_R - 18}
-                  fill="none" stroke={`${CYAN}0a`} strokeWidth={16}/>
+                  fill="none" stroke={`${CYAN}1a`} strokeWidth={18}/>
               </g>
               {/* Static outer border — doesn't rotate */}
               <circle cx={CX} cy={CY} r={DISC_R} fill="none" stroke={CYAN} strokeWidth={3}/>
@@ -709,9 +709,10 @@ export default function ChairsGame() {
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       onError={e => { (e.target as HTMLImageElement).src = avatarFallback(p.username); }}/>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 900, color: "#fff",
-                    textShadow: "0 1px 5px rgba(0,0,0,1)", maxWidth: 56,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#ffffff",
+                    textShadow: "0 1px 6px rgba(0,0,0,1), 0 0 12px rgba(0,0,0,0.9)", maxWidth: 56,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center",
+                    letterSpacing: "0.01em" }}>
                     {p.displayName}
                   </span>
                 </div>
@@ -737,7 +738,7 @@ export default function ChairsGame() {
                     borderRadius: 7, padding: "2px 9px", minWidth: 28, textAlign: "center",
                     boxShadow: `0 0 8px ${CYAN}50`,
                   }}>
-                    <span style={{ color: "#fff", fontSize: 12, fontWeight: 900 }}>{num}</span>
+                    <span style={{ color: "#ffffff", fontSize: 13, fontWeight: 900, letterSpacing: "0.02em" }}>{num}</span>
                   </div>
                 </motion.div>
               );
@@ -788,14 +789,15 @@ export default function ChairsGame() {
                 }}>
                 {selTimer}
               </motion.span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>
                 ثانية — اكتب رقم الكرسي في الشات
               </span>
 
               {/* Progress bar */}
               <div style={{
-                width: 260, height: 6, borderRadius: 6,
-                background: "rgba(255,255,255,0.1)", overflow: "hidden",
+                width: 280, height: 8, borderRadius: 8,
+                background: "rgba(255,255,255,0.2)", overflow: "hidden",
+                border: "1px solid rgba(255,255,255,0.1)",
               }}>
                 <motion.div
                   animate={{ width: `${(selTimer / SELECT_S) * 100}%` }}
@@ -825,9 +827,9 @@ export default function ChairsGame() {
               }}>العب مجدداً</button>
               <button onClick={handleBack} style={{
                 padding: "14px 28px", borderRadius: 16,
-                background: "rgba(255,255,255,0.07)",
-                color: "rgba(255,255,255,0.55)",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.1)",
+                color: "#ffffff",
+                border: "1px solid rgba(255,255,255,0.28)",
                 fontWeight: 700, fontSize: 14,
                 fontFamily: "'Cairo','Arial',sans-serif", cursor: "pointer",
               }}>الرئيسية</button>
