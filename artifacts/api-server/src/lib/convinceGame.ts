@@ -18,6 +18,7 @@ interface ConvincePlayer {
   id: string;
   name: string;
   color: string;
+  avatar: string;
   ws: ConvinceWS | null;
   score: number;
   disconnected: boolean;
@@ -170,7 +171,7 @@ function roomState(room: ConvinceRoom, forPlayerId?: string): Record<string, unk
   const players = Array.from(room.players.values())
     .sort((a, b) => b.score - a.score || a.joinOrder - b.joinOrder)
     .map(p => ({
-      id: p.id, name: p.name, color: p.color, score: p.score,
+      id: p.id, name: p.name, color: p.color, avatar: p.avatar, score: p.score,
       isHost: p.isHost, disconnected: p.disconnected,
       hasAnswered: room.answers.has(p.id), isBot: p.isBot,
     }));
@@ -179,7 +180,7 @@ function roomState(room: ConvinceRoom, forPlayerId?: string): Record<string, unk
   if (room.currentReviewId) {
     const rp = room.players.get(room.currentReviewId);
     if (rp) currentReview = {
-      id: rp.id, name: rp.name, color: rp.color,
+      id: rp.id, name: rp.name, color: rp.color, avatar: rp.avatar,
       answer: room.phase === "revealing" ? null : (room.answers.get(rp.id) ?? ""),
       myRating: forPlayerId ? (room.ratings.get(rp.id)?.get(forPlayerId) ?? null) : null,
       ratingsCount: room.ratings.get(rp.id)?.size ?? 0,
@@ -201,7 +202,7 @@ function roomState(room: ConvinceRoom, forPlayerId?: string): Record<string, unk
     reviewQueueLength: room.reviewQueue.length,
     timerEnd: room.timerEnd,
     settings: room.settings,
-    winner: winner ? { id: winner.id, name: winner.name, color: winner.color } : null,
+    winner: winner ? { id: winner.id, name: winner.name, color: winner.color, avatar: winner.avatar } : null,
   };
 }
 
@@ -236,9 +237,13 @@ function checkRatingComplete(room: ConvinceRoom): void {
     return;
   }
 
-  // Move to leaderboard between players
-  room.phase = "leaderboard";
-  broadcastState(room);
+  // Return to revealing if more players remain, otherwise start next round
+  if (room.reviewQueue.length > 0) {
+    room.phase = "revealing";
+    broadcastState(room);
+  } else {
+    startNextRound(room);
+  }
 }
 
 // ─── Message Handlers ─────────────────────────────────────────────────────────
@@ -273,10 +278,11 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
       winnerId: null,
     };
 
+    const avatar = String(msg.avatar ?? "");
     const colorIdx = 0;
     room.players.set(playerId, {
       id: playerId, name, color: PLAYER_COLORS[colorIdx % PLAYER_COLORS.length],
-      ws, score: 0, disconnected: false, isHost: true, joinOrder: 0, isBot: false,
+      avatar, ws, score: 0, disconnected: false, isHost: true, joinOrder: 0, isBot: false,
     });
 
     ws.convinceRoomCode = code;
@@ -300,9 +306,10 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
 
     const playerId = `${name}_${Date.now()}`;
     const colorIdx = room.players.size;
+    const avatar = String(msg.avatar ?? "");
     room.players.set(playerId, {
       id: playerId, name, color: PLAYER_COLORS[colorIdx % PLAYER_COLORS.length],
-      ws, score: 0, disconnected: false, isHost: false, joinOrder: colorIdx, isBot: false,
+      avatar, ws, score: 0, disconnected: false, isHost: false, joinOrder: colorIdx, isBot: false,
     });
 
     ws.convinceRoomCode = code;
@@ -336,7 +343,7 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
     room.players.set(botId, {
       id: botId, name: `Bot ${botCount}`,
       color: PLAYER_COLORS[colorIdx % PLAYER_COLORS.length],
-      ws: null, score: 0, disconnected: false, isHost: false,
+      avatar: "🤖", ws: null, score: 0, disconnected: false, isHost: false,
       joinOrder: colorIdx, isBot: true,
     });
     broadcastState(room);

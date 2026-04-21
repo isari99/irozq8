@@ -24,13 +24,46 @@ function ConvinceGlowOrbs() {
   </>;
 }
 
+// ─── Preset Avatars ───────────────────────────────────────────────────────────
+const AVATAR_CATEGORIES = [
+  { label: "شباب", items: ["👦","🧑","👱","🧔","🤴","🦸","🧙","🕵️"] },
+  { label: "بنات", items: ["👧","👩","👱‍♀️","👸","🦹‍♀️","🧝‍♀️","🧚‍♀️","🧜‍♀️"] },
+  { label: "إيموجي", items: ["😎","🤩","🥸","🦁","🐯","🦊","👻","🌟"] },
+];
+
+function AvatarPicker({ selected, onSelect }: { selected: string; onSelect: (a: string) => void }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700, display: "block", marginBottom: 10 }}>صورتك</label>
+      {AVATAR_CATEGORIES.map(cat => (
+        <div key={cat.label} style={{ marginBottom: 10 }}>
+          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>{cat.label}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {cat.items.map(a => (
+              <button key={a} onClick={() => onSelect(a)} style={{
+                width: 46, height: 46, borderRadius: 12, fontSize: 24,
+                background: selected === a ? `${GOLD}33` : "rgba(255,255,255,0.06)",
+                border: `2px solid ${selected === a ? GOLD : "rgba(255,255,255,0.12)"}`,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: selected === a ? `0 0 14px ${GOLD}55` : "none",
+                transform: selected === a ? "scale(1.12)" : "scale(1)",
+                transition: "all 0.15s",
+              }}>{a}</button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ConvincePlayer {
-  id: string; name: string; color: string; score: number;
+  id: string; name: string; color: string; avatar: string; score: number;
   isHost: boolean; disconnected: boolean; hasAnswered: boolean; isBot?: boolean;
 }
 interface CurrentReview {
-  id: string; name: string; color: string;
+  id: string; name: string; color: string; avatar: string;
   answer: string | null; myRating: number | null;
   ratingsCount: number; totalRaters: number;
 }
@@ -43,7 +76,7 @@ interface ConvinceState {
   reviewQueueLength: number;
   timerEnd: number;
   settings: { timerSecs: number; targetScore: number; hideWriting: boolean };
-  winner: { id: string; name: string; color: string } | null;
+  winner: { id: string; name: string; color: string; avatar: string } | null;
 }
 type Screen = "entry" | "host-setup" | "join" | "game";
 
@@ -76,7 +109,7 @@ function PlayerCard({ p, dim }: { p: ConvincePlayer; dim?: boolean }) {
         background: p.color + "33", border: `2px solid ${p.color}`,
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: 16, fontWeight: 900, color: p.color,
-      }}>{initials(p.name)}</div>
+      }}>{p.avatar || initials(p.name)}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: "#fff", fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
         {p.isHost && <div style={{ color: GOLD, fontSize: 11, fontWeight: 600 }}>الهوست</div>}
@@ -144,13 +177,12 @@ function ConvinceScoreboard({ players, myId }: { players: ConvincePlayer[]; myId
             }}>
               <div style={{
                 width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                background: p.isBot ? "rgba(124,58,237,0.3)" : p.color + "33",
-                border: `2px solid ${p.isBot ? "#7c3aed" : p.color}`,
+                background: p.color + "22",
+                border: `2px solid ${p.color}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: p.isBot ? 14 : 13, fontWeight: 900,
-                color: p.isBot ? "#a78bfa" : p.color,
+                fontSize: 16, fontWeight: 900, color: p.color,
               }}>
-                {p.isBot ? "🤖" : initials(p.name)}
+                {p.avatar || (p.isBot ? "🤖" : initials(p.name))}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: isMe ? "#fff" : "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: 700,
@@ -191,6 +223,7 @@ export default function ConvinceGame() {
   const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [settings, setSettings] = useState({ timerSecs: 30, targetScore: 50, hideWriting: false });
+  const [selectedAvatar, setSelectedAvatar] = useState("😎");
 
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
@@ -243,13 +276,13 @@ export default function ConvinceGame() {
   // ── Actions ──
   const createRoom = () => {
     if (!myName.trim()) { setError("اكتب اسمك أولاً"); return; }
-    send({ type: "convince:create", name: myName.trim(), ...settings });
+    send({ type: "convince:create", name: myName.trim(), avatar: selectedAvatar, ...settings });
     setScreen("game");
   };
   const joinRoom = () => {
     if (!myName.trim()) { setError("اكتب اسمك أولاً"); return; }
     if (!joinCode.trim()) { setError("اكتب كود الغرفة"); return; }
-    send({ type: "convince:join", name: myName.trim(), code: joinCode.toUpperCase().trim() });
+    send({ type: "convince:join", name: myName.trim(), avatar: selectedAvatar, code: joinCode.toUpperCase().trim() });
     setScreen("game");
   };
   const startGame = () => send({ type: "convince:start" });
@@ -335,7 +368,7 @@ export default function ConvinceGame() {
       {/* Target Score */}
       <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>نقاط الفوز</label>
       <div style={{ display: "flex", gap: 10, marginTop: 8, marginBottom: 22, flexWrap: "wrap" }}>
-        {[30,50,70,100].map(pts => (
+        {[30,50,70,100,150,200].map(pts => (
           <button key={pts} onClick={() => setSettings(p => ({ ...p, targetScore: pts }))} style={{
             padding: "10px 18px", borderRadius: 12, fontWeight: 800, fontSize: 14, cursor: "pointer",
             background: settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.08)",
@@ -365,6 +398,8 @@ export default function ConvinceGame() {
         </div>
       </button>
 
+      <AvatarPicker selected={selectedAvatar} onSelect={setSelectedAvatar}/>
+
       <button onClick={createRoom} disabled={!wsReady} style={{
         width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
         background: wsReady ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.1)",
@@ -393,9 +428,11 @@ export default function ConvinceGame() {
 
       <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>كود الغرفة</label>
       <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="مثال: ABCD"
-        style={{ width: "100%", marginTop: 6, marginBottom: 28, padding: "12px 16px", borderRadius: 12,
+        style={{ width: "100%", marginTop: 6, marginBottom: 22, padding: "12px 16px", borderRadius: 12,
           background: "rgba(255,255,255,0.08)", border: `1px solid rgba(255,255,255,0.2)`, color: "#fff",
           fontSize: 20, fontWeight: 900, outline: "none", boxSizing: "border-box", letterSpacing: "0.12em", textAlign: "center" }}/>
+
+      <AvatarPicker selected={selectedAvatar} onSelect={setSelectedAvatar}/>
 
       <button onClick={joinRoom} disabled={!wsReady} style={{
         width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
@@ -491,13 +528,13 @@ export default function ConvinceGame() {
                   }}>
                   {/* Avatar circle */}
                   <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-                    border: `2.5px solid ${p.isBot ? "#7c3aed" : p.color}`,
-                    boxShadow: `0 0 10px ${p.isBot ? "#7c3aed55" : p.color + "55"}`,
-                    background: p.isBot ? "rgba(124,58,237,0.25)" : p.color + "33",
+                    border: `2.5px solid ${p.color}`,
+                    boxShadow: `0 0 10px ${p.color + "55"}`,
+                    background: p.color + "22",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: p.isBot ? 22 : 20, fontWeight: 900,
-                    color: p.isBot ? "#a78bfa" : p.color }}>
-                    {p.isBot ? "🤖" : initials(p.name)}
+                    fontSize: 22, fontWeight: 900,
+                    color: p.color }}>
+                    {p.avatar || (p.isBot ? "🤖" : initials(p.name))}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#fff", fontWeight: 800, fontSize: 14,
@@ -565,9 +602,8 @@ export default function ConvinceGame() {
 
     // ── Answering ──
     if (phase === "answering") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
         <ConvinceGlowOrbs />
-        <ConvinceScoreboard players={players} myId={myId}/>
         {/* Back header */}
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -699,8 +735,8 @@ export default function ConvinceGame() {
                 <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
                   background: p.color + "22", border: `2.5px solid ${p.color}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 20, fontWeight: 900, color: p.color }}>
-                  {initials(p.name)}
+                  fontSize: 24, fontWeight: 900, color: p.color }}>
+                  {p.avatar || (p.isBot ? "🤖" : initials(p.name))}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}>{p.name}</div>
@@ -713,14 +749,10 @@ export default function ConvinceGame() {
             ))}
           </div>
 
-          {notReviewedPlayers.length === 0 && amHost && (
-            <div style={{ textAlign: "center", marginTop: 32 }}>
-              <button onClick={nextPlayer} style={{
-                padding: "16px 48px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
-                background: `linear-gradient(135deg,${GOLD},#d97706)`, color: "#000", border: "none",
-                boxShadow: `0 6px 24px ${GOLD}50`,
-              }}>الجولة التالية</button>
-            </div>
+          {notReviewedPlayers.length === 0 && !amHost && (
+            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 14, marginTop: 24, fontWeight: 600 }}>
+              في انتظار بدء الجولة التالية...
+            </p>
           )}
         </div>
       </div>
@@ -755,7 +787,7 @@ export default function ConvinceGame() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 36, fontWeight: 900, color: currentReview.color,
                 boxShadow: `0 0 32px ${currentReview.color}55`,
-              }}>{initials(currentReview.name)}</div>
+              }}>{currentReview.avatar || initials(currentReview.name)}</div>
               <h3 style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 4 }}>{currentReview.name}</h3>
               <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: 600 }}>
                 {currentReview.ratingsCount} / {currentReview.totalRaters} قيّموا
@@ -803,112 +835,8 @@ export default function ConvinceGame() {
       );
     }
 
-    // ── Leaderboard ──
-    if (phase === "leaderboard") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
-        <ConvinceGlowOrbs />
-        <ConvinceScoreboard players={players} myId={myId}/>
-        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
-          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button onClick={() => navigate("/")} style={{
-            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
-          }}><ArrowRight size={14}/>رجوع</button>
-          <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
-          <div style={{ width: 60 }}/>
-        </div>
-        <div style={{ maxWidth: 520, margin: "0 auto", padding: "32px 16px" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>📊</div>
-            <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff", textShadow: "0 0 20px rgba(255,255,255,0.3)" }}>لوحة الترتيب</h2>
-            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginTop: 6, fontWeight: 600 }}>
-              هدف الفوز: {gs.targetScore} نقطة
-            </p>
-          </div>
+    // ── Leaderboard phase is removed — backend now goes directly to revealing ──
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 32 }}>
-            {[...players].sort((a,b) => b.score - a.score).map((p, idx) => (
-              <motion.div key={p.id}
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.06 }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 12, padding: "14px 18px",
-                  background: p.id === myId ? `${GOLD}20` : "rgba(255,255,255,0.09)",
-                  border: `1.5px solid ${p.id === myId ? GOLD + "77" : p.color + "55"}`,
-                  borderRadius: 14,
-                }}>
-                <span style={{ fontSize: 20, fontWeight: 900, color: idx === 0 ? "#ffd700" : idx === 1 ? "#c0c0c0" : idx === 2 ? "#cd7f32" : "rgba(255,255,255,0.65)", minWidth: 28, textAlign: "center" }}>
-                  {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx+1}`}
-                </span>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-                  background: p.color + "33", border: `2px solid ${p.color}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 16, fontWeight: 900, color: p.color,
-                  textShadow: `0 0 8px ${p.color}` }}>
-                  {initials(p.name)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>{p.name}</div>
-                </div>
-                <div style={{ color: GOLD, fontSize: 22, fontWeight: 900, textShadow: `0 0 10px ${GOLD}` }}>{p.score}</div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Remaining players to review — host can click directly to start rating */}
-          {gameState.reviewQueueLength > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                {amHost ? "اختر اللاعب التالي لعرض إجابته:" : "في انتظار اختيار الهوست للاعب التالي..."}
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {notReviewedPlayers.map(p => (
-                  <motion.button key={p.id}
-                    whileHover={amHost ? { scale: 1.02 } : {}}
-                    onClick={amHost ? () => showPlayer(p.id) : undefined}
-                    disabled={!amHost}
-                    style={{
-                      width: "100%", textAlign: "right", padding: "14px 18px", borderRadius: 14,
-                      cursor: amHost ? "pointer" : "default",
-                      background: amHost ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.04)",
-                      border: `1.5px solid ${p.color}44`,
-                      display: "flex", alignItems: "center", gap: 12,
-                      boxShadow: amHost ? `0 0 14px ${p.color}18` : "none",
-                      transition: "all 0.2s",
-                    }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                      background: p.color + "22", border: `2px solid ${p.color}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 17, fontWeight: 900, color: p.color }}>
-                      {p.isBot ? "🤖" : initials(p.name)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{p.name}</div>
-                      <div style={{ color: p.hasAnswered ? "#4ade80" : "rgba(255,255,255,0.35)", fontSize: 12 }}>
-                        {p.hasAnswered ? "✓ أجاب" : "لم يجب"}
-                      </div>
-                    </div>
-                    {amHost && <ChevronRight size={16} color={p.color}/>}
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {gameState.reviewQueueLength === 0 && amHost && (
-            <button onClick={nextPlayer} style={{
-              width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
-              background: `linear-gradient(135deg,${GOLD},#d97706)`, color: "#000", border: "none",
-              boxShadow: `0 6px 24px ${GOLD}50`,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            }}><ChevronRight size={20}/>الجولة التالية</button>
-          )}
-          {!amHost && gameState.reviewQueueLength === 0 && (
-            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600 }}>في انتظار الهوست...</p>
-          )}
-        </div>
-      </div>
-    );
 
     // ── Winner ──
     if (phase === "winner" && gameState.winner) return (
@@ -936,7 +864,7 @@ export default function ConvinceGame() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 48, fontWeight: 900, color: gameState.winner.color,
               boxShadow: `0 0 60px ${gameState.winner.color}80`,
-            }}>{initials(gameState.winner.name)}</div>
+            }}>{gameState.winner.avatar || initials(gameState.winner.name)}</div>
             <h2 style={{ fontSize: 36, fontWeight: 900, color: "#fff", marginBottom: 8 }}>{gameState.winner.name}</h2>
           </motion.div>
 
