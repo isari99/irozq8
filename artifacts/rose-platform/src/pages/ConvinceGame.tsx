@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearch, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Copy, Check, Users, Eye, EyeOff, Play, ChevronRight, Link2 } from "lucide-react";
-import { fetchTwitchAvatar, fallbackAvatar } from "../lib/twitchUser";
 
 // ─── WS URL ───────────────────────────────────────────────────────────────────
 function getWsUrl(): string {
@@ -119,6 +118,58 @@ function NumberRating({ value, onChange }: { value: number; onChange: (v: number
   );
 }
 
+// ─── Fixed Scoreboard Sidebar ─────────────────────────────────────────────────
+const SB_W = 155;
+function ConvinceScoreboard({ players, myId }: { players: ConvincePlayer[]; myId: string | null }) {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  return (
+    <div style={{
+      position: "fixed", left: 0, top: 0, bottom: 0, width: SB_W, zIndex: 50,
+      background: "rgba(5,2,14,0.92)", borderRight: "1px solid rgba(255,255,255,0.09)",
+      backdropFilter: "blur(12px)", display: "flex", flexDirection: "column",
+      fontFamily: "'Cairo','Arial',sans-serif",
+    }}>
+      <div style={{ padding: "13px 12px 8px", borderBottom: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>
+        <span style={{ color: GOLD, fontSize: 12, fontWeight: 800, letterSpacing: "0.04em" }}>🏆 لوحة النقاط</span>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
+        {sorted.map((p, idx) => {
+          const isMe = p.id === myId;
+          return (
+            <div key={p.id} style={{
+              display: "flex", alignItems: "center", gap: 7, padding: "7px 10px",
+              background: isMe ? `${p.color}18` : "transparent",
+              borderRight: isMe ? `3px solid ${p.color}` : "3px solid transparent",
+              transition: "all 0.3s",
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                background: p.isBot ? "rgba(124,58,237,0.3)" : p.color + "33",
+                border: `2px solid ${p.isBot ? "#7c3aed" : p.color}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: p.isBot ? 14 : 13, fontWeight: 900,
+                color: p.isBot ? "#a78bfa" : p.color,
+              }}>
+                {p.isBot ? "🤖" : initials(p.name)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: isMe ? "#fff" : "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: 700,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.name}
+                </div>
+                <div style={{ color: GOLD, fontSize: 15, fontWeight: 900, lineHeight: 1.1 }}>{p.score}</div>
+              </div>
+              <div style={{ fontSize: 12, flexShrink: 0, opacity: 0.9 }}>
+                {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ConvinceGame() {
   const search = useSearch();
@@ -140,7 +191,6 @@ export default function ConvinceGame() {
   const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [settings, setSettings] = useState({ timerSecs: 30, targetScore: 50, hideWriting: false });
-  const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
 
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
@@ -176,19 +226,6 @@ export default function ConvinceGame() {
     };
     return () => ws.close();
   }, []);
-
-  // ── Fetch Twitch avatars for players when they join ──
-  useEffect(() => {
-    if (!gameState) return;
-    gameState.players.forEach(p => {
-      if (!avatarMap[p.id]) {
-        fetchTwitchAvatar(p.name).then(url => {
-          setAvatarMap(prev => ({ ...prev, [p.id]: url }));
-        });
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState?.players.map(p => p.id).join(",")]);
 
   const myId = playerIdRef.current;
   const me = gameState?.players.find(p => p.id === myId);
@@ -441,7 +478,6 @@ export default function ConvinceGame() {
           {/* ── Players grid ── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {players.map(p => {
-              const avatar = avatarMap[p.id];
               const isMe = p.id === myId;
               return (
                 <motion.div key={p.id}
@@ -453,25 +489,15 @@ export default function ConvinceGame() {
                     borderRadius: 14, padding: "12px 14px", position: "relative",
                     boxShadow: isMe ? `0 0 20px ${p.color}40` : "none",
                   }}>
-                  {/* Avatar or Bot icon */}
+                  {/* Avatar circle */}
                   <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-                    border: `2.5px solid ${p.isBot ? "#7c3aed" : p.color}`, overflow: "hidden", position: "relative",
+                    border: `2.5px solid ${p.isBot ? "#7c3aed" : p.color}`,
                     boxShadow: `0 0 10px ${p.isBot ? "#7c3aed55" : p.color + "55"}`,
                     background: p.isBot ? "rgba(124,58,237,0.25)" : p.color + "33",
-                    display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {p.isBot ? (
-                      <span style={{ fontSize: 24 }}>🤖</span>
-                    ) : avatar ? (
-                      <img src={avatar} alt={p.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(p.name); }}/>
-                    ) : (
-                      <div style={{ width: "100%", height: "100%",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 20, fontWeight: 900, color: p.color }}>
-                        {initials(p.name)}
-                      </div>
-                    )}
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: p.isBot ? 22 : 20, fontWeight: 900,
+                    color: p.isBot ? "#a78bfa" : p.color }}>
+                    {p.isBot ? "🤖" : initials(p.name)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#fff", fontWeight: 800, fontSize: 14,
@@ -539,8 +565,9 @@ export default function ConvinceGame() {
 
     // ── Answering ──
     if (phase === "answering") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
         <ConvinceGlowOrbs />
+        <ConvinceScoreboard players={players} myId={myId}/>
         {/* Back header */}
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -620,8 +647,9 @@ export default function ConvinceGame() {
 
     // ── Revealing (host selects who to show) ──
     if (phase === "revealing") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
         <ConvinceGlowOrbs />
+        <ConvinceScoreboard players={players} myId={myId}/>
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
@@ -704,8 +732,9 @@ export default function ConvinceGame() {
       const alreadyRated = currentReview.myRating !== null || myRating > 0;
 
       return (
-        <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+        <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
           <ConvinceGlowOrbs />
+          <ConvinceScoreboard players={players} myId={myId}/>
           <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
             display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <button onClick={() => navigate("/")} style={{
@@ -776,8 +805,9 @@ export default function ConvinceGame() {
 
     // ── Leaderboard ──
     if (phase === "leaderboard") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
         <ConvinceGlowOrbs />
+        <ConvinceScoreboard players={players} myId={myId}/>
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
