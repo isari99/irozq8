@@ -751,6 +751,12 @@ export default function UnoGame() {
   const [soundVol, setSoundVol] = useState(0.6);
   const soundVolRef = useRef(0.6);
 
+  // ── Flying-card draw animation ──
+  const drawPileRef = useRef<HTMLDivElement>(null);
+  const handTrayRef = useRef<HTMLDivElement>(null);
+  const flyKeyRef = useRef(0);
+  const [flyingCards, setFlyingCards] = useState<{ key: number; fromX: number; fromY: number; toX: number; toY: number }[]>([]);
+
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
   }, []);
@@ -839,7 +845,29 @@ export default function UnoGame() {
     setScreen("game");
   };
   const playCard = (cardId: string) => send({ type: "uno:play_card", cardId });
-  const drawCard = () => send({ type: "uno:draw" });
+
+  const drawCard = useCallback((count = 1) => {
+    if (drawPileRef.current && handTrayRef.current) {
+      const pileRect = drawPileRef.current.getBoundingClientRect();
+      const handRect = handTrayRef.current.getBoundingClientRect();
+      const toX = handRect.left + handRect.width / 2 - 24;
+      const toY = handRect.top + 8;
+      const newCards = Array.from({ length: count }, (_, i) => {
+        flyKeyRef.current++;
+        return {
+          key: flyKeyRef.current,
+          fromX: pileRect.left + pileRect.width / 2 - 24,
+          fromY: pileRect.top + pileRect.height / 2 - 34,
+          toX, toY,
+        };
+      });
+      setFlyingCards(prev => [...prev, ...newCards]);
+      newCards.forEach(c => {
+        setTimeout(() => setFlyingCards(prev => prev.filter(x => x.key !== c.key)), 650);
+      });
+    }
+    send({ type: "uno:draw" });
+  }, [send]);
   const sayUno = () => send({ type: "uno:say_uno" });
   const chooseColor = (color: Color) => send({ type: "uno:choose_color", color });
   const playAgain = () => send({ type: "uno:play_again" });
@@ -1695,7 +1723,7 @@ export default function UnoGame() {
                   ].join(", "),
                 }}>
                   {/* DRAW PILE */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                  <div ref={drawPileRef} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
                     <motion.div
                       whileHover={isMyTurn && !hasPlayableCard && !gs.pendingWild ? { scale: 1.1, y: -5 } : {}}
                       whileTap={isMyTurn && !hasPlayableCard && !gs.pendingWild ? { scale: 0.93 } : {}}
@@ -1758,7 +1786,7 @@ export default function UnoGame() {
           </div>
 
           {/* ═══════════════ MY HAND (bottom tray) ═══════════════ */}
-          <div style={{
+          <div ref={handTrayRef} style={{
             flexShrink: 0, position: "relative", zIndex: 10,
             padding: "0 10px 0",
           }}>
@@ -1783,7 +1811,7 @@ export default function UnoGame() {
               <motion.button
                 animate={{ scale: [1, 1.025, 1] }} transition={{ repeat: Infinity, duration: 0.85 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={() => { playUnoSound("draw", soundVol); drawCard(); }}
+                onClick={() => { playUnoSound("draw", soundVol); drawCard(gs.drawStack); }}
                 style={{
                   width: "100%", padding: "8px", borderRadius: 10, fontWeight: 900, fontSize: 13,
                   background: "linear-gradient(135deg,#dc2626,#991b1b)",
@@ -1882,6 +1910,22 @@ export default function UnoGame() {
               }} />
             </div>
           </div>
+
+          {/* ── Flying card draw animations ── */}
+          {flyingCards.map(fc => (
+            <motion.div
+              key={fc.key}
+              initial={{ x: fc.fromX, y: fc.fromY, rotate: -10, scale: 1.05, opacity: 1 }}
+              animate={{ x: fc.toX, y: fc.toY, rotate: 720, scale: 0.7, opacity: 0 }}
+              transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
+              style={{
+                position: "fixed", top: 0, left: 0, zIndex: 9999,
+                width: 48, height: 68, pointerEvents: "none",
+                filter: "drop-shadow(0 0 12px rgba(255,200,80,0.7))",
+              }}>
+              <UnoCardBack w={48} h={68} />
+            </motion.div>
+          ))}
         </div>
       );
     }

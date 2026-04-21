@@ -1,0 +1,229 @@
+
+تعديل لعبة اونو
+<!DOCTYPE html>
+‏<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uno Game Modified</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* تحسين الإضاءة والخلفية لتكون فخمة وواضحة /
+        body {
+            margin: 0; padding: 0;
+            background: radial-gradient(circle, #2c0b0b 0%, #000000 100%);
+            color: white; font-family: 'Arial', sans-serif;
+            overflow: hidden; height: 100vh;
+        }
+
+        / توزيع الشاشة بناءً على الصورة المرفقة /
+        .game-layout {
+            display: grid;
+            grid-template-columns: 180px 1fr 180px;
+            grid-template-rows: 140px 1fr 160px;
+            height: 100vh; gap: 10px; padding: 15px;
+        }
+
+        / الساحة المركزية - تم حذف البنت منها /
+        .arena {
+            grid-column: 2; grid-row: 2;
+            border: 3px solid rgba(218, 165, 32, 0.4);
+            border-radius: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex; justify-content: center; align-items: center;
+            position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        / كومة الأوراق في المنتصف /
+        .center-deck {
+            display: flex; gap: 30px; align-items: center;
+        }
+
+        .uno-draw-pile {
+            width: 90px; height: 130px;
+            background: linear-gradient(135deg, #b31d1d, #7a1111);
+            border: 3px solid #fff; border-radius: 12px;
+            cursor: pointer; display: flex; justify-content: center;
+            align-items: center; font-weight: bold; font-size: 18px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            transition: transform 0.2s; position: relative;
+        }
+
+        / أنيميشن طيران الورقة من المنتصف ليد اللاعب */
+        .flying-card {
+position: absolute; z-index: 1000;
+            width: 70px; height: 100px;
+            background: white; border-radius: 8px;
+border: 2px solid #333;
+            transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+            pointer-events: none;
+        }
+
+        /* منطقة اللاعب السفلي - شريط الأوراق /
+        .my-hand {
+            grid-column: 1 / span 3; grid-row: 3;
+            background: rgba(218, 165, 32, 0.15);
+            border-top: 4px solid #daa520;
+            display: flex; justify-content: center; align-items: center;
+            gap: 8px; padding: 10px;
+        }
+
+        .card {
+            width: 75px; height: 110px;
+            border-radius: 10px; border: 2px solid white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 26px; font-weight: bold; cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+        .card:hover { transform: translateY(-25px) scale(1.1); z-index: 50; }
+
+        .red { background: #e74c3c; } .blue { background: #3498db; }
+        .green { background: #2ecc71; } .yellow { background: #f1c40f; }
+
+        / نص التنبيه عند القفز أو العكس */
+        #game-notifier {
+            position: absolute; top: 25%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 45px; font-weight: bold; color: #fff;
+            text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffcc00;
+            opacity: 0; pointer-events: none; transition: 0.5s;
+        }
+
+        .bot-box {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 15px;
+        }
+</style>
+</head>
+<body>
+
+    <div class="game-layout">
+        <!-- البوت العلوي -->
+        <div class="col-start-2 row-start-1 flex justify-center">
+            <div class="bot-box w-48 h-24">
+                <div class="text-xs text-gray-400 mb-2">لاعب 2 (خصم)</div>
+                <div class="flex -space-x-4">
+                    <div class="w-8 h-12 bg-red-900 border rounded"></div>
+                    <div class="w-8 h-12 bg-red-900 border rounded"></div>
+                    <div class="w-8 h-12 bg-red-900 border rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الساحة المركزية -->
+        <div class="arena" id="arena">
+            <div id="game-notifier">تخطي!</div>
+            <div class="center-deck">
+                <!-- كومة السحب - الضغط هنا يسحب ورقة -->
+                <div class="uno-draw-pile" id="main-deck" onclick="animateCardDraw()">
+                    UNO
+                </div>
+                <!-- الورقة الحالية في الملعب -->
+                <div id="current-discard">
+                    <div class="card green">5</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- يد اللاعب السفلي -->
+        <div class="my-hand" id="my-cards">
+            <!-- الأوراق تظهر هنا برمجياً -->
+        </div>
+    </div>
+
+    <script>
+        let direction = 1; // 1 للأمام، -1 للخلف
+        let turn = 0;
+
+        // توليد أوراق اللاعب عند البدء
+        window.onload = () => {
+const colors = ['red', 'blue', 'green', 'yellow'];
+            const container = document.getElementById('my-cards');
+            for(let i=0; i<7; i++) {
+                const color = colors[Math.floor(Math.random()colors.length)];
+                const val = Math.floor(Math.random()9);
+                createCard(color, val);
+            }
+        };
+
+        function createCard(color, val) {
+            const card = document.createElement('div');
+            card.className = card ${color};
+            card.innerText = val;
+            card.onclick = () => playThisCard(card);
+
+            document.getElementById('my-cards').appendChild(card);
+        }
+
+        // أنيميشن سحب الورقة (طيران من المنتصف لليد)
+        function animateCardDraw() {
+            const deck = document.getElementById('main-deck');
+            const hand = document.getElementById('my-cards');
+            const deckRect = deck.getBoundingClientRect();
+const fly = document.createElement('div');
+            fly.className = 'flying-card';
+            fly.style.left = deckRect.left + 'px';
+            fly.style.top = deckRect.top + 'px';
+            document.body.appendChild(fly);
+
+            setTimeout(() => {
+                const handRect = hand.getBoundingClientRect();
+                fly.style.left = (window.innerWidth / 2) + 'px';
+                fly.style.top = (window.innerHeight - 100) + 'px';
+                fly.style.transform = 'rotate(360deg) scale(0.2)';
+                fly.style.opacity = '0';
+            }, 50);
+
+            setTimeout(() => {
+                fly.remove();
+                createCard('yellow', '9');
+            }, 750);
+        }
+
+        // لعب الورقة ومعالجة Skip و Reverse
+        function playThisCard(el) {
+            const val = el.innerText;
+            const color = el.classList[1];
+
+            // نقل الورقة للمنتصف
+            document.getElementById('current-discard').innerHTML = <div class="card ${color}">${val}</div>;
+            el.remove();
+
+            // منطق القفز والعكس
+            if (val == 'S'  val == 'Skip') {
+                notify("تخطي الدور!");
+                skipLogic();
+            } else if (val == 'R' 
+ val == 'Reverse') {
+                notify("عكس الاتجاه!");
+                reverseLogic();
+            } else {
+                normalNextTurn();
+            }
+function notify(msg) {
+            const n = document.getElementById('game-notifier');
+            n.innerText = msg; n.style.opacity = '1';
+            setTimeout(() => n.style.opacity = '0', 1200);
+        }
+
+        function normalNextTurn() {
+            turn = (turn + direction + 4) % 4;
+            console.log("الدور الآن على: " + turn);
+        }
+
+        function skipLogic() {
+            // تخطي: نتحرك خطوتين
+            turn = (turn + (direction * 2) + 4) % 4;
+            console.log("تم التخطي! الدور الآن على: " + turn);
+        }
+
+        function reverseLogic() {
+            direction *= -1;
+            normalNextTurn();
+        }
+    </script>
+</body>
+</html>
