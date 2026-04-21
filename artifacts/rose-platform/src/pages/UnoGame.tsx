@@ -327,138 +327,231 @@ function getPlayerColor(name: string) {
   return PLAYER_PALETTE[name.charCodeAt(0) % PLAYER_PALETTE.length];
 }
 
+// ─── UNO Card Back ───────────────────────────────────────────────────────────
+function UnoCardBack({ w = 32, h = 46 }: { w?: number; h?: number }) {
+  const r = Math.round(h * 0.1);
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: r,
+      background: "linear-gradient(150deg, #1a0e52 0%, #0d0830 100%)",
+      border: "1.5px solid rgba(90,70,180,0.65)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      overflow: "hidden", position: "relative", flexShrink: 0,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)",
+    }}>
+      <div style={{
+        width: w * 0.65, height: h * 0.68, borderRadius: "50%",
+        background: "linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%)",
+        transform: "rotate(-30deg)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 0 8px rgba(220,38,38,0.45)",
+      }}>
+        <span style={{
+          color: "#fff", fontWeight: 900, letterSpacing: "0.04em",
+          transform: "rotate(30deg)", display: "block",
+          fontSize: Math.max(5, Math.round(h * 0.13)),
+        }}>UNO</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Player Seat Components ────────────────────────────────────────────────
+function PlayerAvatar({ player, size = 44 }: { player: PlayerInfo; size?: number }) {
+  const isCurrent = player.isCurrentPlayer;
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <motion.div
+        animate={isCurrent ? {
+          boxShadow: ["0 0 0px rgba(96,212,255,0)", "0 0 22px rgba(96,212,255,0.65)", "0 0 0px rgba(96,212,255,0)"],
+        } : {}}
+        transition={{ repeat: Infinity, duration: 1.2 }}
+        style={{
+          width: size, height: size, borderRadius: "50%",
+          background: isCurrent
+            ? "radial-gradient(circle, rgba(96,212,255,0.18), rgba(30,160,210,0.05))"
+            : "rgba(255,255,255,0.06)",
+          border: `2px solid ${isCurrent ? "rgba(96,212,255,0.85)" : "rgba(255,255,255,0.22)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: size * 0.38, fontWeight: 900,
+          color: isCurrent ? "#60d4ff" : "rgba(255,255,255,0.7)",
+          transition: "border-color 0.3s",
+        }}>
+        {player.isBot ? "🤖" : player.name.trim()[0]?.toUpperCase() ?? "?"}
+      </motion.div>
+      {isCurrent && (
+        <motion.div
+          animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+          style={{
+            position: "absolute", inset: -5, borderRadius: "50%",
+            border: "1.5px dashed rgba(96,212,255,0.35)", pointerEvents: "none",
+          }} />
+      )}
+      {player.saidUno && (
+        <div style={{
+          position: "absolute", top: -8, right: -8, zIndex: 10,
+          background: "#dc2626", color: "#fff", fontSize: 7, fontWeight: 900,
+          padding: "2px 5px", borderRadius: 5, border: "1px solid #fff",
+          letterSpacing: "0.04em",
+        }}>UNO!</div>
+      )}
+    </div>
+  );
+}
+
+// TOP player seat — horizontal card holder
+function TopSeat({ player }: { player: PlayerInfo }) {
+  const n = Math.max(1, Math.min(player.cardCount, 7));
+  const cW = 28, cH = 40, overlap = 8;
+  const totalW = cW + (n - 1) * (cW - overlap);
+  const isCurrent = player.isCurrentPlayer;
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+      opacity: player.isConnected ? 1 : 0.35,
+    }}>
+      <PlayerAvatar player={player} size={44} />
+      <div style={{
+        color: isCurrent ? "#fff" : "rgba(255,255,255,0.6)",
+        fontSize: 10, fontWeight: 800, textAlign: "center",
+        maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{player.name}</div>
+      {/* Leather horizontal holder */}
+      <div style={{
+        background: "linear-gradient(180deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
+        border: "1.5px solid rgba(255,190,90,0.3)",
+        borderRadius: 7,
+        padding: "5px 9px 7px",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,190,80,0.12), inset 0 -2px 0 rgba(0,0,0,0.4)",
+        position: "relative",
+      }}>
+        <div style={{ position: "relative", width: totalW, height: cH }}>
+          {Array.from({ length: n }).map((_, i) => (
+            <div key={i} style={{ position: "absolute", left: i * (cW - overlap), zIndex: i }}>
+              <UnoCardBack w={cW} h={cH} />
+            </div>
+          ))}
+        </div>
+        {/* Bottom ridge */}
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 5, borderRadius: "0 0 6px 6px",
+          background: "linear-gradient(180deg, #4a2510, #2a1207)",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+        }} />
+      </div>
+      <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700 }}>
+        {player.cardCount} ورقة
+      </div>
+    </div>
+  );
+}
+
+// LEFT player seat — vertical card holder, cards fan rightward
+function LeftSeat({ player }: { player: PlayerInfo }) {
+  const n = Math.max(1, Math.min(player.cardCount, 6));
+  const cW = 28, cH = 40, overlap = 10;
+  const totalH = cH + (n - 1) * (cH - overlap);
+  const isCurrent = player.isCurrentPlayer;
+  return (
+    <div style={{
+      display: "flex", flexDirection: "row", alignItems: "center", gap: 7,
+      opacity: player.isConnected ? 1 : 0.35,
+    }}>
+      {/* Vertical leather holder */}
+      <div style={{
+        background: "linear-gradient(90deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
+        border: "1.5px solid rgba(255,190,90,0.3)",
+        borderRadius: 7,
+        padding: "8px 5px 8px 7px",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.65), inset 1px 0 0 rgba(255,190,80,0.12), inset -2px 0 0 rgba(0,0,0,0.4)",
+        position: "relative",
+      }}>
+        <div style={{ position: "relative", width: cW, height: totalH }}>
+          {Array.from({ length: n }).map((_, i) => (
+            <div key={i} style={{
+              position: "absolute",
+              top: i * (cH - overlap),
+              zIndex: i,
+              transform: `rotate(${(i - (n - 1) / 2) * 4}deg)`,
+              transformOrigin: "bottom center",
+            }}>
+              <UnoCardBack w={cW} h={cH} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Info */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <PlayerAvatar player={player} size={40} />
+        <div style={{
+          color: isCurrent ? "#fff" : "rgba(255,255,255,0.6)",
+          fontSize: 9, fontWeight: 800,
+          maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          textAlign: "center",
+        }}>{player.name}</div>
+        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
+      </div>
+    </div>
+  );
+}
+
+// RIGHT player seat — vertical card holder, cards fan leftward
+function RightSeat({ player }: { player: PlayerInfo }) {
+  const n = Math.max(1, Math.min(player.cardCount, 6));
+  const cW = 28, cH = 40, overlap = 10;
+  const totalH = cH + (n - 1) * (cH - overlap);
+  const isCurrent = player.isCurrentPlayer;
+  return (
+    <div style={{
+      display: "flex", flexDirection: "row-reverse", alignItems: "center", gap: 7,
+      opacity: player.isConnected ? 1 : 0.35,
+    }}>
+      {/* Vertical leather holder */}
+      <div style={{
+        background: "linear-gradient(270deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
+        border: "1.5px solid rgba(255,190,90,0.3)",
+        borderRadius: 7,
+        padding: "8px 7px 8px 5px",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.65), inset -1px 0 0 rgba(255,190,80,0.12), inset 2px 0 0 rgba(0,0,0,0.4)",
+        position: "relative",
+      }}>
+        <div style={{ position: "relative", width: cW, height: totalH }}>
+          {Array.from({ length: n }).map((_, i) => (
+            <div key={i} style={{
+              position: "absolute",
+              top: i * (cH - overlap),
+              zIndex: i,
+              transform: `rotate(${(i - (n - 1) / 2) * -4}deg)`,
+              transformOrigin: "bottom center",
+            }}>
+              <UnoCardBack w={cW} h={cH} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Info */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <PlayerAvatar player={player} size={40} />
+        <div style={{
+          color: isCurrent ? "#fff" : "rgba(255,255,255,0.6)",
+          fontSize: 9, fontWeight: 800,
+          maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          textAlign: "center",
+        }}>{player.name}</div>
+        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
+      </div>
+    </div>
+  );
+}
+
+// Legacy wrapper (still used in non-playing phases if any)
 function OtherPlayerCard({ player, orientation = "top" }: {
   player: PlayerInfo;
   orientation?: "top" | "left" | "right";
 }) {
-  const c = getPlayerColor(player.name);
-  const isCurrent = player.isCurrentPlayer;
-  const isHoriz = orientation === "top";
-  const shown = Math.min(player.cardCount, isHoriz ? 6 : 4);
-  const cardW = isHoriz ? 22 : 18;
-  const cardH = isHoriz ? 31 : 26;
-  const overlap = isHoriz ? 10 : 8;
-
-  const cardFan = () => {
-    if (shown === 0) return null;
-    if (isHoriz) {
-      const totalW = cardW + (shown - 1) * (cardW - overlap);
-      return (
-        <div style={{ position: "relative", width: totalW, height: cardH, flexShrink: 0 }}>
-          {Array.from({ length: shown }).map((_, i) => (
-            <div key={i} style={{
-              position: "absolute", left: i * (cardW - overlap),
-              width: cardW, height: cardH, borderRadius: 4,
-              background: "linear-gradient(135deg,#1e1b4b,#312e81)",
-              border: "1.5px solid #4f46e5",
-              boxShadow: i === shown-1 ? "2px 2px 6px rgba(0,0,0,0.5)" : "none",
-              zIndex: i,
-            }} />
-          ))}
-        </div>
-      );
-    } else {
-      const totalH = cardH + (shown - 1) * (cardH - overlap);
-      return (
-        <div style={{ position: "relative", width: cardW, height: totalH, flexShrink: 0 }}>
-          {Array.from({ length: shown }).map((_, i) => (
-            <div key={i} style={{
-              position: "absolute", top: i * (cardH - overlap),
-              width: cardW, height: cardH, borderRadius: 4,
-              background: "linear-gradient(135deg,#1e1b4b,#312e81)",
-              border: "1.5px solid #4f46e5",
-              boxShadow: i === shown-1 ? "2px 2px 6px rgba(0,0,0,0.5)" : "none",
-              zIndex: i,
-            }} />
-          ))}
-        </div>
-      );
-    }
-  };
-
-  const avatar = (
-    <div style={{ position: "relative", flexShrink: 0 }}>
-      <motion.div
-        animate={isCurrent ? { boxShadow: [`0 0 0px ${c}`, `0 0 18px ${c}aa`, `0 0 0px ${c}`] } : {}}
-        transition={{ repeat: Infinity, duration: 1.0 }}
-        style={{
-          width: isHoriz ? 42 : 38, height: isHoriz ? 42 : 38, borderRadius: "50%",
-          background: c + "22",
-          border: `2.5px solid ${isCurrent ? c : c + "66"}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: isHoriz ? 17 : 14, fontWeight: 900, color: isCurrent ? c : c + "bb",
-          transition: "all 0.3s",
-        }}>
-        {player.isBot ? "🤖" : player.name.trim()[0]?.toUpperCase() ?? "?"}
-      </motion.div>
-      {player.saidUno && (
-        <div style={{
-          position: "absolute", top: -8, right: -8,
-          background: "#dc2626", color: "#fff", fontSize: 7, fontWeight: 900,
-          padding: "2px 5px", borderRadius: 6, border: "1.5px solid #fff",
-          letterSpacing: "0.04em",
-        }}>UNO!</div>
-      )}
-      {isCurrent && (
-        <motion.div
-          animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
-          style={{
-            position: "absolute", inset: -5, borderRadius: "50%",
-            border: `2px dashed ${c}99`, pointerEvents: "none",
-          }} />
-      )}
-    </div>
-  );
-
-  if (isHoriz) return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-      opacity: player.isConnected ? 1 : 0.35,
-      background: isCurrent ? `${c}14` : "rgba(255,255,255,0.04)",
-      border: `1.5px solid ${isCurrent ? c + "55" : "rgba(255,255,255,0.08)"}`,
-      borderRadius: 14, padding: "10px 10px 7px",
-      minWidth: 72, boxShadow: isCurrent ? `0 0 20px ${c}22` : "none",
-      transition: "all 0.3s",
-    }}>
-      {avatar}
-      <div style={{
-        color: isCurrent ? "#fff" : "rgba(255,255,255,0.75)",
-        fontSize: 10, fontWeight: 800, textAlign: "center",
-        maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>{player.name}</div>
-      {cardFan()}
-      <div style={{ color: isCurrent ? c : "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700 }}>
-        {player.cardCount} {player.cardCount === 1 ? "ورقة" : "أوراق"}
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{
-      display: "flex",
-      flexDirection: orientation === "left" ? "row" : "row-reverse",
-      alignItems: "center", gap: 6,
-      opacity: player.isConnected ? 1 : 0.35,
-      background: isCurrent ? `${c}14` : "rgba(255,255,255,0.04)",
-      border: `1.5px solid ${isCurrent ? c + "55" : "rgba(255,255,255,0.08)"}`,
-      borderRadius: 12, padding: "7px 8px",
-      boxShadow: isCurrent ? `0 0 18px ${c}22` : "none",
-      transition: "all 0.3s",
-    }}>
-      {avatar}
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
-        <div style={{
-          color: isCurrent ? "#fff" : "rgba(255,255,255,0.75)",
-          fontSize: 10, fontWeight: 800,
-          maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>{player.name}</div>
-        <div style={{ color: isCurrent ? c : "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: 700 }}>
-          {player.cardCount} أوراق
-        </div>
-      </div>
-      {cardFan()}
-    </div>
-  );
+  if (orientation === "top") return <TopSeat player={player} />;
+  if (orientation === "left") return <LeftSeat player={player} />;
+  return <RightSeat player={player} />;
 }
 
 // ─── Color Indicator ─────────────────────────────────────────────────────────
@@ -1034,295 +1127,416 @@ export default function UnoGame() {
       const myHand = gs.myHand ?? [];
       const top = gs.topCard;
 
-      // Fixed 4-player positions: top, right, left (me = bottom)
-      const topP    = others[0] ?? null;
-      const rightP  = others[1] ?? null;
-      const leftP   = others[2] ?? null;
+      // Fixed 4-player positions
+      const topP   = others[0] ?? null;
+      const rightP = others[1] ?? null;
+      const leftP  = others[2] ?? null;
 
       return (
         <div style={{
-          height: "100dvh", display: "flex", flexDirection: "column",
-          fontFamily: "'Cairo','Arial',sans-serif", position: "relative",
-          background: "linear-gradient(170deg,#0d0a1e 0%,#080513 100%)",
-          overflow: "hidden", userSelect: "none",
+          height: "100dvh",
+          background: "linear-gradient(175deg, #1d0d05 0%, #140803 50%, #0d0502 100%)",
+          position: "relative", overflow: "hidden", userSelect: "none",
+          fontFamily: "'Cairo','Arial',sans-serif",
+          display: "flex", flexDirection: "column",
         }} dir="rtl">
 
-          {/* ── Color Picker Modal ── */}
+          {/* ── Warm ambient lamp glow (upper-right) ── */}
+          <div style={{
+            position: "absolute", top: -60, right: "8%",
+            width: 320, height: 260,
+            background: "radial-gradient(ellipse, rgba(210,130,25,0.28) 0%, transparent 70%)",
+            filter: "blur(50px)", pointerEvents: "none", zIndex: 0,
+          }} />
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, height: "25%",
+            background: "linear-gradient(0deg, rgba(0,0,0,0.5), transparent)",
+            pointerEvents: "none", zIndex: 0,
+          }} />
+
+          {/* ── Modals ── */}
           <AnimatePresence>
             {gs.pendingWild && <ColorPicker onPick={chooseColor} />}
           </AnimatePresence>
-
-          {/* ── Chat Panel ── */}
           <AnimatePresence>
             {chatOpen && (
               <ChatPanel chat={gs.chat} myId={myId ?? ""} onSend={sendChat} onClose={() => setChatOpen(false)} />
             )}
           </AnimatePresence>
 
-          {/* ── Floating Volume Control (top-left) ── */}
+          {/* ── Back + Chat buttons (top-left) ── */}
           <div style={{
-            position: "absolute", top: 10, right: 10, zIndex: 30,
-            background: "rgba(0,0,0,0.6)", borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
-            padding: "6px 10px", display: "flex", alignItems: "center", gap: 6,
-            backdropFilter: "blur(8px)",
-          }}>
-            <span style={{ fontSize: 14 }}>{soundVol === 0 ? "🔇" : soundVol < 0.4 ? "🔈" : "🔊"}</span>
-            <input type="range" min={0} max={1} step={0.05} value={soundVol}
-              onChange={e => setSoundVol(parseFloat(e.target.value))}
-              style={{ width: 64, accentColor: "#dc2626", cursor: "pointer" }} />
-          </div>
-
-          {/* ── Back + Game Info (top-left) ── */}
-          <div style={{
-            position: "absolute", top: 10, left: 10, zIndex: 30,
-            display: "flex", alignItems: "center", gap: 8,
+            position: "absolute", top: 10, left: 10, zIndex: 40,
+            display: "flex", alignItems: "center", gap: 7,
           }}>
             <button onClick={() => navigate("/")} style={{
-              background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: 9, color: "rgba(255,255,255,0.75)", cursor: "pointer",
+              background: "rgba(5,2,0,0.72)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 8, color: "rgba(255,255,255,0.8)", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
-              padding: "5px 9px", backdropFilter: "blur(6px)",
+              padding: "5px 9px", backdropFilter: "blur(8px)",
             }}><ArrowRight size={12}/>رجوع</button>
-
             <button onClick={() => setChatOpen(v => !v)} style={{
-              background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: 9, padding: "5px 9px", cursor: "pointer", color: "#fff",
+              background: "rgba(5,2,0,0.72)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "#fff",
               display: "flex", alignItems: "center", gap: 4, fontSize: 11,
-              position: "relative", backdropFilter: "blur(6px)",
+              position: "relative", backdropFilter: "blur(8px)",
             }}>
               <MessageCircle size={13} />
               {unreadChat > 0 && (
-                <div style={{ position: "absolute", top: -5, right: -5, width: 16, height: 16,
-                  background: "#dc2626", borderRadius: "50%", fontSize: 9, fontWeight: 900,
+                <div style={{ position: "absolute", top: -5, right: -5, width: 15, height: 15,
+                  background: "#dc2626", borderRadius: "50%", fontSize: 8, fontWeight: 900,
                   display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-                  {unreadChat > 9 ? "9+" : unreadChat}
+                  {unreadChat}
                 </div>
               )}
             </button>
-
             {gs.drawStack > 0 && (
-              <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}
-                style={{ background: "#dc2626", color: "#fff", fontWeight: 900, fontSize: 12,
-                  padding: "3px 10px", borderRadius: 20, border: "1px solid #fca5a5" }}>
+              <motion.div animate={{ scale: [1, 1.18, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}
+                style={{ background: "#dc2626", color: "#fff", fontWeight: 900, fontSize: 11,
+                  padding: "3px 9px", borderRadius: 18, border: "1px solid #fca5a5" }}>
                 +{gs.drawStack}
               </motion.div>
             )}
           </div>
 
-          {/* ── Table Layout: top / [left | center | right] ── */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          {/* ── Volume Control (bottom-right, matching image) ── */}
+          <div style={{
+            position: "absolute", right: 14, bottom: "calc(22% + 12px)", zIndex: 40,
+            background: "rgba(12,8,5,0.88)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 10,
+            padding: "8px 13px 10px",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+            minWidth: 140,
+          }}>
+            <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 600, textAlign: "center", marginBottom: 7, letterSpacing: "0.02em" }}>
+              Volume
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 13, lineHeight: 1 }}>🔇</span>
+              <input type="range" min={0} max={1} step={0.05} value={soundVol}
+                onChange={e => setSoundVol(parseFloat(e.target.value))}
+                style={{ flex: 1, accentColor: "#c87a20", cursor: "pointer", height: 3 }} />
+              <span style={{ fontSize: 13, lineHeight: 1 }}>🔊</span>
+            </div>
+          </div>
+
+          {/* ═══════════════ MAIN TABLE LAYOUT ═══════════════ */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", minHeight: 0, position: "relative", zIndex: 1 }}>
 
             {/* TOP PLAYER */}
-            <div style={{ flexShrink: 0, paddingTop: 14, display: "flex", justifyContent: "center" }}>
-              {topP ? <OtherPlayerCard player={topP} orientation="top" /> : <div style={{ height: 80 }}/>}
+            <div style={{ flexShrink: 0, paddingTop: 10, paddingBottom: 6, display: "flex", justifyContent: "center" }}>
+              {topP
+                ? <TopSeat player={topP} />
+                : <div style={{ height: 108 }} />
+              }
             </div>
 
-            {/* MIDDLE ROW */}
-            <div style={{ flex: 1, display: "flex", alignItems: "center", minHeight: 0 }}>
+            {/* MIDDLE ROW: left seat | TABLE | right seat */}
+            <div style={{ flex: 1, display: "flex", alignItems: "center", width: "100%", minHeight: 0, padding: "0 6px" }}>
 
-              {/* LEFT PLAYER */}
-              <div style={{ flexShrink: 0, paddingLeft: 8 }}>
-                {leftP ? <OtherPlayerCard player={leftP} orientation="left" /> : <div style={{ width: 80 }}/>}
+              {/* LEFT SEAT */}
+              <div style={{ flexShrink: 0, paddingLeft: 2 }}>
+                {leftP
+                  ? <LeftSeat player={leftP} />
+                  : <div style={{ width: 88 }} />
+                }
               </div>
 
-              {/* TABLE CENTER */}
-              <div style={{
-                flex: 1, position: "relative",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                gap: 20,
-              }}>
-                {/* Dark wood table */}
+              {/* ───── THE TABLE ───── */}
+              <div style={{ flex: 1, position: "relative", margin: "0 6px", alignSelf: "stretch" }}>
+
+                {/* Outer table frame — dark mahogany */}
                 <div style={{
-                  position: "absolute",
-                  width: "min(85vw,340px)", height: "min(38vw,180px)",
-                  borderRadius: 28,
-                  background: "radial-gradient(ellipse at 40% 40%,#3d2008 0%,#2a1505 55%,#1a0d03 100%)",
-                  border: "2px solid #c87a2088",
-                  boxShadow: "0 0 40px rgba(200,122,32,0.15), inset 0 0 60px rgba(0,0,0,0.5)",
-                }} />
-                {/* Table inner glow line */}
-                <div style={{
-                  position: "absolute",
-                  width: "min(72vw,290px)", height: "min(31vw,150px)",
-                  borderRadius: 20, border: "1px solid rgba(200,122,32,0.25)",
-                  pointerEvents: "none",
+                  position: "absolute", inset: 0,
+                  background: "linear-gradient(150deg, #4e2510 0%, #3a1b08 30%, #281405 65%, #1c0e03 100%)",
+                  borderRadius: 18,
+                  border: "3px solid #6e3212",
+                  boxShadow: [
+                    "0 22px 70px rgba(0,0,0,0.9)",
+                    "0 0 0 1px rgba(255,160,60,0.08)",
+                    "inset 0 1px 0 rgba(255,160,60,0.1)",
+                    "inset 0 -2px 0 rgba(0,0,0,0.5)",
+                  ].join(", "),
                 }} />
 
-                {/* Draw pile */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, zIndex: 2 }}>
-                  <motion.div
-                    whileHover={isMyTurn && !hasPlayableCard && !gs.pendingWild ? { scale: 1.1, y: -6 } : {}}
-                    whileTap={isMyTurn && !hasPlayableCard && !gs.pendingWild ? { scale: 0.95 } : {}}
-                    onClick={isMyTurn && !hasPlayableCard && !gs.pendingWild ? () => { playUnoSound("draw", soundVol); drawCard(); } : undefined}
-                    style={{ cursor: isMyTurn && !hasPlayableCard && !gs.pendingWild ? "pointer" : "default", position: "relative" }}>
-                    {[3, 2, 1, 0].map(i => (
-                      <div key={i} style={{
-                        position: i === 0 ? "relative" : "absolute",
-                        top: i === 0 ? 0 : -i * 2, left: i === 0 ? 0 : i * 2,
-                        width: 54, height: 78, borderRadius: 9,
-                        background: "linear-gradient(135deg,#1e1b4b,#312e81)",
-                        border: `1.5px solid ${i === 0 ? "#6366f1" : "#3730a3"}`,
-                        boxShadow: i === 0 ? "0 6px 18px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        {i === 0 && <span style={{ color: "#818cf8", fontWeight: 900, fontSize: 10, letterSpacing: "0.05em" }}>UNO</span>}
-                      </div>
-                    ))}
-                    {isMyTurn && !hasPlayableCard && !gs.pendingWild && (
-                      <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 0.7 }}
-                        style={{ position: "absolute", inset: -4, borderRadius: 13,
-                          border: "2.5px solid #dc2626", pointerEvents: "none" }} />
-                    )}
-                  </motion.div>
-                  <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 9, fontWeight: 700 }}>{gs.deckCount}</div>
-                </div>
+                {/* Inner table surface — slightly lighter mahogany */}
+                <div style={{
+                  position: "absolute", inset: 10,
+                  background: "linear-gradient(145deg, #3a1a08 0%, #2a1206 45%, #1d0d04 100%)",
+                  borderRadius: 10,
+                }} />
 
-                {/* Discard (top card) */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, zIndex: 2 }}>
-                  <AnimatePresence mode="wait">
-                    {top && (
-                      <motion.div key={top.id}
-                        initial={{ rotateY: 90, scale: 0.7 }} animate={{ rotateY: 0, scale: 1 }}
-                        exit={{ rotateY: -90, scale: 0.7 }} transition={{ duration: 0.22 }}>
-                        <UnoCardEl card={top} size="lg" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  {top?.color === "wild" && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: "50%",
-                        background: CARD_COLORS[gs.currentColor],
-                        boxShadow: `0 0 6px ${CARD_COLORS[gs.currentColor]}` }} />
-                      <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 9 }}>{COLOR_AR[gs.currentColor]}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                {/* ★ NEON / LED BORDER GLOW — the most distinctive feature */}
+                <div style={{
+                  position: "absolute", inset: 10, borderRadius: 10,
+                  border: "1.5px solid rgba(185,235,255,0.72)",
+                  boxShadow: [
+                    "0 0 10px rgba(160,220,255,0.55)",
+                    "0 0 22px rgba(120,190,255,0.25)",
+                    "inset 0 0 10px rgba(160,220,255,0.18)",
+                    "inset 0 0 3px rgba(200,240,255,0.3)",
+                  ].join(", "),
+                  pointerEvents: "none", zIndex: 5,
+                }} />
 
-              {/* RIGHT PLAYER */}
-              <div style={{ flexShrink: 0, paddingRight: 8 }}>
-                {rightP ? <OtherPlayerCard player={rightP} orientation="right" /> : <div style={{ width: 80 }}/>}
-              </div>
-            </div>
-          </div>
+                {/* Decorative center ornament (barely visible, like the image) */}
+                <div style={{
+                  position: "absolute", inset: "22% 18%",
+                  border: "0.5px solid rgba(255,200,100,0.06)",
+                  borderRadius: 6, pointerEvents: "none", zIndex: 4,
+                }} />
+                <div style={{
+                  position: "absolute", inset: "34% 28%",
+                  border: "0.5px solid rgba(255,200,100,0.04)",
+                  borderRadius: 4, pointerEvents: "none", zIndex: 4,
+                }} />
 
-          {/* ── Status Row ── */}
-          <div style={{
-            flexShrink: 0, padding: "4px 14px", zIndex: 10,
-            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-          }}>
-            {isMyTurn ? (
-              <motion.div animate={{ opacity: [0.7, 1, 0.7] }} transition={{ repeat: Infinity, duration: 0.9 }}
-                style={{ color: "#4ade80", fontWeight: 900, fontSize: 13 }}>
-                ⚡ دورك!{gs.drawStack > 0 ? ` اسحب ${gs.drawStack}` : !hasPlayableCard ? " — اسحب ورقة" : ""}
-              </motion.div>
-            ) : (
-              <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 12, fontWeight: 600 }}>
-                دور {gs.players[gs.currentPlayerIndex]?.name}...
-              </div>
-            )}
-            <AnimatePresence mode="wait">
-              <motion.div key={lastActionAnim}
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, textAlign: "left", flex: 1 }}>
-                {lastActionAnim}
-              </motion.div>
-            </AnimatePresence>
-            {/* Active color */}
-            {top && <ActiveColor color={gs.currentColor} />}
-            {/* Direction */}
-            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>{gs.direction === 1 ? "↻" : "↺"}</div>
-          </div>
-
-          {/* ── My Hand Area ── */}
-          <div style={{
-            flexShrink: 0,
-            borderTop: "1px solid rgba(255,255,255,0.07)",
-            background: "rgba(0,0,0,0.5)",
-            position: "relative", zIndex: 10, padding: "8px 12px 12px",
-          }}>
-            {/* Label + UNO Button row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700 }}>
-                أوراقي ({myHand.length}){!isMyTurn && <span style={{ marginRight: 4, color: "rgba(255,255,255,0.18)" }}>انتظر...</span>}
-              </div>
-              {/* UNO Button — only when has playable cards */}
-              {myHand.length <= 2 && hasPlayableCard && (
-                <motion.button
-                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                  animate={myHand.length === 1 && !me?.saidUno
-                    ? { scale: [1, 1.06, 1], boxShadow: ["0 4px 14px #dc262666","0 6px 24px #dc2626cc","0 4px 14px #dc262666"] }
-                    : {}}
-                  transition={{ repeat: Infinity, duration: 0.7 }}
-                  onClick={sayUno}
-                  style={{
-                    padding: "5px 20px", borderRadius: 16, fontWeight: 900, fontSize: 15,
-                    background: me?.saidUno ? "rgba(255,255,255,0.07)" : "linear-gradient(135deg,#dc2626,#991b1b)",
-                    color: me?.saidUno ? "rgba(255,255,255,0.35)" : "#fff",
-                    border: "2px solid rgba(255,255,255,0.2)",
-                    cursor: me?.saidUno ? "default" : "pointer",
-                    boxShadow: me?.saidUno ? "none" : "0 4px 16px rgba(220,38,38,0.5)",
+                {/* ── CENTER PILES on wood platform ── */}
+                <div style={{
+                  position: "absolute", inset: 0, zIndex: 12,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {/* Elevated wood platform */}
+                  <div style={{
+                    background: "linear-gradient(145deg, #2e1608, #1c0d04)",
+                    border: "2px solid #5a2a10",
+                    borderRadius: 14,
+                    padding: "10px 18px",
+                    display: "flex", gap: 18, alignItems: "center",
+                    boxShadow: [
+                      "0 6px 22px rgba(0,0,0,0.75)",
+                      "0 2px 6px rgba(0,0,0,0.5)",
+                      "inset 0 1px 0 rgba(255,180,60,0.08)",
+                    ].join(", "),
                   }}>
-                  {me?.saidUno ? "✓ UNO!" : "UNO!"}
-                </motion.button>
-              )}
+
+                    {/* DRAW PILE */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                      <motion.div
+                        whileHover={isMyTurn && !hasPlayableCard && !gs.pendingWild ? { scale: 1.1, y: -5 } : {}}
+                        whileTap={isMyTurn && !hasPlayableCard && !gs.pendingWild ? { scale: 0.93 } : {}}
+                        onClick={isMyTurn && !hasPlayableCard && !gs.pendingWild
+                          ? () => { playUnoSound("draw", soundVol); drawCard(); }
+                          : undefined}
+                        style={{
+                          cursor: isMyTurn && !hasPlayableCard && !gs.pendingWild ? "pointer" : "default",
+                          position: "relative",
+                        }}>
+                        {/* Stack of 3 backs */}
+                        {[2, 1, 0].map(i => (
+                          <div key={i} style={{
+                            position: i === 0 ? "relative" : "absolute",
+                            top: i === 0 ? 0 : i * 2, left: i === 0 ? 0 : i * 1.5,
+                            zIndex: 3 - i,
+                          }}>
+                            <UnoCardBack w={48} h={68} />
+                          </div>
+                        ))}
+                        {isMyTurn && !hasPlayableCard && !gs.pendingWild && (
+                          <motion.div
+                            animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.7 }}
+                            style={{
+                              position: "absolute", inset: -4, borderRadius: 8,
+                              border: "2.5px solid #dc2626", pointerEvents: "none", zIndex: 10,
+                            }} />
+                        )}
+                      </motion.div>
+                      <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 9, fontWeight: 700 }}>
+                        {gs.deckCount}
+                      </div>
+                    </div>
+
+                    {/* DISCARD PILE */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                      <AnimatePresence mode="wait">
+                        {top && (
+                          <motion.div key={top.id}
+                            initial={{ rotateY: 90, scale: 0.75, opacity: 0 }}
+                            animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+                            exit={{ rotateY: -90, scale: 0.75, opacity: 0 }}
+                            transition={{ duration: 0.22 }}>
+                            <UnoCardEl card={top} size="lg" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      {top?.color === "wild" && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <div style={{
+                            width: 9, height: 9, borderRadius: "50%",
+                            background: CARD_COLORS[gs.currentColor],
+                            boxShadow: `0 0 6px ${CARD_COLORS[gs.currentColor]}`,
+                          }} />
+                          <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 9 }}>{COLOR_AR[gs.currentColor]}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Direction + active color indicator (bottom-left of table) */}
+                <div style={{
+                  position: "absolute", bottom: 14, left: 18, zIndex: 10,
+                  display: "flex", alignItems: "center", gap: 6,
+                }}>
+                  <div style={{ color: "rgba(200,230,255,0.5)", fontSize: 16, lineHeight: 1 }}>
+                    {gs.direction === 1 ? "↻" : "↺"}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{
+                      width: 10, height: 10, borderRadius: "50%",
+                      background: CARD_COLORS[gs.currentColor],
+                      boxShadow: `0 0 8px ${CARD_COLORS[gs.currentColor]}`,
+                    }} />
+                    <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: 700 }}>{COLOR_AR[gs.currentColor]}</span>
+                  </div>
+                </div>
+              </div>
+              {/* ───── END TABLE ───── */}
+
+              {/* RIGHT SEAT */}
+              <div style={{ flexShrink: 0, paddingRight: 2 }}>
+                {rightP
+                  ? <RightSeat player={rightP} />
+                  : <div style={{ width: 88 }} />
+                }
+              </div>
             </div>
 
-            {/* No valid cards: show big draw button */}
+            {/* Turn status strip */}
+            <div style={{
+              flexShrink: 0, width: "100%",
+              padding: "3px 14px", display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              {isMyTurn ? (
+                <motion.div
+                  animate={{ opacity: [0.7, 1, 0.7] }} transition={{ repeat: Infinity, duration: 0.9 }}
+                  style={{ color: "#4ade80", fontWeight: 900, fontSize: 12 }}>
+                  ⚡ دورك!{!hasPlayableCard && gs.drawStack === 0 ? " اسحب ورقة" : ""}
+                </motion.div>
+              ) : (
+                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, fontWeight: 600 }}>
+                  دور {gs.players[gs.currentPlayerIndex]?.name}...
+                </div>
+              )}
+              <AnimatePresence mode="wait">
+                <motion.div key={lastActionAnim}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 600 }}>
+                  {lastActionAnim}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* ═══════════════ MY HAND (bottom leather holder) ═══════════════ */}
+          <div style={{
+            flexShrink: 0, position: "relative", zIndex: 10,
+            padding: "0 10px 0",
+          }}>
+            {/* Draw button when no valid card */}
             {isMyTurn && !hasPlayableCard && !gs.pendingWild && gs.drawStack === 0 && (
               <motion.button
-                animate={{ scale: [1, 1.03, 1], boxShadow: ["0 0 0px #dc2626","0 0 20px #dc2626aa","0 0 0px #dc2626"] }}
+                animate={{ scale: [1, 1.025, 1], boxShadow: ["0 0 0px #6366f1","0 0 18px #6366f1aa","0 0 0px #6366f1"] }}
                 transition={{ repeat: Infinity, duration: 0.85 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => { playUnoSound("draw", soundVol); drawCard(); }}
                 style={{
-                  width: "100%", padding: "13px", borderRadius: 14, fontWeight: 900, fontSize: 16,
-                  background: "linear-gradient(135deg,#7c3aed,#4f46e5)",
-                  color: "#fff", border: "2px solid #818cf8",
+                  width: "100%", padding: "11px", borderRadius: 12, fontWeight: 900, fontSize: 15,
+                  background: "linear-gradient(135deg,#4f46e5,#7c3aed)",
+                  color: "#fff", border: "1.5px solid #818cf8",
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  fontFamily: "'Cairo','Arial',sans-serif", marginBottom: 8,
+                  fontFamily: "'Cairo','Arial',sans-serif", marginBottom: 5,
                 }}>
                 🃏 اسحب ورقة
               </motion.button>
             )}
-
-            {/* Force draw for drawStack */}
             {isMyTurn && gs.drawStack > 0 && !gs.pendingWild && (
               <motion.button
-                animate={{ scale: [1, 1.03, 1] }} transition={{ repeat: Infinity, duration: 0.85 }}
+                animate={{ scale: [1, 1.025, 1] }} transition={{ repeat: Infinity, duration: 0.85 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => { playUnoSound("draw", soundVol); drawCard(); }}
                 style={{
-                  width: "100%", padding: "11px", borderRadius: 13, fontWeight: 900, fontSize: 15,
+                  width: "100%", padding: "9px", borderRadius: 11, fontWeight: 900, fontSize: 14,
                   background: "linear-gradient(135deg,#dc2626,#991b1b)",
                   color: "#fff", border: "1.5px solid #fca5a5",
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  fontFamily: "'Cairo','Arial',sans-serif", marginBottom: 6,
+                  fontFamily: "'Cairo','Arial',sans-serif", marginBottom: 5,
                 }}>
                 💀 اسحب {gs.drawStack} أوراق
               </motion.button>
             )}
 
-            {/* Cards scroll */}
+            {/* UNO button when hand ≤ 2 and has playable */}
+            {myHand.length <= 2 && hasPlayableCard && (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                <motion.button
+                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.9 }}
+                  animate={myHand.length === 1 && !me?.saidUno
+                    ? { scale: [1, 1.07, 1] } : {}}
+                  transition={{ repeat: Infinity, duration: 0.7 }}
+                  onClick={sayUno}
+                  style={{
+                    padding: "5px 26px", borderRadius: 16, fontWeight: 900, fontSize: 16,
+                    background: me?.saidUno ? "rgba(255,255,255,0.07)" : "linear-gradient(135deg,#dc2626,#991b1b)",
+                    color: me?.saidUno ? "rgba(255,255,255,0.35)" : "#fff",
+                    border: `2px solid ${me?.saidUno ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.25)"}`,
+                    cursor: me?.saidUno ? "default" : "pointer",
+                    boxShadow: me?.saidUno ? "none" : "0 4px 16px rgba(220,38,38,0.55)",
+                  }}>
+                  {me?.saidUno ? "✓ UNO!" : "UNO!"}
+                </motion.button>
+              </div>
+            )}
+
+            {/* Leather card holder strip */}
             <div style={{
-              display: "flex", gap: 6, overflowX: "auto",
-              paddingBottom: 2, alignItems: "flex-end",
-              scrollbarWidth: "thin",
+              background: "linear-gradient(180deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
+              border: "1.5px solid rgba(255,190,90,0.32)",
+              borderRadius: "10px 10px 8px 8px",
+              padding: "7px 10px 9px",
+              boxShadow: [
+                "0 -4px 16px rgba(0,0,0,0.4)",
+                "inset 0 1px 0 rgba(255,190,80,0.14)",
+                "inset 0 -2px 0 rgba(0,0,0,0.45)",
+              ].join(", "),
+              position: "relative",
+              marginBottom: 8,
             }}>
-              {myHand.map(card => {
-                const playable = canPlayCard(card);
-                return (
-                  <UnoCardEl key={card.id} card={card} size="md"
-                    playable={isMyTurn && hasPlayableCard ? playable : false}
-                    onClick={isMyTurn && hasPlayableCard && !gs.pendingWild && playable
-                      ? () => { playUnoSound("play", soundVol); playCard(card.id); }
-                      : undefined} />
-                );
-              })}
-              {myHand.length === 0 && (
-                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, padding: "14px 0" }}>لا توجد أوراق!</div>
-              )}
+              {/* Card count label */}
+              <div style={{
+                position: "absolute", top: -20, right: 12,
+                color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700,
+              }}>
+                أوراقي ({myHand.length}){!isMyTurn && " — انتظر..."}
+              </div>
+              {/* Cards row */}
+              <div style={{
+                display: "flex", gap: 5, overflowX: "auto", alignItems: "flex-end",
+                scrollbarWidth: "none", paddingBottom: 1,
+              }}>
+                {myHand.map(card => {
+                  const playable = canPlayCard(card);
+                  return (
+                    <UnoCardEl key={card.id} card={card} size="md"
+                      playable={isMyTurn && hasPlayableCard ? playable : false}
+                      onClick={isMyTurn && hasPlayableCard && !gs.pendingWild && playable
+                        ? () => { playUnoSound("play", soundVol); playCard(card.id); }
+                        : undefined} />
+                  );
+                })}
+                {myHand.length === 0 && (
+                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, padding: "12px 0" }}>لا أوراق!</div>
+                )}
+              </div>
+              {/* Bottom ridge */}
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0, height: 5,
+                borderRadius: "0 0 7px 7px",
+                background: "linear-gradient(180deg, #4a2510, #2a1207)",
+                boxShadow: "0 3px 6px rgba(0,0,0,0.6)",
+              }} />
             </div>
           </div>
         </div>
