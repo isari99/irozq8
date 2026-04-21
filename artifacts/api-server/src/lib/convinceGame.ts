@@ -23,6 +23,7 @@ interface ConvincePlayer {
   disconnected: boolean;
   isHost: boolean;
   joinOrder: number;
+  isBot: boolean;
 }
 
 interface ConvinceRoom {
@@ -43,6 +44,23 @@ interface ConvinceRoom {
   roundNum: number;
   winnerId: string | null;
 }
+
+// ─── Bot Answers Pool ─────────────────────────────────────────────────────────
+const BOT_ANSWERS = [
+  "الأدلة العلمية تثبت ذلك بشكل قاطع",
+  "كل من جرّب هذا يوافق عليه تماماً",
+  "المنطق البسيط يقول إن هذا هو الصواب",
+  "الحياة تعلمنا أن هذا الخيار دائماً أفضل",
+  "التاريخ يثبت ذلك مراراً وتكراراً",
+  "كل الحكماء يؤكدون هذه الحقيقة",
+  "جرّب ذلك بنفسك وستقتنع فوراً",
+  "الأرقام والإحصاءات تدعم هذا الرأي",
+  "هذه حقيقة واضحة يعرفها الجميع",
+  "المنطق والعقل يؤيدان هذا الطرح بشكل كامل",
+  "هذا ما أثبتته التجربة الشخصية لكثيرين",
+  "لا يوجد حجة أقوى من هذه الحقيقة البديهية",
+  "العلم الحديث يدعم هذا الطرح بكل وضوح",
+];
 
 // ─── Question Bank ────────────────────────────────────────────────────────────
 const QUESTIONS: string[] = [
@@ -114,13 +132,47 @@ function sendToRoom(room: ConvinceRoom, msg: Record<string, unknown>): void {
   });
 }
 
+// ─── Bot Helpers ──────────────────────────────────────────────────────────────
+function scheduleBotAnswers(room: ConvinceRoom): void {
+  room.players.forEach(bot => {
+    if (!bot.isBot || bot.disconnected) return;
+    const delay = 2000 + Math.random() * 4000;
+    setTimeout(() => {
+      if (room.phase !== "answering") return;
+      if (room.answers.has(bot.id)) return;
+      const answer = BOT_ANSWERS[Math.floor(Math.random() * BOT_ANSWERS.length)];
+      room.answers.set(bot.id, answer);
+      broadcastState(room);
+      const eligible = Array.from(room.players.values()).filter(p => !p.disconnected);
+      if (eligible.every(p => room.answers.has(p.id))) endAnswering(room);
+    }, delay);
+  });
+}
+
+function scheduleBotRatings(room: ConvinceRoom, reviewedPlayerId: string): void {
+  room.players.forEach(bot => {
+    if (!bot.isBot || bot.disconnected || bot.id === reviewedPlayerId) return;
+    const delay = 800 + Math.random() * 2000;
+    setTimeout(() => {
+      if (room.phase !== "rating" || room.currentReviewId !== reviewedPlayerId) return;
+      const ratingMap = room.ratings.get(reviewedPlayerId) ?? new Map();
+      room.ratings.set(reviewedPlayerId, ratingMap);
+      if (ratingMap.has(bot.id)) return;
+      const score = Math.floor(Math.random() * 5) + 5; // 5-9
+      ratingMap.set(bot.id, score);
+      broadcastState(room);
+      checkRatingComplete(room);
+    }, delay);
+  });
+}
+
 function roomState(room: ConvinceRoom, forPlayerId?: string): Record<string, unknown> {
   const players = Array.from(room.players.values())
     .sort((a, b) => b.score - a.score || a.joinOrder - b.joinOrder)
     .map(p => ({
       id: p.id, name: p.name, color: p.color, score: p.score,
       isHost: p.isHost, disconnected: p.disconnected,
-      hasAnswered: room.answers.has(p.id),
+      hasAnswered: room.answers.has(p.id), isBot: p.isBot,
     }));
 
   let currentReview: Record<string, unknown> | null = null;
@@ -224,7 +276,7 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
     const colorIdx = 0;
     room.players.set(playerId, {
       id: playerId, name, color: PLAYER_COLORS[colorIdx % PLAYER_COLORS.length],
-      ws, score: 0, disconnected: false, isHost: true, joinOrder: 0,
+      ws, score: 0, disconnected: false, isHost: true, joinOrder: 0, isBot: false,
     });
 
     ws.convinceRoomCode = code;
@@ -250,7 +302,7 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
     const colorIdx = room.players.size;
     room.players.set(playerId, {
       id: playerId, name, color: PLAYER_COLORS[colorIdx % PLAYER_COLORS.length],
-      ws, score: 0, disconnected: false, isHost: false, joinOrder: colorIdx,
+      ws, score: 0, disconnected: false, isHost: false, joinOrder: colorIdx, isBot: false,
     });
 
     ws.convinceRoomCode = code;
@@ -271,6 +323,40 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
   const player = room.players.get(playerId);
   if (!player) return;
 
+  // ── Add Bot ───────────────────────────────────────────────────────────────
+  if (type === "convince:add_bot") {
+    if (!player.isHost || room.phase !== "lobby") return;
+    if (room.players.size >= 10) {
+      ws.send(JSON.stringify({ type: "convince:error", message: "الغرفة ممتلئة (الحد الأقصى 10 لاعبين)" }));
+      return;
+    }
+    const botCount = Array.from(room.players.values()).filter(p => p.isBot).length + 1;
+    const botId = `bot_${Date.now()}_${botCount}`;
+    const colorIdx = room.players.size;
+    room.players.set(botId, {
+      id: botId, name: `Bot ${botCount}`,
+      color: PLAYER_COLORS[colorIdx % PLAYER_COLORS.length],
+      ws: null, score: 0, disconnected: false, isHost: false,
+      joinOrder: colorIdx, isBot: true,
+    });
+    broadcastState(room);
+    return;
+  }
+
+  // ── Remove Bot ────────────────────────────────────────────────────────────
+  if (type === "convince:remove_bot") {
+    if (!player.isHost || room.phase !== "lobby") return;
+    const botId = String(msg.botId ?? "");
+    const bot = room.players.get(botId);
+    if (!bot || !bot.isBot) return;
+    room.players.delete(botId);
+    // Re-number remaining bots
+    let botNum = 1;
+    room.players.forEach(p => { if (p.isBot) p.name = `Bot ${botNum++}`; });
+    broadcastState(room);
+    return;
+  }
+
   // ── Start Game ───────────────────────────────────────────────────────────
   if (type === "convince:start") {
     if (!player.isHost) return;
@@ -290,6 +376,7 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
     room.timerHandle = setTimeout(() => endAnswering(room), room.settings.timerSecs * 1000 + 500);
 
     broadcastState(room);
+    scheduleBotAnswers(room);
     return;
   }
 
@@ -319,6 +406,7 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
     room.ratings.set(targetId, new Map());
     room.phase = "rating";
     broadcastState(room);
+    scheduleBotRatings(room, targetId);
     return;
   }
 
@@ -402,6 +490,7 @@ function startNextRound(room: ConvinceRoom): void {
   if (room.timerHandle) clearTimeout(room.timerHandle);
   room.timerHandle = setTimeout(() => endAnswering(room), room.settings.timerSecs * 1000 + 500);
   broadcastState(room);
+  scheduleBotAnswers(room);
 }
 
 // ─── Disconnect Handler ───────────────────────────────────────────────────────

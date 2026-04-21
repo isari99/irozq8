@@ -30,7 +30,7 @@ function ConvinceGlowOrbs() {
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ConvincePlayer {
   id: string; name: string; color: string; score: number;
-  isHost: boolean; disconnected: boolean; hasAnswered: boolean;
+  isHost: boolean; disconnected: boolean; hasAnswered: boolean; isBot?: boolean;
 }
 interface CurrentReview {
   id: string; name: string; color: string;
@@ -432,7 +432,7 @@ export default function ConvinceGame() {
           </div>
 
           {/* ── Players grid ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {players.map(p => {
               const avatar = avatarMap[p.id];
               const isMe = p.id === myId;
@@ -441,21 +441,25 @@ export default function ConvinceGame() {
                   initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                   style={{
                     display: "flex", alignItems: "center", gap: 10,
-                    background: isMe ? `${p.color}18` : "rgba(255,255,255,0.07)",
-                    border: `1.5px solid ${isMe ? p.color : p.color + "44"}`,
-                    borderRadius: 14, padding: "12px 14px",
+                    background: isMe ? `${p.color}18` : p.isBot ? "rgba(124,58,237,0.1)" : "rgba(255,255,255,0.07)",
+                    border: `1.5px solid ${isMe ? p.color : p.isBot ? "rgba(124,58,237,0.4)" : p.color + "44"}`,
+                    borderRadius: 14, padding: "12px 14px", position: "relative",
                     boxShadow: isMe ? `0 0 20px ${p.color}40` : "none",
                   }}>
-                  {/* Avatar */}
+                  {/* Avatar or Bot icon */}
                   <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-                    border: `2.5px solid ${p.color}`, overflow: "hidden", position: "relative",
-                    boxShadow: `0 0 10px ${p.color}55` }}>
-                    {avatar ? (
+                    border: `2.5px solid ${p.isBot ? "#7c3aed" : p.color}`, overflow: "hidden", position: "relative",
+                    boxShadow: `0 0 10px ${p.isBot ? "#7c3aed55" : p.color + "55"}`,
+                    background: p.isBot ? "rgba(124,58,237,0.25)" : p.color + "33",
+                    display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {p.isBot ? (
+                      <span style={{ fontSize: 24 }}>🤖</span>
+                    ) : avatar ? (
                       <img src={avatar} alt={p.name}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         onError={e => { (e.target as HTMLImageElement).src = fallbackAvatar(p.name); }}/>
                     ) : (
-                      <div style={{ width: "100%", height: "100%", background: p.color + "33",
+                      <div style={{ width: "100%", height: "100%",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 20, fontWeight: 900, color: p.color }}>
                         {initials(p.name)}
@@ -469,12 +473,42 @@ export default function ConvinceGame() {
                       {isMe && <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, marginRight: 4 }}>(أنت)</span>}
                     </div>
                     {p.isHost && <div style={{ color: GOLD, fontSize: 11, fontWeight: 700 }}>هوست 👑</div>}
+                    {p.isBot && <div style={{ color: "#a78bfa", fontSize: 11, fontWeight: 600 }}>بوت 🤖</div>}
                     {p.disconnected && <div style={{ color: "#f87171", fontSize: 11 }}>انقطع الاتصال</div>}
                   </div>
+                  {amHost && p.isBot && (
+                    <button
+                      onClick={() => send({ type: "convince:remove_bot", botId: p.id })}
+                      title="حذف البوت"
+                      style={{
+                        background: "rgba(220,38,38,0.2)", border: "1px solid rgba(220,38,38,0.4)",
+                        borderRadius: 8, width: 26, height: 26, display: "flex", alignItems: "center",
+                        justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fca5a5",
+                        fontSize: 12, padding: 0,
+                      }}>✕</button>
+                  )}
                 </motion.div>
               );
             })}
           </div>
+
+          {/* ── Add Bot (host only) ── */}
+          {amHost && players.length < 10 && (
+            <motion.button
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={() => send({ type: "convince:add_bot" })}
+              style={{
+                width: "100%", padding: "13px", borderRadius: 14, cursor: "pointer",
+                background: "linear-gradient(135deg,rgba(124,58,237,0.25),rgba(124,58,237,0.15))",
+                border: "1.5px dashed rgba(124,58,237,0.5)",
+                color: "#a78bfa", fontWeight: 800, fontSize: 15,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                marginBottom: 16, fontFamily: "'Cairo','Arial',sans-serif",
+              }}>
+              🤖 إضافة بوت
+            </motion.button>
+          )}
 
           {amHost ? (
             <button onClick={startGame} disabled={players.length < 2} style={{
