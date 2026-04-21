@@ -434,12 +434,11 @@ export function handleConvinceMessage(ws: ConvinceWS, msg: Record<string, unknow
   // ── Next Player (host advances from leaderboard) ──────────────────────────
   if (type === "convince:next_player") {
     if (!player.isHost) return;
-    if (room.phase !== "leaderboard") return;
+    if (room.phase !== "leaderboard" && room.phase !== "revealing") return;
     if (room.reviewQueue.length > 0) {
       room.phase = "revealing";
       broadcastState(room);
     } else {
-      // All reviewed → next round
       startNextRound(room);
     }
     return;

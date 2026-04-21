@@ -11,16 +11,21 @@ function getWsUrl(): string {
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const GOLD = "#f59e0b";
+const BG   = "linear-gradient(145deg,#13082e 0%,#1d0f4a 60%,#110628 100%)";
+const HDR  = "rgba(18,8,40,0.97)";
 
-// ─── Glow background orbs (outside component to avoid re-mount) ───────────────
+// ─── Glow background orbs ─────────────────────────────────────────────────────
 function ConvinceGlowOrbs() {
   return <>
-    <div style={{ position: "fixed", top: "-10%", left: "-5%", width: 560, height: 560, borderRadius: "50%",
-      background: `radial-gradient(circle,${GOLD}45,transparent)`, filter: "blur(110px)",
-      pointerEvents: "none", zIndex: 0, opacity: 0.55 }} />
-    <div style={{ position: "fixed", bottom: "-10%", right: "-5%", width: 480, height: 480, borderRadius: "50%",
-      background: "radial-gradient(circle,#7c3aed55,transparent)", filter: "blur(90px)",
-      pointerEvents: "none", zIndex: 0, opacity: 0.45 }} />
+    <div style={{ position: "fixed", top: "-8%", right: "0%", width: 500, height: 500, borderRadius: "50%",
+      background: `radial-gradient(circle,${GOLD}28,transparent)`, filter: "blur(100px)",
+      pointerEvents: "none", zIndex: 0 }} />
+    <div style={{ position: "fixed", bottom: "-8%", left: "0%", width: 450, height: 450, borderRadius: "50%",
+      background: "radial-gradient(circle,#6d28d940,transparent)", filter: "blur(90px)",
+      pointerEvents: "none", zIndex: 0 }} />
+    <div style={{ position: "fixed", top: "40%", left: "30%", width: 300, height: 300, borderRadius: "50%",
+      background: `radial-gradient(circle,${GOLD}12,transparent)`, filter: "blur(70px)",
+      pointerEvents: "none", zIndex: 0 }} />
   </>;
 }
 
@@ -32,27 +37,26 @@ const AVATAR_CATEGORIES = [
 ];
 
 function AvatarPicker({ selected, onSelect }: { selected: string; onSelect: (a: string) => void }) {
+  const ALL = AVATAR_CATEGORIES.flatMap(c => c.items);
   return (
-    <div style={{ marginBottom: 22 }}>
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700, display: "block", marginBottom: 10 }}>صورتك</label>
-      {AVATAR_CATEGORIES.map(cat => (
-        <div key={cat.label} style={{ marginBottom: 10 }}>
-          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>{cat.label}</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {cat.items.map(a => (
-              <button key={a} onClick={() => onSelect(a)} style={{
-                width: 46, height: 46, borderRadius: 12, fontSize: 24,
-                background: selected === a ? `${GOLD}33` : "rgba(255,255,255,0.06)",
-                border: `2px solid ${selected === a ? GOLD : "rgba(255,255,255,0.12)"}`,
-                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: selected === a ? `0 0 14px ${GOLD}55` : "none",
-                transform: selected === a ? "scale(1.12)" : "scale(1)",
-                transition: "all 0.15s",
-              }}>{a}</button>
-            ))}
-          </div>
-        </div>
-      ))}
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: 700 }}>صورتك</label>
+        {selected && <span style={{ fontSize: 20, lineHeight: 1 }}>{selected}</span>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 6 }}>
+        {ALL.map(a => (
+          <button key={a} onClick={() => onSelect(a)} style={{
+            width: "100%", aspectRatio: "1", borderRadius: 10, fontSize: 20,
+            background: selected === a ? `${GOLD}30` : "rgba(255,255,255,0.05)",
+            border: `2px solid ${selected === a ? GOLD : "rgba(255,255,255,0.1)"}`,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: selected === a ? `0 0 10px ${GOLD}55` : "none",
+            transform: selected === a ? "scale(1.1)" : "scale(1)",
+            transition: "all 0.12s", padding: 0,
+          }}>{a}</button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -158,8 +162,8 @@ function ConvinceScoreboard({ players, myId }: { players: ConvincePlayer[]; myId
   return (
     <div style={{
       position: "fixed", left: 0, top: 0, bottom: 0, width: SB_W, zIndex: 50,
-      background: "rgba(5,2,14,0.92)", borderRight: "1px solid rgba(255,255,255,0.09)",
-      backdropFilter: "blur(12px)", display: "flex", flexDirection: "column",
+      background: "rgba(19,8,46,0.97)", borderRight: `1px solid ${GOLD}22`,
+      backdropFilter: "blur(16px)", display: "flex", flexDirection: "column",
       fontFamily: "'Cairo','Arial',sans-serif",
     }}>
       <div style={{ padding: "13px 12px 8px", borderBottom: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>
@@ -305,10 +309,13 @@ export default function ConvinceGame() {
 
   // ─── Shared wrapper ───────────────────────────────────────────────────────
   const wrap = (children: React.ReactNode, maxW = 520) => (
-    <div className="min-h-screen gradient-bg flex flex-col items-center justify-center p-4" dir="rtl"
-      style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+    <div dir="rtl" style={{
+      minHeight: "100vh", background: BG, display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", padding: "16px",
+      fontFamily: "'Cairo','Arial',sans-serif", position: "relative", overflowY: "auto",
+    }}>
       <ConvinceGlowOrbs />
-      <div style={{ width: "100%", maxWidth: maxW, position: "relative" }}>{children}</div>
+      <div style={{ width: "100%", maxWidth: maxW, position: "relative", zIndex: 1 }}>{children}</div>
     </div>
   );
 
@@ -337,111 +344,146 @@ export default function ConvinceGame() {
   if (screen === "host-setup") return wrap(
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <button onClick={() => setScreen("entry")} style={{
-        background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 24,
-      }}><ArrowRight size={16}/>رجوع</button>
+        background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 16, fontWeight: 700,
+      }}><ArrowRight size={15}/>رجوع</button>
 
-      <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 28, textAlign: "center" }}>إعدادات الجلسة</h2>
-      {error && <p style={{ color: "#f87171", marginBottom: 14, fontSize: 13 }}>{error}</p>}
+      <h2 style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 16, textAlign: "center" }}>إعدادات الجلسة</h2>
+      {error && <p style={{ color: "#f87171", marginBottom: 10, fontSize: 13 }}>{error}</p>}
 
-      {/* Name */}
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>اسمك</label>
-      <input value={myName} onChange={e => setMyName(e.target.value)}
-        placeholder="أدخل اسمك..."
-        style={{ width: "100%", marginTop: 6, marginBottom: 22, padding: "12px 16px", borderRadius: 12,
-          background: "rgba(255,255,255,0.08)", border: `1px solid ${GOLD}44`, color: "#fff",
-          fontSize: 15, fontWeight: 600, outline: "none", boxSizing: "border-box" }}/>
-
-      {/* Timer */}
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>مدة الإجابة</label>
-      <div style={{ display: "flex", gap: 10, marginTop: 8, marginBottom: 22, flexWrap: "wrap" }}>
-        {[20,30,60,100,180].map(s => (
-          <button key={s} onClick={() => setSettings(p => ({ ...p, timerSecs: s }))} style={{
-            padding: "10px 18px", borderRadius: 12, fontWeight: 800, fontSize: 14, cursor: "pointer",
-            background: settings.timerSecs === s ? GOLD : "rgba(255,255,255,0.08)",
-            color: settings.timerSecs === s ? "#000" : "rgba(255,255,255,0.7)",
-            border: `1px solid ${settings.timerSecs === s ? GOLD : "rgba(255,255,255,0.15)"}`,
-          }}>{s}ث</button>
-        ))}
+      {/* Name + Avatar side by side */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "start", marginBottom: 14 }}>
+        <div>
+          <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, display: "block", marginBottom: 6 }}>اسمك</label>
+          <input value={myName} onChange={e => setMyName(e.target.value)} placeholder="أدخل اسمك..."
+            style={{ width: "100%", padding: "11px 14px", borderRadius: 12,
+              background: "rgba(255,255,255,0.08)", border: `1px solid ${GOLD}44`, color: "#fff",
+              fontSize: 15, fontWeight: 700, outline: "none", boxSizing: "border-box" }}/>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, display: "block", marginBottom: 6 }}>صورتك</label>
+          <div style={{ width: 46, height: 46, borderRadius: 12, background: `${GOLD}20`,
+            border: `2px solid ${GOLD}66`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>
+            {selectedAvatar}
+          </div>
+        </div>
       </div>
 
-      {/* Target Score */}
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>نقاط الفوز</label>
-      <div style={{ display: "flex", gap: 10, marginTop: 8, marginBottom: 22, flexWrap: "wrap" }}>
-        {[30,50,70,100,150,200].map(pts => (
-          <button key={pts} onClick={() => setSettings(p => ({ ...p, targetScore: pts }))} style={{
-            padding: "10px 18px", borderRadius: 12, fontWeight: 800, fontSize: 14, cursor: "pointer",
-            background: settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.08)",
-            color: settings.targetScore === pts ? "#000" : "rgba(255,255,255,0.7)",
-            border: `1px solid ${settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.15)"}`,
-          }}>{pts}</button>
-        ))}
+      {/* Avatar picker */}
+      <AvatarPicker selected={selectedAvatar} onSelect={setSelectedAvatar}/>
+
+      {/* Settings grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+        {/* Timer */}
+        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "14px 12px",
+          border: "1px solid rgba(255,255,255,0.09)" }}>
+          <div style={{ color: GOLD, fontSize: 12, fontWeight: 800, marginBottom: 10 }}>⏱ مدة الإجابة</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {[20,30,60,100,180].map(s => (
+              <button key={s} onClick={() => setSettings(p => ({ ...p, timerSecs: s }))} style={{
+                padding: "7px 10px", borderRadius: 9, fontWeight: 800, fontSize: 12, cursor: "pointer",
+                background: settings.timerSecs === s ? GOLD : "rgba(255,255,255,0.07)",
+                color: settings.timerSecs === s ? "#000" : "rgba(255,255,255,0.75)",
+                border: `1px solid ${settings.timerSecs === s ? GOLD : "rgba(255,255,255,0.12)"}`,
+                boxShadow: settings.timerSecs === s ? `0 2px 10px ${GOLD}40` : "none",
+                fontFamily: "'Cairo','Arial',sans-serif",
+              }}>{s}ث</button>
+            ))}
+          </div>
+        </div>
+        {/* Score */}
+        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "14px 12px",
+          border: "1px solid rgba(255,255,255,0.09)" }}>
+          <div style={{ color: GOLD, fontSize: 12, fontWeight: 800, marginBottom: 10 }}>🏆 نقاط الفوز</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {[30,50,70,100,150,200].map(pts => (
+              <button key={pts} onClick={() => setSettings(p => ({ ...p, targetScore: pts }))} style={{
+                padding: "7px 10px", borderRadius: 9, fontWeight: 800, fontSize: 12, cursor: "pointer",
+                background: settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.07)",
+                color: settings.targetScore === pts ? "#000" : "rgba(255,255,255,0.75)",
+                border: `1px solid ${settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.12)"}`,
+                boxShadow: settings.targetScore === pts ? `0 2px 10px ${GOLD}40` : "none",
+                fontFamily: "'Cairo','Arial',sans-serif",
+              }}>{pts}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Hide Writing */}
       <button onClick={() => setSettings(p => ({ ...p, hideWriting: !p.hideWriting }))} style={{
-        width: "100%", padding: "14px 20px", borderRadius: 14, cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 12, marginBottom: 28,
-        background: settings.hideWriting ? `${GOLD}22` : "rgba(255,255,255,0.05)",
-        border: `1px solid ${settings.hideWriting ? GOLD : "rgba(255,255,255,0.15)"}`,
-        color: "#fff",
+        width: "100%", padding: "12px 16px", borderRadius: 12, cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
+        background: settings.hideWriting ? `${GOLD}18` : "rgba(255,255,255,0.04)",
+        border: `1px solid ${settings.hideWriting ? GOLD + "66" : "rgba(255,255,255,0.1)"}`,
+        color: "#fff", fontFamily: "'Cairo','Arial',sans-serif",
       }}>
-        {settings.hideWriting ? <EyeOff size={18} color={GOLD}/> : <Eye size={18} color="rgba(255,255,255,0.5)"/>}
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontWeight: 800, fontSize: 15, color: settings.hideWriting ? GOLD : "#fff" }}>إخفاء الكتابة</div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>يمنع ظهور الإجابات على البث</div>
+        {settings.hideWriting ? <EyeOff size={16} color={GOLD}/> : <Eye size={16} color="rgba(255,255,255,0.45)"/>}
+        <div style={{ textAlign: "right", flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: settings.hideWriting ? GOLD : "rgba(255,255,255,0.85)" }}>إخفاء الكتابة</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>يمنع ظهور الإجابات على البث</div>
         </div>
-        <div style={{ marginRight: "auto", width: 44, height: 24, borderRadius: 12,
-          background: settings.hideWriting ? GOLD : "rgba(255,255,255,0.15)", position: "relative", transition: "background 0.3s" }}>
-          <div style={{ position: "absolute", top: 2, width: 20, height: 20, borderRadius: "50%", background: "#fff",
-            transition: "right 0.3s", right: settings.hideWriting ? 2 : 22 }}/>
+        <div style={{ width: 40, height: 22, borderRadius: 11,
+          background: settings.hideWriting ? GOLD : "rgba(255,255,255,0.15)", position: "relative", transition: "background 0.3s", flexShrink: 0 }}>
+          <div style={{ position: "absolute", top: 2, width: 18, height: 18, borderRadius: "50%", background: "#fff",
+            transition: "right 0.3s", right: settings.hideWriting ? 2 : 20 }}/>
         </div>
       </button>
 
-      <AvatarPicker selected={selectedAvatar} onSelect={setSelectedAvatar}/>
-
       <button onClick={createRoom} disabled={!wsReady} style={{
-        width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
-        background: wsReady ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.1)",
+        width: "100%", padding: "15px", borderRadius: 14, fontWeight: 900, fontSize: 16, cursor: "pointer",
+        background: wsReady ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.08)",
         color: wsReady ? "#000" : "rgba(255,255,255,0.4)", border: "none",
-        boxShadow: wsReady ? `0 6px 24px ${GOLD}50` : "none",
-      }}>ابدأ الجلسة</button>
+        boxShadow: wsReady ? `0 6px 24px ${GOLD}50` : "none", fontFamily: "'Cairo','Arial',sans-serif",
+      }}>🎤 ابدأ الجلسة</button>
     </motion.div>
-  );
+  , 540);
 
   // ─── JOIN SCREEN ──────────────────────────────────────────────────────────
   if (screen === "join") return wrap(
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <button onClick={() => setScreen("entry")} style={{
-        background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 24,
-      }}><ArrowRight size={16}/>رجوع</button>
+        background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 16, fontWeight: 700,
+      }}><ArrowRight size={15}/>رجوع</button>
 
-      <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 28, textAlign: "center" }}>انضم لغرفة</h2>
-      {error && <p style={{ color: "#f87171", marginBottom: 14, fontSize: 13 }}>{error}</p>}
+      <h2 style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 16, textAlign: "center" }}>انضم لغرفة</h2>
+      {error && <p style={{ color: "#f87171", marginBottom: 10, fontSize: 13 }}>{error}</p>}
 
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>اسمك</label>
-      <input value={myName} onChange={e => setMyName(e.target.value)} placeholder="أدخل اسمك..."
-        style={{ width: "100%", marginTop: 6, marginBottom: 18, padding: "12px 16px", borderRadius: 12,
-          background: "rgba(255,255,255,0.08)", border: `1px solid ${GOLD}44`, color: "#fff",
-          fontSize: 15, fontWeight: 600, outline: "none", boxSizing: "border-box" }}/>
+      {/* Name + Avatar + Code */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "start", marginBottom: 12 }}>
+        <div>
+          <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, display: "block", marginBottom: 6 }}>اسمك</label>
+          <input value={myName} onChange={e => setMyName(e.target.value)} placeholder="أدخل اسمك..."
+            style={{ width: "100%", padding: "11px 14px", borderRadius: 12,
+              background: "rgba(255,255,255,0.08)", border: `1px solid ${GOLD}44`, color: "#fff",
+              fontSize: 15, fontWeight: 700, outline: "none", boxSizing: "border-box" }}/>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, display: "block", marginBottom: 6 }}>صورتك</label>
+          <div style={{ width: 46, height: 46, borderRadius: 12, background: `${GOLD}20`,
+            border: `2px solid ${GOLD}66`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>
+            {selectedAvatar}
+          </div>
+        </div>
+      </div>
 
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>كود الغرفة</label>
-      <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="مثال: ABCD"
-        style={{ width: "100%", marginTop: 6, marginBottom: 22, padding: "12px 16px", borderRadius: 12,
+      <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, display: "block", marginBottom: 6 }}>كود الغرفة</label>
+      <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="ABCD"
+        style={{ width: "100%", marginBottom: 14, padding: "12px 16px", borderRadius: 12,
           background: "rgba(255,255,255,0.08)", border: `1px solid rgba(255,255,255,0.2)`, color: "#fff",
-          fontSize: 20, fontWeight: 900, outline: "none", boxSizing: "border-box", letterSpacing: "0.12em", textAlign: "center" }}/>
+          fontSize: 22, fontWeight: 900, outline: "none", boxSizing: "border-box", letterSpacing: "0.15em", textAlign: "center" }}/>
 
       <AvatarPicker selected={selectedAvatar} onSelect={setSelectedAvatar}/>
 
       <button onClick={joinRoom} disabled={!wsReady} style={{
-        width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
-        background: wsReady ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.1)",
+        width: "100%", padding: "15px", borderRadius: 14, fontWeight: 900, fontSize: 16, cursor: "pointer",
+        background: wsReady ? `linear-gradient(135deg,${GOLD},#d97706)` : "rgba(255,255,255,0.08)",
         color: wsReady ? "#000" : "rgba(255,255,255,0.4)", border: "none",
-        boxShadow: wsReady ? `0 6px 24px ${GOLD}50` : "none",
-      }}>انضم</button>
+        boxShadow: wsReady ? `0 6px 24px ${GOLD}50` : "none", fontFamily: "'Cairo','Arial',sans-serif",
+      }}>انضم للغرفة</button>
     </motion.div>
-  );
+  , 480);
 
   // ─── GAME SCREEN ──────────────────────────────────────────────────────────
   if (screen === "game" && gameState) {
@@ -450,10 +492,10 @@ export default function ConvinceGame() {
 
     // ── Lobby ──
     if (phase === "lobby") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", padding: 0, position: "relative" }}>
+      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", padding: 0, position: "relative" }}>
         <ConvinceGlowOrbs />
         {/* Header */}
-        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}55`, padding: "14px 20px",
+        <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
             background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
@@ -602,10 +644,10 @@ export default function ConvinceGame() {
 
     // ── Answering ──
     if (phase === "answering") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
         <ConvinceGlowOrbs />
         {/* Back header */}
-        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+        <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
             background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
@@ -682,81 +724,133 @@ export default function ConvinceGame() {
     );
 
     // ── Revealing (host selects who to show) ──
-    if (phase === "revealing") return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
-        <ConvinceGlowOrbs />
-        <ConvinceScoreboard players={players} myId={myId}/>
-        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
-          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button onClick={() => navigate("/")} style={{
-            background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
-          }}><ArrowRight size={14}/>رجوع</button>
-          <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
-          <div style={{ width: 60 }}/>
-        </div>
-        <div style={{ maxWidth: 600, margin: "0 auto", padding: "32px 16px" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ fontSize: 32, marginBottom: 10 }}>🎛️</div>
-            <h2 style={{ fontSize: 24, fontWeight: 900, color: "#fff", marginBottom: 8, textShadow: "0 0 20px rgba(255,255,255,0.3)" }}>مرحلة العرض</h2>
-            <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: 600 }}>
-              {amHost ? "اختر لاعبًا لعرض إجابته على الجميع" : "الهوست يختار من يعرض إجابته..."}
-            </p>
+    if (phase === "revealing") {
+      const allDone = notReviewedPlayers.length === 0;
+      const cols = players.length <= 3 ? players.length : players.length <= 6 ? 3 : 4;
+      return (
+        <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
+          <ConvinceGlowOrbs />
+          <ConvinceScoreboard players={players} myId={myId}/>
+          {/* Header */}
+          <div style={{ position: "sticky", top: 0, zIndex: 10, background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+            display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <button onClick={() => navigate("/")} style={{
+              background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 700,
+            }}><ArrowRight size={14}/>رجوع</button>
+            <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
+            <div style={{ width: 60 }}/>
           </div>
 
-          {/* Already reviewed */}
-          {gameState.reviewedIds.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 8, fontWeight: 700 }}>تم تقييمهم:</p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {players.filter(p => gameState.reviewedIds.includes(p.id)).map(p => (
-                  <div key={p.id} style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-                    background: p.color + "22", color: p.color, border: `1px solid ${p.color}44`, opacity: 0.6 }}>
-                    ✓ {p.name}
-                  </div>
-                ))}
-              </div>
+          <div style={{ maxWidth: 640, margin: "0 auto", padding: "28px 16px" }}>
+            {/* Title */}
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 6 }}>
+                {allDone ? "✅ تم تقييم الجميع" : "🎛️ مرحلة العرض"}
+              </h2>
+              <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 13, fontWeight: 600 }}>
+                {allDone
+                  ? (amHost ? "اضغط زر الجولة التالية للمتابعة" : "في انتظار الهوست...")
+                  : (amHost ? "اختر لاعبًا لعرض إجابته" : "الهوست يختار من يعرض إجابته...")}
+              </p>
             </div>
-          )}
 
-          {/* Remaining players */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {notReviewedPlayers.map(p => (
-              <motion.button key={p.id}
-                whileHover={amHost ? { scale: 1.02 } : {}}
-                onClick={amHost ? () => showPlayer(p.id) : undefined}
-                disabled={!amHost}
+            {/* ALL players grid */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${cols}, 1fr)`,
+              gap: 14,
+              marginBottom: 28,
+            }}>
+              {players.filter(p => !p.disconnected).map(p => {
+                const reviewed = gameState.reviewedIds.includes(p.id);
+                const canClick = amHost && !reviewed;
+                return (
+                  <motion.button
+                    key={p.id}
+                    whileHover={canClick ? { scale: 1.04, y: -2 } : {}}
+                    whileTap={canClick ? { scale: 0.97 } : {}}
+                    onClick={canClick ? () => showPlayer(p.id) : undefined}
+                    style={{
+                      background: reviewed
+                        ? "rgba(74,222,128,0.07)"
+                        : `${p.color}12`,
+                      border: `2px solid ${reviewed ? "#4ade8055" : p.color + "66"}`,
+                      borderRadius: 18,
+                      padding: "20px 12px",
+                      cursor: canClick ? "pointer" : "default",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                      position: "relative", transition: "all 0.2s",
+                      boxShadow: reviewed ? "none" : `0 4px 20px ${p.color}18`,
+                      opacity: reviewed ? 0.65 : 1,
+                      fontFamily: "'Cairo','Arial',sans-serif",
+                    }}>
+                    {/* Reviewed badge */}
+                    {reviewed && (
+                      <div style={{
+                        position: "absolute", top: 8, left: 8,
+                        width: 22, height: 22, borderRadius: "50%",
+                        background: "#4ade80", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 900, color: "#000",
+                      }}>✓</div>
+                    )}
+                    {/* Avatar */}
+                    <div style={{
+                      width: 56, height: 56, borderRadius: "50%",
+                      background: p.color + "25",
+                      border: `2.5px solid ${reviewed ? "#4ade8077" : p.color}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 28, boxShadow: reviewed ? "none" : `0 0 16px ${p.color}40`,
+                    }}>{p.avatar || (p.isBot ? "🤖" : initials(p.name))}</div>
+                    {/* Name */}
+                    <div style={{ color: reviewed ? "rgba(255,255,255,0.6)" : "#fff", fontWeight: 800, fontSize: 14, textAlign: "center" }}>
+                      {p.name}
+                    </div>
+                    {/* Status */}
+                    <div style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: reviewed ? "#4ade80" : p.hasAnswered ? "#86efac" : "rgba(255,255,255,0.4)",
+                    }}>
+                      {reviewed ? "تم التقييم" : p.hasAnswered ? "✓ أجاب" : "لم يجب"}
+                    </div>
+                    {/* Arrow hint for host */}
+                    {canClick && (
+                      <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)" }}>
+                        <ChevronRight size={16} color={p.color} style={{ transform: "rotate(90deg)" }}/>
+                      </div>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Next Round button (host only, when all done) */}
+            {allDone && amHost && (
+              <motion.button
+                initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                onClick={nextPlayer}
                 style={{
-                  width: "100%", textAlign: "right", padding: "16px 18px", borderRadius: 16, cursor: amHost ? "pointer" : "default",
-                  background: "rgba(255,255,255,0.07)", border: `1.5px solid ${p.color}44`,
-                  display: "flex", alignItems: "center", gap: 14,
-                  boxShadow: `0 0 16px ${p.color}22`, transition: "all 0.2s",
+                  width: "100%", padding: "18px", borderRadius: 16,
+                  background: `linear-gradient(135deg,${GOLD},#d97706)`,
+                  border: "none", color: "#000", fontWeight: 900, fontSize: 18,
+                  cursor: "pointer", boxShadow: `0 8px 32px ${GOLD}60`,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  fontFamily: "'Cairo','Arial',sans-serif",
                 }}>
-                <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-                  background: p.color + "22", border: `2.5px solid ${p.color}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 24, fontWeight: 900, color: p.color }}>
-                  {p.avatar || (p.isBot ? "🤖" : initials(p.name))}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}>{p.name}</div>
-                  {p.hasAnswered
-                    ? <div style={{ color: "#4ade80", fontSize: 12 }}>✓ أجاب</div>
-                    : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>لم يجب</div>}
-                </div>
-                {amHost && <ChevronRight size={18} color={p.color}/>}
+                <Play size={20}/>الجولة التالية
               </motion.button>
-            ))}
+            )}
+            {allDone && !amHost && (
+              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600,
+                padding: 20, background: "rgba(255,255,255,0.04)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }}>
+                ⏳ في انتظار الهوست...
+              </div>
+            )}
           </div>
-
-          {notReviewedPlayers.length === 0 && !amHost && (
-            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: 14, marginTop: 24, fontWeight: 600 }}>
-              في انتظار بدء الجولة التالية...
-            </p>
-          )}
         </div>
-      </div>
-    );
+      );
+    }
 
     // ── Rating ──
     if (phase === "rating" && currentReview) {
@@ -764,10 +858,10 @@ export default function ConvinceGame() {
       const alreadyRated = currentReview.myRating !== null || myRating > 0;
 
       return (
-        <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
+        <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
           <ConvinceGlowOrbs />
           <ConvinceScoreboard players={players} myId={myId}/>
-          <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+          <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
             display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <button onClick={() => navigate("/")} style={{
               background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
@@ -840,9 +934,9 @@ export default function ConvinceGame() {
 
     // ── Winner ──
     if (phase === "winner" && gameState.winner) return (
-      <div className="min-h-screen gradient-bg" dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
+      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
         <ConvinceGlowOrbs />
-        <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+        <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
             background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
