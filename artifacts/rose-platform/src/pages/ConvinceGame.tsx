@@ -155,53 +155,48 @@ function NumberRating({ value, onChange }: { value: number; onChange: (v: number
   );
 }
 
-// ─── Fixed Scoreboard Sidebar ─────────────────────────────────────────────────
-const SB_W = 155;
+// ─── Inline Scoreboard Grid ───────────────────────────────────────────────────
+const MEDALS = ["🥇","🥈","🥉"];
 function ConvinceScoreboard({ players, myId }: { players: ConvincePlayer[]; myId: string | null }) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
+  const cols = Math.min(sorted.length, 6);
   return (
     <div style={{
-      position: "fixed", left: 0, top: 0, bottom: 0, width: SB_W, zIndex: 50,
-      background: "rgba(19,8,46,0.97)", borderRight: `1px solid ${GOLD}22`,
-      backdropFilter: "blur(16px)", display: "flex", flexDirection: "column",
-      fontFamily: "'Cairo','Arial',sans-serif",
+      background: "rgba(0,0,0,0.25)", borderBottom: "1px solid rgba(255,255,255,0.07)",
+      padding: "10px 16px",
+      display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gap: 6, fontFamily: "'Cairo','Arial',sans-serif",
     }}>
-      <div style={{ padding: "13px 12px 8px", borderBottom: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>
-        <span style={{ color: GOLD, fontSize: 12, fontWeight: 800, letterSpacing: "0.04em" }}>🏆 لوحة النقاط</span>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
-        {sorted.map((p, idx) => {
-          const isMe = p.id === myId;
-          return (
-            <div key={p.id} style={{
-              display: "flex", alignItems: "center", gap: 7, padding: "7px 10px",
-              background: isMe ? `${p.color}18` : "transparent",
-              borderRight: isMe ? `3px solid ${p.color}` : "3px solid transparent",
-              transition: "all 0.3s",
-            }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                background: p.color + "22",
-                border: `2px solid ${p.color}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 16, fontWeight: 900, color: p.color,
-              }}>
-                {p.avatar || (p.isBot ? "🤖" : initials(p.name))}
+      {sorted.map((p, idx) => {
+        const isMe = p.id === myId;
+        return (
+          <div key={p.id} style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+            padding: "6px 4px", borderRadius: 10, position: "relative",
+            background: isMe ? `${p.color}18` : "rgba(255,255,255,0.03)",
+            border: `1px solid ${isMe ? p.color + "55" : "rgba(255,255,255,0.06)"}`,
+            transition: "all 0.3s",
+          }}>
+            {idx < 3 && (
+              <div style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", fontSize: 12, lineHeight: 1 }}>
+                {MEDALS[idx]}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: isMe ? "#fff" : "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: 700,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {p.name}
-                </div>
-                <div style={{ color: GOLD, fontSize: 15, fontWeight: 900, lineHeight: 1.1 }}>{p.score}</div>
-              </div>
-              <div style={{ fontSize: 12, flexShrink: 0, opacity: 0.9 }}>
-                {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : ""}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+              background: p.color + "25", border: `2px solid ${p.color}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 17, boxShadow: isMe ? `0 0 12px ${p.color}55` : "none",
+            }}>{p.avatar || (p.isBot ? "🤖" : initials(p.name))}</div>
+            <div style={{
+              color: isMe ? "#fff" : "rgba(255,255,255,0.75)", fontSize: 10, fontWeight: 700,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              width: "100%", textAlign: "center",
+            }}>{p.name.length > 7 ? p.name.slice(0,6)+"…" : p.name}</div>
+            <div style={{ color: GOLD, fontSize: 14, fontWeight: 900, lineHeight: 1 }}>{p.score}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -374,38 +369,58 @@ export default function ConvinceGame() {
 
       {/* Settings grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-        {/* Timer */}
-        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "14px 12px",
-          border: "1px solid rgba(255,255,255,0.09)" }}>
-          <div style={{ color: GOLD, fontSize: 12, fontWeight: 800, marginBottom: 10 }}>⏱ مدة الإجابة</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {[20,30,60,100,180].map(s => (
-              <button key={s} onClick={() => setSettings(p => ({ ...p, timerSecs: s }))} style={{
-                padding: "7px 10px", borderRadius: 9, fontWeight: 800, fontSize: 12, cursor: "pointer",
-                background: settings.timerSecs === s ? GOLD : "rgba(255,255,255,0.07)",
-                color: settings.timerSecs === s ? "#000" : "rgba(255,255,255,0.75)",
-                border: `1px solid ${settings.timerSecs === s ? GOLD : "rgba(255,255,255,0.12)"}`,
-                boxShadow: settings.timerSecs === s ? `0 2px 10px ${GOLD}40` : "none",
-                fontFamily: "'Cairo','Arial',sans-serif",
-              }}>{s}ث</button>
-            ))}
+        {/* Timer – vertical list */}
+        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "12px 10px",
+          border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ color: GOLD, fontSize: 11, fontWeight: 900, marginBottom: 8, textAlign: "center", letterSpacing: "0.04em" }}>⏱ مدة الإجابة</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {[20,30,60,100,180].map(s => {
+              const sel = settings.timerSecs === s;
+              return (
+                <button key={s} onClick={() => setSettings(p => ({ ...p, timerSecs: s }))} style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 9, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: sel ? `${GOLD}22` : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${sel ? GOLD + "77" : "rgba(255,255,255,0.08)"}`,
+                  color: sel ? GOLD : "rgba(255,255,255,0.72)",
+                  fontWeight: sel ? 800 : 600, fontSize: 12, fontFamily: "'Cairo','Arial',sans-serif",
+                  boxShadow: sel ? `0 2px 10px ${GOLD}25` : "none", transition: "all 0.12s",
+                }}>
+                  <span>{s} ث</span>
+                  <div style={{ width: 13, height: 13, borderRadius: "50%", flexShrink: 0,
+                    border: `2px solid ${sel ? GOLD : "rgba(255,255,255,0.25)"}`,
+                    background: sel ? GOLD : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{sel && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#000" }}/>}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
-        {/* Score */}
-        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "14px 12px",
-          border: "1px solid rgba(255,255,255,0.09)" }}>
-          <div style={{ color: GOLD, fontSize: 12, fontWeight: 800, marginBottom: 10 }}>🏆 نقاط الفوز</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {[30,50,70,100,150,200].map(pts => (
-              <button key={pts} onClick={() => setSettings(p => ({ ...p, targetScore: pts }))} style={{
-                padding: "7px 10px", borderRadius: 9, fontWeight: 800, fontSize: 12, cursor: "pointer",
-                background: settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.07)",
-                color: settings.targetScore === pts ? "#000" : "rgba(255,255,255,0.75)",
-                border: `1px solid ${settings.targetScore === pts ? GOLD : "rgba(255,255,255,0.12)"}`,
-                boxShadow: settings.targetScore === pts ? `0 2px 10px ${GOLD}40` : "none",
-                fontFamily: "'Cairo','Arial',sans-serif",
-              }}>{pts}</button>
-            ))}
+        {/* Score – vertical list */}
+        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "12px 10px",
+          border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ color: GOLD, fontSize: 11, fontWeight: 900, marginBottom: 8, textAlign: "center", letterSpacing: "0.04em" }}>🏆 نقاط الفوز</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {[30,50,70,100,150,200].map(pts => {
+              const sel = settings.targetScore === pts;
+              return (
+                <button key={pts} onClick={() => setSettings(p => ({ ...p, targetScore: pts }))} style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 9, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: sel ? `${GOLD}22` : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${sel ? GOLD + "77" : "rgba(255,255,255,0.08)"}`,
+                  color: sel ? GOLD : "rgba(255,255,255,0.72)",
+                  fontWeight: sel ? 800 : 600, fontSize: 12, fontFamily: "'Cairo','Arial',sans-serif",
+                  boxShadow: sel ? `0 2px 10px ${GOLD}25` : "none", transition: "all 0.12s",
+                }}>
+                  <span>{pts}</span>
+                  <div style={{ width: 13, height: 13, borderRadius: "50%", flexShrink: 0,
+                    border: `2px solid ${sel ? GOLD : "rgba(255,255,255,0.25)"}`,
+                    background: sel ? GOLD : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{sel && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#000" }}/>}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -492,8 +507,7 @@ export default function ConvinceGame() {
 
     // ── Lobby ──
     if (phase === "lobby") return (
-      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", padding: 0, position: "relative" }}>
-        <ConvinceGlowOrbs />
+      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", padding: 0 }}>
         {/* Header */}
         <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -644,8 +658,7 @@ export default function ConvinceGame() {
 
     // ── Answering ──
     if (phase === "answering") return (
-      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
-        <ConvinceGlowOrbs />
+      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif" }}>
         {/* Back header */}
         <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -726,13 +739,10 @@ export default function ConvinceGame() {
     // ── Revealing (host selects who to show) ──
     if (phase === "revealing") {
       const allDone = notReviewedPlayers.length === 0;
-      const cols = players.length <= 3 ? players.length : players.length <= 6 ? 3 : 4;
       return (
-        <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
-          <ConvinceGlowOrbs />
-          <ConvinceScoreboard players={players} myId={myId}/>
+        <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif" }}>
           {/* Header */}
-          <div style={{ position: "sticky", top: 0, zIndex: 10, background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+          <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}33`, padding: "10px 16px",
             display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <button onClick={() => navigate("/")} style={{
               background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
@@ -742,109 +752,95 @@ export default function ConvinceGame() {
             <div style={{ width: 60 }}/>
           </div>
 
-          <div style={{ maxWidth: 640, margin: "0 auto", padding: "28px 16px" }}>
+          {/* Scoreboard inline */}
+          <ConvinceScoreboard players={players} myId={myId}/>
+
+          <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 16px" }}>
             {/* Title */}
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 6 }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 900, color: "#fff", marginBottom: 4 }}>
                 {allDone ? "✅ تم تقييم الجميع" : "🎛️ مرحلة العرض"}
               </h2>
-              <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 13, fontWeight: 600 }}>
+              <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600 }}>
                 {allDone
                   ? (amHost ? "اضغط زر الجولة التالية للمتابعة" : "في انتظار الهوست...")
-                  : (amHost ? "اختر لاعبًا لعرض إجابته" : "الهوست يختار من يعرض إجابته...")}
+                  : (amHost ? "اضغط على اسم اللاعب لعرض إجابته" : "الهوست يختار من يعرض إجابته...")}
               </p>
             </div>
 
-            {/* ALL players grid */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${cols}, 1fr)`,
-              gap: 14,
-              marginBottom: 28,
-            }}>
+            {/* Vertical players list */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
               {players.filter(p => !p.disconnected).map(p => {
                 const reviewed = gameState.reviewedIds.includes(p.id);
                 const canClick = amHost && !reviewed;
                 return (
                   <motion.button
                     key={p.id}
-                    whileHover={canClick ? { scale: 1.04, y: -2 } : {}}
-                    whileTap={canClick ? { scale: 0.97 } : {}}
+                    whileHover={canClick ? { x: -4 } : {}}
+                    whileTap={canClick ? { scale: 0.98 } : {}}
                     onClick={canClick ? () => showPlayer(p.id) : undefined}
                     style={{
-                      background: reviewed
-                        ? "rgba(74,222,128,0.07)"
-                        : `${p.color}12`,
-                      border: `2px solid ${reviewed ? "#4ade8055" : p.color + "66"}`,
-                      borderRadius: 18,
-                      padding: "20px 12px",
+                      width: "100%", textAlign: "right",
+                      padding: "13px 16px", borderRadius: 14,
                       cursor: canClick ? "pointer" : "default",
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                      position: "relative", transition: "all 0.2s",
-                      boxShadow: reviewed ? "none" : `0 4px 20px ${p.color}18`,
-                      opacity: reviewed ? 0.65 : 1,
+                      background: reviewed ? "rgba(74,222,128,0.06)" : "rgba(255,255,255,0.05)",
+                      border: `1.5px solid ${reviewed ? "#4ade8044" : p.color + "55"}`,
+                      display: "flex", alignItems: "center", gap: 13,
+                      opacity: reviewed ? 0.72 : 1, transition: "all 0.18s",
+                      boxShadow: reviewed ? "none" : `0 2px 14px ${p.color}14`,
                       fontFamily: "'Cairo','Arial',sans-serif",
                     }}>
-                    {/* Reviewed badge */}
-                    {reviewed && (
-                      <div style={{
-                        position: "absolute", top: 8, left: 8,
-                        width: 22, height: 22, borderRadius: "50%",
-                        background: "#4ade80", display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, fontWeight: 900, color: "#000",
-                      }}>✓</div>
-                    )}
                     {/* Avatar */}
-                    <div style={{
-                      width: 56, height: 56, borderRadius: "50%",
-                      background: p.color + "25",
-                      border: `2.5px solid ${reviewed ? "#4ade8077" : p.color}`,
+                    <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+                      background: p.color + "22", border: `2px solid ${reviewed ? "#4ade80" : p.color}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 28, boxShadow: reviewed ? "none" : `0 0 16px ${p.color}40`,
+                      fontSize: 22, boxShadow: reviewed ? "none" : `0 0 10px ${p.color}35`,
                     }}>{p.avatar || (p.isBot ? "🤖" : initials(p.name))}</div>
-                    {/* Name */}
-                    <div style={{ color: reviewed ? "rgba(255,255,255,0.6)" : "#fff", fontWeight: 800, fontSize: 14, textAlign: "center" }}>
-                      {p.name}
-                    </div>
-                    {/* Status */}
-                    <div style={{
-                      fontSize: 11, fontWeight: 700,
-                      color: reviewed ? "#4ade80" : p.hasAnswered ? "#86efac" : "rgba(255,255,255,0.4)",
-                    }}>
-                      {reviewed ? "تم التقييم" : p.hasAnswered ? "✓ أجاب" : "لم يجب"}
-                    </div>
-                    {/* Arrow hint for host */}
-                    {canClick && (
-                      <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)" }}>
-                        <ChevronRight size={16} color={p.color} style={{ transform: "rotate(90deg)" }}/>
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: reviewed ? "rgba(255,255,255,0.6)" : "#fff", fontWeight: 800, fontSize: 15, marginBottom: 2 }}>
+                        {p.name}
                       </div>
-                    )}
+                      <div style={{ fontSize: 12, fontWeight: 700,
+                        color: reviewed ? "#4ade80" : p.hasAnswered ? "#86efac" : "rgba(255,255,255,0.38)" }}>
+                        {reviewed ? "✓ تم تقييمه" : p.hasAnswered ? "✓ أجاب" : "لم يجب بعد"}
+                      </div>
+                    </div>
+                    {/* Right badge */}
+                    {reviewed ? (
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#4ade80",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, fontWeight: 900, color: "#000", flexShrink: 0 }}>✓</div>
+                    ) : canClick ? (
+                      <ChevronRight size={18} color={p.color} style={{ flexShrink: 0 }}/>
+                    ) : null}
                   </motion.button>
                 );
               })}
             </div>
 
-            {/* Next Round button (host only, when all done) */}
+            {/* Next Round button */}
             {allDone && amHost && (
               <motion.button
-                initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                 onClick={nextPlayer}
                 style={{
-                  width: "100%", padding: "18px", borderRadius: 16,
+                  width: "100%", padding: "17px", borderRadius: 14,
                   background: `linear-gradient(135deg,${GOLD},#d97706)`,
-                  border: "none", color: "#000", fontWeight: 900, fontSize: 18,
-                  cursor: "pointer", boxShadow: `0 8px 32px ${GOLD}60`,
+                  border: "none", color: "#000", fontWeight: 900, fontSize: 17,
+                  cursor: "pointer", boxShadow: `0 6px 28px ${GOLD}55`,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                   fontFamily: "'Cairo','Arial',sans-serif",
                 }}>
-                <Play size={20}/>الجولة التالية
+                <Play size={19}/>الجولة التالية
               </motion.button>
             )}
             {allDone && !amHost && (
-              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600,
-                padding: 20, background: "rgba(255,255,255,0.04)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }}>
-                ⏳ في انتظار الهوست...
+              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 14, fontWeight: 600,
+                padding: 18, background: "rgba(255,255,255,0.03)", borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.07)" }}>
+                ⏳ في انتظار الهوست للجولة التالية...
               </div>
             )}
           </div>
@@ -858,10 +854,8 @@ export default function ConvinceGame() {
       const alreadyRated = currentReview.myRating !== null || myRating > 0;
 
       return (
-        <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative", paddingLeft: SB_W }}>
-          <ConvinceGlowOrbs />
-          <ConvinceScoreboard players={players} myId={myId}/>
-          <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+        <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif" }}>
+          <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}33`, padding: "10px 16px",
             display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <button onClick={() => navigate("/")} style={{
               background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
@@ -870,7 +864,8 @@ export default function ConvinceGame() {
             <span style={{ color: GOLD, fontWeight: 900, fontSize: 15, textShadow: `0 0 10px ${GOLD}` }}>🎤 أقنعني</span>
             <div style={{ width: 60 }}/>
           </div>
-          <div style={{ maxWidth: 600, margin: "0 auto", padding: "32px 16px" }}>
+          <ConvinceScoreboard players={players} myId={myId}/>
+          <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px" }}>
 
             {/* Player being rated */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -934,9 +929,8 @@ export default function ConvinceGame() {
 
     // ── Winner ──
     if (phase === "winner" && gameState.winner) return (
-      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
-        <ConvinceGlowOrbs />
-        <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}44`, padding: "10px 16px",
+      <div dir="rtl" style={{ minHeight: "100vh", background: BG, fontFamily: "'Cairo','Arial',sans-serif" }}>
+        <div style={{ background: HDR, borderBottom: `1px solid ${GOLD}33`, padding: "10px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => navigate("/")} style={{
             background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
