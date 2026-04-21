@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { useSearch, useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Copy, Check, Users, Play, Link2,
@@ -54,16 +55,16 @@ const COLOR_AR: Record<Color, string> = {
   red: "أحمر", blue: "أزرق", green: "أخضر", yellow: "أصفر",
 };
 
-// ─── Avatar System ────────────────────────────────────────────────────────────
+// ─── Avatar System (DiceBear adventurer — same as برا السالفة) ──────────────
 export const AVATARS = [
-  { id: 0, emoji: "🧝‍♀️", bg: "linear-gradient(135deg,#7c3aed,#4c1d95)", label: "الساحرة",   glow: "#7c3aed" },
-  { id: 1, emoji: "🧙‍♂️", bg: "linear-gradient(135deg,#2563eb,#1e3a8a)", label: "المايسترو", glow: "#3b82f6" },
-  { id: 2, emoji: "🦊",   bg: "linear-gradient(135deg,#d97706,#92400e)", label: "الثعلب",    glow: "#f59e0b" },
-  { id: 3, emoji: "🕵️",  bg: "linear-gradient(135deg,#16a34a,#14532d)", label: "المحقق",   glow: "#22c55e" },
-  { id: 4, emoji: "🤺",   bg: "linear-gradient(135deg,#dc2626,#7f1d1d)", label: "الفارس",   glow: "#ef4444" },
-  { id: 5, emoji: "🐉",   bg: "linear-gradient(135deg,#0891b2,#164e63)", label: "التنين",   glow: "#06b6d4" },
-  { id: 6, emoji: "🦁",   bg: "linear-gradient(135deg,#b45309,#78350f)", label: "الأسد",    glow: "#f59e0b" },
-  { id: 7, emoji: "🧛",   bg: "linear-gradient(135deg,#4f46e5,#1e1b4b)", label: "الشبح",    glow: "#818cf8" },
+  { id: 0, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Jasmine&backgroundColor=fecaca", bg: "#fecaca", label: "ياسمين",   glow: "#f87171" },
+  { id: 1, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Leo&backgroundColor=fde68a",     bg: "#fde68a", label: "ليو",       glow: "#facc15" },
+  { id: 2, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Nora&backgroundColor=ddd6fe",    bg: "#ddd6fe", label: "نورا",      glow: "#a78bfa" },
+  { id: 3, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Omar&backgroundColor=bfdbfe",    bg: "#bfdbfe", label: "عمر",       glow: "#60a5fa" },
+  { id: 4, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Zara&backgroundColor=bbf7d0",    bg: "#bbf7d0", label: "زارا",      glow: "#34d399" },
+  { id: 5, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Max&backgroundColor=fda4af",     bg: "#fda4af", label: "مكس",       glow: "#fb7185" },
+  { id: 6, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Sara&backgroundColor=fdba74",    bg: "#fdba74", label: "سارة",      glow: "#fb923c" },
+  { id: 7, img: "https://api.dicebear.com/7.x/adventurer/svg?seed=Amir&backgroundColor=93c5fd",    bg: "#93c5fd", label: "أمير",      glow: "#38bdf8" },
 ] as const;
 
 type AvatarId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -398,29 +399,33 @@ function PlayerAvatar({ player, size = 44 }: { player: PlayerInfo; size?: number
     <div style={{ position: "relative", flexShrink: 0 }}>
       <motion.div
         animate={isCurrent ? {
-          boxShadow: [`0 0 0px ${av.glow}00`, `0 0 22px ${av.glow}bb`, `0 0 0px ${av.glow}00`],
+          boxShadow: [`0 0 0px ${av.glow}00`, `0 0 28px ${av.glow}ee`, `0 0 0px ${av.glow}00`],
         } : {}}
         transition={{ repeat: Infinity, duration: 1.2 }}
         style={{
           width: size, height: size, borderRadius: "50%",
-          background: player.isBot ? "rgba(124,58,237,0.3)" : av.bg,
-          border: `2.5px solid ${isCurrent ? av.glow : "rgba(255,255,255,0.22)"}`,
+          background: player.isBot ? "rgba(124,58,237,0.25)" : av.bg,
+          border: `3px solid ${isCurrent ? av.glow : "rgba(255,255,255,0.22)"}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: size * 0.48,
           transition: "border-color 0.3s",
-          boxShadow: isCurrent ? `0 0 14px ${av.glow}88` : "0 2px 8px rgba(0,0,0,0.5)",
+          boxShadow: isCurrent
+            ? `0 0 0 4px ${av.glow}44, 0 0 24px ${av.glow}88`
+            : "0 3px 10px rgba(0,0,0,0.6)",
           overflow: "hidden",
         }}>
-        <span style={{ lineHeight: 1, userSelect: "none" }}>
-          {player.isBot ? "🤖" : av.emoji}
-        </span>
+        {player.isBot ? (
+          <span style={{ fontSize: size * 0.5, lineHeight: 1 }}>🤖</span>
+        ) : (
+          <img src={av.img} alt={av.label}
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+        )}
       </motion.div>
       {isCurrent && (
         <motion.div
           animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
           style={{
             position: "absolute", inset: -5, borderRadius: "50%",
-            border: `1.5px dashed ${av.glow}88`, pointerEvents: "none",
+            border: `2px dashed ${av.glow}99`, pointerEvents: "none",
           }} />
       )}
       {player.saidUno && (
@@ -485,9 +490,6 @@ function TopSeat({ player }: { player: PlayerInfo }) {
           boxShadow: "0 3px 6px rgba(0,0,0,0.6)",
         }} />
       </div>
-      <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700 }}>
-        {player.cardCount} ورقة
-      </div>
     </div>
   );
 }
@@ -547,7 +549,6 @@ function LeftSeat({ player }: { player: PlayerInfo }) {
           maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           textAlign: "center",
         }}>{displayName}</div>
-        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
       </div>
     </div>
   );
@@ -609,7 +610,6 @@ function RightSeat({ player }: { player: PlayerInfo }) {
           maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           textAlign: "center",
         }}>{displayName}</div>
-        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
       </div>
     </div>
   );
@@ -631,27 +631,32 @@ function HologramAvatar({ player }: { player: PlayerInfo }) {
         animate={isCurrent ? {
           boxShadow: [
             `0 0 10px ${av.glow}55, 0 0 30px ${av.glow}33`,
-            `0 0 20px ${av.glow}aa, 0 0 50px ${av.glow}55`,
+            `0 0 22px ${av.glow}cc, 0 0 55px ${av.glow}66`,
             `0 0 10px ${av.glow}55, 0 0 30px ${av.glow}33`,
           ],
         } : {}}
         transition={{ repeat: Infinity, duration: 1.5 }}
         style={{
-          width: 52, height: 52,
-          borderRadius: 6,
+          width: 58, height: 58,
+          borderRadius: 8,
           background: player.isBot ? "rgba(124,58,237,0.25)" : av.bg,
-          border: `1.5px solid ${av.glow}99`,
+          border: `2px solid ${av.glow}bb`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 26,
-          boxShadow: `0 0 14px ${av.glow}55, inset 0 0 14px ${av.glow}22`,
+          boxShadow: `0 0 16px ${av.glow}66, inset 0 0 10px ${av.glow}22`,
           backdropFilter: "blur(4px)",
           position: "relative", zIndex: 2,
+          overflow: "hidden",
         }}>
-        <span style={{ lineHeight: 1 }}>{player.isBot ? "🤖" : av.emoji}</span>
+        {player.isBot ? (
+          <span style={{ fontSize: 28, lineHeight: 1 }}>🤖</span>
+        ) : (
+          <img src={av.img} alt={av.label}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
         {/* Scan lines effect */}
         <div style={{
-          position: "absolute", inset: 0, borderRadius: 5, overflow: "hidden",
-          background: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(80,200,255,0.04) 3px, rgba(80,200,255,0.04) 4px)",
+          position: "absolute", inset: 0, borderRadius: 7, overflow: "hidden",
+          background: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(80,200,255,0.05) 3px, rgba(80,200,255,0.05) 4px)",
           pointerEvents: "none",
         }} />
       </motion.div>
@@ -721,6 +726,7 @@ function ActiveColor({ color }: { color: Color }) {
 type Screen = "entry" | "join" | "game";
 
 export default function UnoGame() {
+  const { user } = useAuth();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const urlCode = params.get("r") ?? "";
@@ -733,7 +739,7 @@ export default function UnoGame() {
   const [wsReady, setWsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gs, setGs] = useState<UnoState | null>(null);
-  const [myName, setMyName] = useState("");
+  const [myName, setMyName] = useState(user?.username ?? "");
   const [myAvatar, setMyAvatar] = useState<AvatarId>(0);
   const [myBotCount, setMyBotCount] = useState(1);
   const [joinCode, setJoinCode] = useState(urlCode);
@@ -869,9 +875,12 @@ export default function UnoGame() {
 
   // ─── ENTRY SCREEN (unified — name + avatar + bots + create) ──────────────
   if (screen === "entry") return (
-    <div className="min-h-screen gradient-bg flex flex-col items-center justify-start p-4"
-      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", overflowY: "auto" }}>
-      <UnoGlowOrbs />
+    <div dir="rtl" style={{
+      minHeight: "100dvh", fontFamily: "'Cairo','Arial',sans-serif",
+      background: "linear-gradient(160deg,#0d0a1e 0%,#130820 40%,#0a0510 100%)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+      padding: 16, overflowY: "auto",
+    }}>
       <div style={{ width: "100%", maxWidth: 520, position: "relative", zIndex: 1, paddingTop: 12 }}>
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
           {/* Back button */}
@@ -929,25 +938,27 @@ export default function UnoGame() {
                 const selected = myAvatar === av.id;
                 return (
                   <motion.button key={av.id}
-                    whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.94 }}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.93 }}
                     onClick={() => setMyAvatar(av.id as AvatarId)}
                     style={{
-                      background: selected ? av.bg : "rgba(255,255,255,0.07)",
-                      border: selected ? `2px solid ${av.glow}` : "2px solid rgba(255,255,255,0.12)",
-                      borderRadius: 14, padding: "10px 6px 8px",
+                      background: selected ? `linear-gradient(135deg,${av.bg}55,${av.bg}22)` : "rgba(255,255,255,0.05)",
+                      border: selected ? `2.5px solid ${av.glow}` : "2px solid rgba(255,255,255,0.1)",
+                      borderRadius: 16, padding: "8px 6px 7px",
                       display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
                       cursor: "pointer",
-                      boxShadow: selected ? `0 0 18px ${av.glow}66` : "none",
-                      transition: "all 0.15s",
+                      boxShadow: selected ? `0 0 20px ${av.glow}55` : "none",
+                      transition: "all 0.14s",
                     }}>
-                    <span style={{ fontSize: 26, lineHeight: 1 }}>{av.emoji}</span>
+                    <img src={av.img} alt={av.label}
+                      style={{ width: 48, height: 48, borderRadius: "50%",
+                        border: `2px solid ${selected ? av.glow : "rgba(255,255,255,0.15)"}`,
+                        objectFit: "cover",
+                        boxShadow: selected ? `0 0 12px ${av.glow}88` : "0 2px 8px rgba(0,0,0,0.4)",
+                      }} />
                     <span style={{
                       color: selected ? "#fff" : "rgba(255,255,255,0.5)",
-                      fontSize: 9, fontWeight: 700, textAlign: "center",
+                      fontSize: 9, fontWeight: 800, textAlign: "center",
                     }}>{av.label}</span>
-                    {selected && (
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />
-                    )}
                   </motion.button>
                 );
               })}
@@ -1022,9 +1033,12 @@ export default function UnoGame() {
 
   // ─── JOIN SCREEN ──────────────────────────────────────────────────────────
   if (screen === "join") return (
-    <div className="min-h-screen gradient-bg flex flex-col items-center justify-start p-4"
-      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", overflowY: "auto" }}>
-      <UnoGlowOrbs />
+    <div dir="rtl" style={{
+      minHeight: "100dvh", fontFamily: "'Cairo','Arial',sans-serif",
+      background: "linear-gradient(160deg,#0d0a1e 0%,#130820 40%,#0a0510 100%)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+      padding: 16, overflowY: "auto",
+    }}>
       <div style={{ width: "100%", maxWidth: 520, position: "relative", zIndex: 1, paddingTop: 12 }}>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <button onClick={() => setScreen("entry")} style={{
@@ -1083,18 +1097,23 @@ export default function UnoGame() {
                 const selected = myAvatar === av.id;
                 return (
                   <motion.button key={av.id}
-                    whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.94 }}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.93 }}
                     onClick={() => setMyAvatar(av.id as AvatarId)}
                     style={{
-                      background: selected ? av.bg : "rgba(255,255,255,0.07)",
-                      border: selected ? `2px solid ${av.glow}` : "2px solid rgba(255,255,255,0.12)",
-                      borderRadius: 14, padding: "10px 6px 8px",
+                      background: selected ? `linear-gradient(135deg,${av.bg}55,${av.bg}22)` : "rgba(255,255,255,0.05)",
+                      border: selected ? `2.5px solid ${av.glow}` : "2px solid rgba(255,255,255,0.1)",
+                      borderRadius: 16, padding: "8px 6px 7px",
                       display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-                      cursor: "pointer", boxShadow: selected ? `0 0 18px ${av.glow}66` : "none",
-                      transition: "all 0.15s",
+                      cursor: "pointer", boxShadow: selected ? `0 0 20px ${av.glow}55` : "none",
+                      transition: "all 0.14s",
                     }}>
-                    <span style={{ fontSize: 26, lineHeight: 1 }}>{av.emoji}</span>
-                    <span style={{ color: selected ? "#fff" : "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: 700, textAlign: "center" }}>
+                    <img src={av.img} alt={av.label}
+                      style={{ width: 48, height: 48, borderRadius: "50%",
+                        border: `2px solid ${selected ? av.glow : "rgba(255,255,255,0.15)"}`,
+                        objectFit: "cover",
+                        boxShadow: selected ? `0 0 12px ${av.glow}88` : "0 2px 8px rgba(0,0,0,0.4)",
+                      }} />
+                    <span style={{ color: selected ? "#fff" : "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: 800, textAlign: "center" }}>
                       {av.label}
                     </span>
                   </motion.button>
@@ -1123,9 +1142,11 @@ export default function UnoGame() {
 
     // ── LOBBY ──
     if (gs.phase === "lobby") return (
-      <div className="min-h-screen gradient-bg" dir="rtl"
-        style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative" }}>
-        <UnoGlowOrbs />
+      <div dir="rtl" style={{
+        minHeight: "100dvh", fontFamily: "'Cairo','Arial',sans-serif",
+        background: "linear-gradient(160deg,#0d0a1e 0%,#130820 40%,#0a0510 100%)",
+        position: "relative",
+      }}>
         {/* Header */}
         <div style={{ background: "rgba(5,2,14,0.95)", borderBottom: "1px solid rgba(220,38,38,0.3)",
           padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1213,14 +1234,19 @@ export default function UnoGame() {
                   }}>
                   {/* Avatar circle */}
                   <div style={{
-                    width: 52, height: 52, borderRadius: "50%", marginBottom: 8,
+                    width: 56, height: 56, borderRadius: "50%", marginBottom: 8,
                     background: p.isBot ? "rgba(124,58,237,0.3)" : av.bg,
                     border: `3px solid ${isMe ? av.glow : "rgba(255,255,255,0.2)"}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 26,
-                    boxShadow: isMe ? `0 0 16px ${av.glow}88` : "0 3px 10px rgba(0,0,0,0.5)",
+                    overflow: "hidden",
+                    boxShadow: isMe ? `0 0 20px ${av.glow}99` : "0 3px 10px rgba(0,0,0,0.5)",
                   }}>
-                    {p.isBot ? "🤖" : av.emoji}
+                    {p.isBot ? (
+                      <span style={{ fontSize: 26 }}>🤖</span>
+                    ) : (
+                      <img src={av.img} alt={av.label}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
                   </div>
                   {/* Name */}
                   <div style={{
@@ -1343,10 +1369,11 @@ export default function UnoGame() {
       const sorted = [...gs.players].sort((a, b) => b.score - a.score);
 
       return (
-        <div className="min-h-screen gradient-bg" dir="rtl"
-          style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative",
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <UnoGlowOrbs />
+        <div dir="rtl" style={{
+            minHeight: "100dvh", fontFamily: "'Cairo','Arial',sans-serif",
+            background: "linear-gradient(160deg,#0d0a1e 0%,#130820 40%,#0a0510 100%)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24,
+          }}>
 
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
             style={{ width: "100%", maxWidth: 480, position: "relative", zIndex: 1 }}>
@@ -1518,6 +1545,52 @@ export default function UnoGame() {
             )}
           </div>
 
+          {/* ── Turn indicator — top-right gold badge ── */}
+          <div style={{ position: "fixed", top: 10, right: 10, zIndex: 60 }}>
+            <AnimatePresence mode="wait">
+              <motion.div key={gs.currentPlayerIndex}
+                initial={{ opacity: 0, scale: 0.8, y: -8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                style={{
+                  background: isMyTurn
+                    ? "linear-gradient(135deg,#92400e,#d97706)"
+                    : "linear-gradient(135deg,#0f0a02,#1c1207)",
+                  border: isMyTurn
+                    ? "2px solid #f59e0b"
+                    : "1.5px solid rgba(245,158,11,0.3)",
+                  borderRadius: 10, padding: "5px 12px",
+                  backdropFilter: "blur(12px)",
+                  boxShadow: isMyTurn
+                    ? "0 0 20px rgba(245,158,11,0.7), 0 4px 12px rgba(0,0,0,0.5)"
+                    : "0 2px 8px rgba(0,0,0,0.5)",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}>
+                {isMyTurn ? (
+                  <motion.span animate={{ opacity: [0.8, 1, 0.8] }} transition={{ repeat: Infinity, duration: 0.8 }}
+                    style={{ fontSize: 13 }}>⚡</motion.span>
+                ) : (
+                  <span style={{ fontSize: 11 }}>⏳</span>
+                )}
+                <div>
+                  <div style={{
+                    color: isMyTurn ? "#fef3c7" : "rgba(245,158,11,0.6)",
+                    fontSize: 9, fontWeight: 700, letterSpacing: "0.05em",
+                  }}>{isMyTurn ? "دورك الآن" : "الدور على"}</div>
+                  {!isMyTurn && (
+                    <div style={{ color: "#f59e0b", fontSize: 11, fontWeight: 900, lineHeight: 1.2 }}>
+                      {(() => {
+                        const cp = gs.players[gs.currentPlayerIndex];
+                        if (!cp) return "";
+                        return cp.isBot ? cp.name : decodePlayerName(cp.name).name;
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
           {/* ═══════════════ GAME AREA (absolute positioning) ═══════════════ */}
           <div style={{ flex: 1, position: "relative", zIndex: 6, minHeight: 0, overflow: "hidden" }}>
 
@@ -1682,29 +1755,6 @@ export default function UnoGame() {
             </div>
             {/* ═══ END TABLE ═══ */}
 
-            {/* Turn status */}
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25,
-              padding: "2px 14px", display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              {isMyTurn ? (
-                <motion.div animate={{ opacity: [0.7, 1, 0.7] }} transition={{ repeat: Infinity, duration: 0.9 }}
-                  style={{ color: "#4ade80", fontWeight: 900, fontSize: 12 }}>
-                  ⚡ دورك!{!hasPlayableCard && gs.drawStack === 0 ? " اسحب ورقة" : ""}
-                </motion.div>
-              ) : (
-                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, fontWeight: 600 }}>
-                  دور {gs.players[gs.currentPlayerIndex]?.name}...
-                </div>
-              )}
-              <AnimatePresence mode="wait">
-                <motion.div key={lastActionAnim}
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 600 }}>
-                  {lastActionAnim}
-                </motion.div>
-              </AnimatePresence>
-            </div>
           </div>
 
           {/* ═══════════════ MY HAND (bottom tray) ═══════════════ */}
@@ -1791,8 +1841,13 @@ export default function UnoGame() {
                 position: "absolute", top: -22, left: 0, right: 0,
                 display: "flex", justifyContent: "space-between", padding: "0 12px",
               }}>
-                <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: 800 }}>
-                  {me ? decodePlayerName(me.name).name : "أنت"}{isMyTurn ? " ⚡" : ""}
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 800 }}>
+                    {me ? decodePlayerName(me.name).name : "أنت"}
+                  </div>
+                  <div style={{ color: "rgba(255,200,80,0.65)", fontSize: 8, fontWeight: 600 }}>
+                    حظ موفق ✨
+                  </div>
                 </div>
                 <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700 }}>
                   {myHand.length} ورقة{!isMyTurn && " — انتظر..."}
