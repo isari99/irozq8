@@ -243,7 +243,7 @@ function botAI(room: UnoRoom, bot: UnoPlayer): void {
     playable = playable.filter(c => (c.type === "draw2" && top.type === "draw2") || c.type === "wild4");
   }
 
-  // ── No playable card → draw ──
+  // ── No playable card → draw until valid ──
   if (playable.length === 0) {
     if (room.drawStack > 0) {
       const drawn = drawFrom(room, room.drawStack);
@@ -252,26 +252,40 @@ function botAI(room: UnoRoom, bot: UnoPlayer): void {
       room.drawStack = 0;
       room.currentPlayerIndex = advance(room, 1);
     } else {
-      const drawn = drawFrom(room, 1);
-      bot.hand.push(...drawn);
-      const drawnCard = drawn[0];
-      if (drawnCard && canPlay(drawnCard, top, room.currentColor)) {
-        // Play the drawn card immediately
-        bot.hand.splice(bot.hand.length - 1, 1);
-        bot.saidUno = false;
-        room.discardPile.push(drawnCard);
-        if (drawnCard.color !== "wild") room.currentColor = drawnCard.color as Color;
-        if (bot.hand.length === 0) {
-          room.winner = bot.id;
-          room.phase = "gameover";
-          bot.score += 1;
-          room.lastAction = `🎉 ${bot.name} فاز! UNO! 🎉`;
-          return;
+      // Draw cards one by one until finding a valid card
+      let found: UnoCard | null = null;
+      let drawCount = 0;
+      const maxDraw = Math.min(room.deck.length + room.discardPile.length, 20);
+      while (!found && drawCount < maxDraw) {
+        const drawn = drawFrom(room, 1);
+        if (drawn.length === 0) break;
+        bot.hand.push(drawn[0]);
+        drawCount++;
+        if (canPlay(drawn[0], top, room.currentColor)) {
+          found = drawn[0];
         }
-        if (bot.hand.length === 1) { bot.saidUno = true; }
-        applyCard(room, drawnCard, bot);
+      }
+      if (found) {
+        // Play the found card
+        const idx = bot.hand.findIndex(c => c.id === found!.id);
+        if (idx >= 0) {
+          bot.hand.splice(idx, 1);
+          bot.saidUno = false;
+          room.discardPile.push(found);
+          if (found.color !== "wild") room.currentColor = found.color as Color;
+          if (bot.hand.length === 0) {
+            room.winner = bot.id;
+            room.phase = "gameover";
+            bot.score += 1;
+            room.lastAction = `🎉 ${bot.name} فاز! UNO! 🎉`;
+            return;
+          }
+          if (bot.hand.length === 1) { bot.saidUno = true; }
+          room.lastAction = `${bot.name} سحب ${drawCount} أوراق ولعب`;
+          applyCard(room, found, bot);
+        }
       } else {
-        room.lastAction = `${bot.name} سحب ورقة وانتهى دوره`;
+        room.lastAction = `${bot.name} سحب ${drawCount} أوراق`;
         room.currentPlayerIndex = advance(room, 1);
       }
     }
@@ -508,7 +522,7 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
 
     if (!room) { ws.send(JSON.stringify({ type: "uno:error", message: "كود الغرفة غير موجود" })); return; }
     if (room.phase !== "lobby") { ws.send(JSON.stringify({ type: "uno:error", message: "اللعبة بدأت بالفعل" })); return; }
-    if (room.players.length >= 10) { ws.send(JSON.stringify({ type: "uno:error", message: "الغرفة ممتلئة (الحد الأقصى 10 لاعبين)" })); return; }
+    if (room.players.length >= 4) { ws.send(JSON.stringify({ type: "uno:error", message: "الغرفة ممتلئة (الحد الأقصى 4 لاعبين)" })); return; }
 
     const playerId = Math.random().toString(36).slice(2, 10);
     ws.unoRoomCode = code;
@@ -520,7 +534,15 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
       isBot: false, difficulty: "easy",
     });
     ws.send(JSON.stringify({ type: "uno:joined", code, playerId }));
-    broadcast(room);
+
+    // Auto-start when 4 players join
+    if (room.players.length === 4) {
+      startGame(room);
+      broadcast(room);
+      scheduleBotTurn(room);
+    } else {
+      broadcast(room);
+    }
     return;
   }
 
@@ -533,8 +555,8 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
   // ── Add Bot ──
   if (type === "uno:add_bot") {
     if (!player.isHost || room.phase !== "lobby") return;
-    if (room.players.length >= 10) {
-      ws.send(JSON.stringify({ type: "uno:error", message: "الغرفة ممتلئة (الحد الأقصى 10 لاعبين)" }));
+    if (room.players.length >= 4) {
+      ws.send(JSON.stringify({ type: "uno:error", message: "الغرفة ممتلئة (الحد الأقصى 4 لاعبين)" }));
       return;
     }
 
@@ -713,10 +735,11 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
       player.hand.push(...drawn);
       const drawnCard = drawn[0];
       if (drawnCard && top && canPlay(drawnCard, top, room.currentColor)) {
-        room.lastAction = `${player.name} سحب ورقة (يمكنك لعبها)`;
+        // Drew a playable card — stay on same player so they can choose to play it
+        room.lastAction = `${player.name} سحب ورقة ✅ يمكنك لعبها!`;
       } else {
-        room.lastAction = `${player.name} سحب ورقة وانتهى دوره`;
-        room.currentPlayerIndex = advance(room, 1);
+        // Not playable — stay on same player so they can keep drawing
+        room.lastAction = `${player.name} سحب ورقة... اسحب مجدداً`;
       }
     }
 
