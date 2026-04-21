@@ -488,39 +488,66 @@ export default function UnoGame() {
   if (screen === "entry") return wrap(
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
       <button onClick={() => navigate("/")} style={{
-        background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 32, fontWeight: 700,
-      }}><ArrowRight size={16}/>الرئيسية</button>
+        background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 28, fontWeight: 700,
+      }}><ArrowRight size={14}/>الرئيسية</button>
 
       <div style={{ textAlign: "center" }}>
-        <img src="/uno-logo.png" alt="UNO" style={{ width: 120, height: 120, borderRadius: 20,
-          boxShadow: "0 8px 32px rgba(220,38,38,0.5)", marginBottom: 20, border: "3px solid rgba(255,255,255,0.2)" }} />
-        <h1 style={{ fontSize: 42, fontWeight: 900, color: "#fff",
-          textShadow: "0 0 30px rgba(220,38,38,0.8)", marginBottom: 8 }}>UNO</h1>
-        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 15, marginBottom: 40 }}>لعبة الأوراق الأشهر — أونلاين!</p>
-
-        {error && <p style={{ color: "#f87171", marginBottom: 16, fontSize: 14, fontWeight: 600 }}>{error}</p>}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={() => { setError(null); setScreen("host-setup"); }}
+        {/* Logo with glow ring */}
+        <div style={{ position: "relative", display: "inline-block", marginBottom: 28 }}>
+          <div style={{
+            position: "absolute", inset: -10, borderRadius: 32,
+            background: "radial-gradient(circle,rgba(220,38,38,0.45),transparent 70%)",
+            filter: "blur(18px)", zIndex: 0,
+          }} />
+          <motion.img
+            src="/uno-logo.png" alt="UNO"
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
             style={{
-              padding: "18px", borderRadius: 18, fontWeight: 900, fontSize: 18, cursor: "pointer",
-              background: "linear-gradient(135deg,#dc2626,#991b1b)",
-              color: "#fff", border: "none",
-              boxShadow: "0 8px 32px rgba(220,38,38,0.5)",
-              fontFamily: "'Cairo','Arial',sans-serif",
-            }}>🃏 أنشئ غرفة</motion.button>
-
-          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={() => { setError(null); setScreen("join"); }}
-            style={{
-              padding: "16px", borderRadius: 18, fontWeight: 900, fontSize: 17, cursor: "pointer",
-              background: "rgba(255,255,255,0.1)", color: "#fff",
-              border: "2px solid rgba(255,255,255,0.25)",
-              fontFamily: "'Cairo','Arial',sans-serif",
-            }}>🔗 انضم لغرفة</motion.button>
+              width: 130, height: 130, borderRadius: 26, position: "relative", zIndex: 1,
+              border: "3px solid rgba(255,255,255,0.18)",
+              boxShadow: "0 12px 40px rgba(220,38,38,0.55), 0 4px 16px rgba(0,0,0,0.5)",
+            }}
+          />
         </div>
+
+        <h1 style={{
+          fontSize: 52, fontWeight: 900, color: "#fff", letterSpacing: "0.04em",
+          textShadow: "0 0 40px rgba(220,38,38,0.9), 0 2px 8px rgba(0,0,0,0.6)",
+          marginBottom: 10, lineHeight: 1,
+        }}>UNO</h1>
+
+        <p style={{
+          color: "rgba(255,255,255,0.6)", fontSize: 15, marginBottom: 48,
+          fontWeight: 500, letterSpacing: "0.02em",
+        }}>لعبة الأوراق الأشهر — أونلاين!</p>
+
+        {error && (
+          <div style={{
+            background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.4)",
+            borderRadius: 12, padding: "10px 16px", marginBottom: 20,
+            color: "#fca5a5", fontSize: 14, fontWeight: 600,
+          }}>{error}</div>
+        )}
+
+        <motion.button
+          whileHover={{ scale: 1.04, boxShadow: "0 16px 48px rgba(220,38,38,0.7)" }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => { setError(null); setScreen("host-setup"); }}
+          style={{
+            width: "100%", padding: "20px", borderRadius: 20,
+            fontWeight: 900, fontSize: 20, cursor: "pointer",
+            background: "linear-gradient(135deg,#ef4444 0%,#b91c1c 100%)",
+            color: "#fff", border: "none",
+            boxShadow: "0 8px 32px rgba(220,38,38,0.55), inset 0 1px 0 rgba(255,255,255,0.15)",
+            letterSpacing: "0.03em",
+            fontFamily: "'Cairo','Arial',sans-serif",
+          }}>🃏 أنشئ غرفة</motion.button>
+
+        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, marginTop: 20, fontWeight: 500 }}>
+          أنشئ غرفة وشارك الرابط مع أصدقائك للعب معاً
+        </p>
       </div>
     </motion.div>
   );
