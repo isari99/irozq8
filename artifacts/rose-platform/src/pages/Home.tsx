@@ -121,6 +121,19 @@ const games = [
     emoji: "🎤",
     heroImage: "/convince-hero.png",
   },
+  {
+    id: "uno-game",
+    title: "UNO",
+    description: "لعبة أوراق UNO أونلاين — 2 إلى 10 لاعبين!",
+    icon: CircleDot,
+    color: "from-red-600 to-rose-700",
+    borderColor: "border-red-500/40",
+    glowColor: "shadow-red-500/30",
+    neonColor: "#dc2626",
+    path: "/uno-game",
+    emoji: "🃏",
+    heroImage: "/uno-logo.png",
+  },
 ];
 
 export default function Home() {

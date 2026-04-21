@@ -2,8 +2,9 @@ import { WebSocketServer, WebSocket } from "ws";
 import { logger } from "./logger";
 import { handleImposterMessage, handleImposterDisconnect, ImposterWS } from "./imposterGame";
 import { handleConvinceMessage, handleConvinceDisconnect, ConvinceWS } from "./convinceGame";
+import { handleUnoMessage, handleUnoDisconnect, UnoWS } from "./unoGame";
 
-interface AuthenticatedWS extends ImposterWS, ConvinceWS {
+interface AuthenticatedWS extends ImposterWS, ConvinceWS, UnoWS {
   userId?: number;
   username?: string;
   isAlive?: boolean;
@@ -31,6 +32,8 @@ export function setupWebSocketServer(server: import("http").Server): WebSocketSe
           handleImposterMessage(ws, msg);
         } else if (typeof msg.type === "string" && msg.type.startsWith("convince:")) {
           handleConvinceMessage(ws, msg);
+        } else if (typeof msg.type === "string" && msg.type.startsWith("uno:")) {
+          handleUnoMessage(ws, msg);
         }
       } catch {
         logger.warn("Invalid WS message");
@@ -40,6 +43,7 @@ export function setupWebSocketServer(server: import("http").Server): WebSocketSe
     ws.on("close", () => {
       handleImposterDisconnect(ws);
       handleConvinceDisconnect(ws);
+      handleUnoDisconnect(ws);
       logger.debug({ userId: ws.userId }, "WS disconnected");
     });
   });

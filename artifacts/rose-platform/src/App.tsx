@@ -13,6 +13,7 @@ import FruitsGame from "@/pages/FruitsGame";
 import ImposterGame from "@/pages/ImposterGame";
 import ChairsGame from "@/pages/ChairsGame";
 import ConvinceGame from "@/pages/ConvinceGame";
+import UnoGame from "@/pages/UnoGame";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "@/pages/not-found";
 
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/imposter-game"><ImposterGame /></Route>
       <Route path="/chairs-game"><ProtectedRoute component={ChairsGame} /></Route>
       <Route path="/convince-game"><ConvinceGame /></Route>
+      <Route path="/uno-game"><UnoGame /></Route>
       <Route component={NotFound} />
     </Switch>
   );
