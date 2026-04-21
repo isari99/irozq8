@@ -12,8 +12,6 @@ function getWsUrl(): string {
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const GOLD = "#f59e0b";
-const GOLD2 = "#fbbf24";
-const DARK = "#0d0a00";
 
 // ─── Glow background orbs (outside component to avoid re-mount) ───────────────
 function ConvinceGlowOrbs() {
@@ -92,22 +90,31 @@ function PlayerCard({ p, dim }: { p: ConvincePlayer; dim?: boolean }) {
   );
 }
 
-function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [hover, setHover] = useState(0);
+function NumberRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const locked = value > 0;
   return (
-    <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-      {[1,2,3,4,5,6,7,8,9,10].map(n => (
-        <button key={n}
-          onMouseEnter={() => setHover(n)} onMouseLeave={() => setHover(0)}
-          onClick={() => onChange(n)}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            fontSize: n <= (hover || value) ? 28 : 22,
-            filter: n <= (hover || value) ? `drop-shadow(0 0 6px ${GOLD})` : "none",
-            transition: "all 0.15s",
-            color: n <= (hover || value) ? GOLD2 : "rgba(255,255,255,0.25)",
-          }}>★</button>
-      ))}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+      {[1,2,3,4,5,6,7,8,9,10].map(n => {
+        const selected = n === value;
+        return (
+          <button key={n}
+            onClick={() => { if (!locked) onChange(n); }}
+            disabled={locked}
+            style={{
+              padding: "14px 0", borderRadius: 14, fontWeight: 900, fontSize: 20,
+              cursor: locked ? "default" : "pointer",
+              border: `2px solid ${selected ? GOLD : "rgba(255,255,255,0.15)"}`,
+              background: selected
+                ? `linear-gradient(135deg,${GOLD},#d97706)`
+                : "rgba(255,255,255,0.07)",
+              color: selected ? "#000" : "rgba(255,255,255,0.75)",
+              boxShadow: selected ? `0 4px 20px ${GOLD}60` : "none",
+              transform: selected ? "scale(1.07)" : "scale(1)",
+              transition: "all 0.15s",
+              fontFamily: "'Cairo','Arial',sans-serif",
+            }}>{n}</button>
+        );
+      })}
     </div>
   );
 }
@@ -751,7 +758,7 @@ export default function ConvinceGame() {
               </div>
             ) : alreadyRated ? (
               <div style={{ textAlign: "center", padding: 24 }}>
-                <p style={{ color: GOLD, fontWeight: 800, fontSize: 18 }}>✅ أعطيت {myRating} نجمة</p>
+                <p style={{ color: GOLD, fontWeight: 800, fontSize: 18 }}>✅ أعطيت {myRating} من 10</p>
                 <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 8 }}>في انتظار باقي اللاعبين...</p>
               </div>
             ) : (
@@ -759,7 +766,7 @@ export default function ConvinceGame() {
                 <p style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 15, fontWeight: 700, marginBottom: 18 }}>
                   قيّم الإجابة من 1 إلى 10
                 </p>
-                <StarRating value={myRating} onChange={ratePlayer}/>
+                <NumberRating value={myRating} onChange={ratePlayer}/>
               </div>
             )}
           </div>
@@ -818,15 +825,55 @@ export default function ConvinceGame() {
             ))}
           </div>
 
-          {amHost && (
+          {/* Remaining players to review — host can click directly to start rating */}
+          {gameState.reviewQueueLength > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                {amHost ? "اختر اللاعب التالي لعرض إجابته:" : "في انتظار اختيار الهوست للاعب التالي..."}
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {notReviewedPlayers.map(p => (
+                  <motion.button key={p.id}
+                    whileHover={amHost ? { scale: 1.02 } : {}}
+                    onClick={amHost ? () => showPlayer(p.id) : undefined}
+                    disabled={!amHost}
+                    style={{
+                      width: "100%", textAlign: "right", padding: "14px 18px", borderRadius: 14,
+                      cursor: amHost ? "pointer" : "default",
+                      background: amHost ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.04)",
+                      border: `1.5px solid ${p.color}44`,
+                      display: "flex", alignItems: "center", gap: 12,
+                      boxShadow: amHost ? `0 0 14px ${p.color}18` : "none",
+                      transition: "all 0.2s",
+                    }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                      background: p.color + "22", border: `2px solid ${p.color}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 17, fontWeight: 900, color: p.color }}>
+                      {p.isBot ? "🤖" : initials(p.name)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{p.name}</div>
+                      <div style={{ color: p.hasAnswered ? "#4ade80" : "rgba(255,255,255,0.35)", fontSize: 12 }}>
+                        {p.hasAnswered ? "✓ أجاب" : "لم يجب"}
+                      </div>
+                    </div>
+                    {amHost && <ChevronRight size={16} color={p.color}/>}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {gameState.reviewQueueLength === 0 && amHost && (
             <button onClick={nextPlayer} style={{
               width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 17, cursor: "pointer",
               background: `linear-gradient(135deg,${GOLD},#d97706)`, color: "#000", border: "none",
               boxShadow: `0 6px 24px ${GOLD}50`,
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            }}><ChevronRight size={20}/>{gameState.reviewQueueLength > 0 ? "عرض اللاعب التالي" : "الجولة التالية"}</button>
+            }}><ChevronRight size={20}/>الجولة التالية</button>
           )}
-          {!amHost && (
+          {!amHost && gameState.reviewQueueLength === 0 && (
             <p style={{ textAlign: "center", color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 600 }}>في انتظار الهوست...</p>
           )}
         </div>
