@@ -158,7 +158,7 @@ interface UnoCardProps {
   card: UnoCard;
   playable?: boolean;
   active?: boolean; // current color highlight
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
   size?: "sm" | "md" | "lg";
   faceDown?: boolean;
   style?: React.CSSProperties;
@@ -751,11 +751,13 @@ export default function UnoGame() {
   const [soundVol, setSoundVol] = useState(0.6);
   const soundVolRef = useRef(0.6);
 
-  // ── Flying-card draw animation ──
+  // ── Flying-card animations ──
   const drawPileRef = useRef<HTMLDivElement>(null);
+  const discardPileRef = useRef<HTMLDivElement>(null);
   const handTrayRef = useRef<HTMLDivElement>(null);
   const flyKeyRef = useRef(0);
-  const [flyingCards, setFlyingCards] = useState<{ key: number; fromX: number; fromY: number; toX: number; toY: number }[]>([]);
+  const [flyingCards, setFlyingCards] = useState<{ key: number; delay: number; fromX: number; fromY: number; toX: number; toY: number }[]>([]);
+  const [flyingPlayCards, setFlyingPlayCards] = useState<{ key: number; card: UnoCard; fromX: number; fromY: number; toX: number; toY: number }[]>([]);
 
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
@@ -812,6 +814,13 @@ export default function UnoGame() {
   }, [gs?.chat.length]);
   useEffect(() => { if (chatOpen) setUnreadChat(0); }, [chatOpen]);
 
+  // Auto-clear notification after 2.6s
+  useEffect(() => {
+    if (!lastActionAnim) return;
+    const t = setTimeout(() => setLastActionAnim(""), 2600);
+    return () => clearTimeout(t);
+  }, [lastActionAnim]);
+
   const myId = playerIdRef.current;
   const me = gs?.players.find(p => p.id === myId);
   const amHost = me?.isHost ?? false;
@@ -856,18 +865,38 @@ export default function UnoGame() {
         flyKeyRef.current++;
         return {
           key: flyKeyRef.current,
+          delay: i * 110,
           fromX: pileRect.left + pileRect.width / 2 - 24,
           fromY: pileRect.top + pileRect.height / 2 - 34,
           toX, toY,
         };
       });
       setFlyingCards(prev => [...prev, ...newCards]);
-      newCards.forEach(c => {
-        setTimeout(() => setFlyingCards(prev => prev.filter(x => x.key !== c.key)), 650);
+      newCards.forEach((c, i) => {
+        setTimeout(() => setFlyingCards(prev => prev.filter(x => x.key !== c.key)), 700 + i * 110);
       });
     }
     send({ type: "uno:draw" });
   }, [send]);
+
+  const handlePlayCard = useCallback((cardId: string, card: UnoCard, e: React.MouseEvent) => {
+    if (discardPileRef.current) {
+      const cardRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const pileRect = discardPileRef.current.getBoundingClientRect();
+      flyKeyRef.current++;
+      const key = flyKeyRef.current;
+      setFlyingPlayCards(prev => [...prev, {
+        key, card,
+        fromX: cardRect.left,
+        fromY: cardRect.top,
+        toX: pileRect.left + pileRect.width / 2 - cardRect.width / 2,
+        toY: pileRect.top + pileRect.height / 2 - cardRect.height / 2,
+      }]);
+      setTimeout(() => setFlyingPlayCards(prev => prev.filter(x => x.key !== key)), 420);
+    }
+    playUnoSound("play", soundVol);
+    playCard(cardId);
+  }, [playCard, soundVol]);
   const sayUno = () => send({ type: "uno:say_uno" });
   const chooseColor = (color: Color) => send({ type: "uno:choose_color", color });
   const playAgain = () => send({ type: "uno:play_again" });
@@ -1619,6 +1648,33 @@ export default function UnoGame() {
             </AnimatePresence>
           </div>
 
+          {/* ── Center-screen action notification ── */}
+          <AnimatePresence>
+            {lastActionAnim && (
+              <motion.div
+                key={lastActionAnim + Date.now()}
+                initial={{ opacity: 0, scale: 0.8, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -12 }}
+                transition={{ duration: 0.22 }}
+                style={{
+                  position: "fixed", top: "38%", left: "50%", transform: "translateX(-50%)",
+                  zIndex: 80, pointerEvents: "none",
+                  background: "linear-gradient(135deg,rgba(10,4,1,0.93),rgba(28,12,3,0.91))",
+                  border: "1.5px solid rgba(255,200,80,0.32)",
+                  borderRadius: 18, padding: "14px 26px",
+                  backdropFilter: "blur(14px)",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.75), 0 0 22px rgba(220,145,28,0.18)",
+                  maxWidth: 290, textAlign: "center",
+                }}>
+                <div style={{
+                  color: "#fbbf24", fontWeight: 900, fontSize: 14,
+                  fontFamily: "'Cairo','Arial',sans-serif", lineHeight: 1.4,
+                }}>{lastActionAnim}</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* ═══════════════ GAME AREA (absolute positioning) ═══════════════ */}
           <div style={{ flex: 1, position: "relative", zIndex: 6, minHeight: 0, overflow: "hidden" }}>
 
@@ -1698,12 +1754,6 @@ export default function UnoGame() {
                 borderRadius: 6, pointerEvents: "none", zIndex: 4,
               }} />
 
-              {/* Hologram (upper-right for rightP) */}
-              {rightP && (
-                <div style={{ position: "absolute", top: 16, right: 18, zIndex: 14 }}>
-                  <HologramAvatar player={rightP} />
-                </div>
-              )}
 
               {/* CENTER PILES */}
               <div style={{
@@ -1749,7 +1799,7 @@ export default function UnoGame() {
                   </div>
 
                   {/* DISCARD PILE */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                  <div ref={discardPileRef} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
                     <AnimatePresence mode="wait">
                       {top && (
                         <motion.div key={top.id}
@@ -1893,7 +1943,7 @@ export default function UnoGame() {
                     <UnoCardEl key={card.id} card={card} size="md"
                       playable={isMyTurn && hasPlayableCard ? playable : false}
                       onClick={isMyTurn && hasPlayableCard && !gs.pendingWild && playable
-                        ? () => { playUnoSound("play", soundVol); playCard(card.id); }
+                        ? (e) => handlePlayCard(card.id, card, e as React.MouseEvent)
                         : undefined} />
                   );
                 })}
@@ -1911,19 +1961,35 @@ export default function UnoGame() {
             </div>
           </div>
 
-          {/* ── Flying card draw animations ── */}
+          {/* ── Flying card DRAW animations (deck → hand) ── */}
           {flyingCards.map(fc => (
             <motion.div
               key={fc.key}
               initial={{ x: fc.fromX, y: fc.fromY, rotate: -10, scale: 1.05, opacity: 1 }}
               animate={{ x: fc.toX, y: fc.toY, rotate: 720, scale: 0.7, opacity: 0 }}
-              transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
+              transition={{ duration: 0.52, ease: [0.19, 1, 0.22, 1], delay: fc.delay / 1000 }}
               style={{
                 position: "fixed", top: 0, left: 0, zIndex: 9999,
                 width: 48, height: 68, pointerEvents: "none",
                 filter: "drop-shadow(0 0 12px rgba(255,200,80,0.7))",
               }}>
               <UnoCardBack w={48} h={68} />
+            </motion.div>
+          ))}
+
+          {/* ── Flying card PLAY animations (hand → discard pile) ── */}
+          {flyingPlayCards.map(fc => (
+            <motion.div
+              key={fc.key}
+              initial={{ x: fc.fromX, y: fc.fromY, rotate: 0, scale: 1, opacity: 1 }}
+              animate={{ x: fc.toX, y: fc.toY, rotate: -12, scale: 0.88, opacity: 0.15 }}
+              transition={{ duration: 0.38, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{
+                position: "fixed", top: 0, left: 0, zIndex: 9998,
+                pointerEvents: "none",
+                filter: "drop-shadow(0 0 16px rgba(255,255,100,0.5))",
+              }}>
+              <UnoCardEl card={fc.card} size="md" />
             </motion.div>
           ))}
         </div>
@@ -1933,9 +1999,11 @@ export default function UnoGame() {
 
   // ─── LOADING / CONNECTING ─────────────────────────────────────────────────
   return (
-    <div className="min-h-screen gradient-bg flex items-center justify-center" dir="rtl"
-      style={{ fontFamily: "'Cairo','Arial',sans-serif" }}>
-      <UnoGlowOrbs />
+    <div dir="rtl" style={{
+      minHeight: "100dvh", fontFamily: "'Cairo','Arial',sans-serif",
+      background: "linear-gradient(160deg,#0d0a1e 0%,#130820 40%,#0a0510 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
       <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
         <img src="/uno-logo.png" alt="UNO" style={{ width: 80, height: 80, borderRadius: 16, marginBottom: 20 }} />
         <div className="animate-spin w-10 h-10 border-2 border-red-400/40 border-t-red-400 rounded-full mx-auto mb-4" />
