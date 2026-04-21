@@ -20,7 +20,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
   - **السلم والثعبان** (Snakes Game): Twitch chat board game
   - **الكراسي الموسيقية** (Chairs Game): Musical chairs via Twitch chat with spinning wheel
   - **أقنعني** (Convince Game): Web multiplayer, players write answers + rate each other 1-10, first to target score wins
-  - **UNO** (Uno Game): Full online UNO card game, 2-10 players, WebSocket multiplayer, all special cards + chat + leaderboard
+  - **UNO** (Uno Game): Full online UNO card game, 2-10 players, WebSocket multiplayer, all special cards + chat + leaderboard + avatar system (8 characters, encoded as `avatarId:name`) + bot support (0-3 bots, 3 difficulty levels) + hologram avatar display
 - **Design**: Dark purple/neon theme (pink #e040fb + cyan #00e5ff), Arabic RTL UI, Cairo font, Framer Motion animations
 - **Logo**: `public/rose-logo.png` (cyberpunk character)
 

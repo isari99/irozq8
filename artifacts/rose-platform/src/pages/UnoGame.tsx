@@ -54,6 +54,39 @@ const COLOR_AR: Record<Color, string> = {
   red: "أحمر", blue: "أزرق", green: "أخضر", yellow: "أصفر",
 };
 
+// ─── Avatar System ────────────────────────────────────────────────────────────
+export const AVATARS = [
+  { id: 0, emoji: "🧝‍♀️", bg: "linear-gradient(135deg,#7c3aed,#4c1d95)", label: "الساحرة",   glow: "#7c3aed" },
+  { id: 1, emoji: "🧙‍♂️", bg: "linear-gradient(135deg,#2563eb,#1e3a8a)", label: "المايسترو", glow: "#3b82f6" },
+  { id: 2, emoji: "🦊",   bg: "linear-gradient(135deg,#d97706,#92400e)", label: "الثعلب",    glow: "#f59e0b" },
+  { id: 3, emoji: "🕵️",  bg: "linear-gradient(135deg,#16a34a,#14532d)", label: "المحقق",   glow: "#22c55e" },
+  { id: 4, emoji: "🤺",   bg: "linear-gradient(135deg,#dc2626,#7f1d1d)", label: "الفارس",   glow: "#ef4444" },
+  { id: 5, emoji: "🐉",   bg: "linear-gradient(135deg,#0891b2,#164e63)", label: "التنين",   glow: "#06b6d4" },
+  { id: 6, emoji: "🦁",   bg: "linear-gradient(135deg,#b45309,#78350f)", label: "الأسد",    glow: "#f59e0b" },
+  { id: 7, emoji: "🧛",   bg: "linear-gradient(135deg,#4f46e5,#1e1b4b)", label: "الشبح",    glow: "#818cf8" },
+] as const;
+
+type AvatarId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+function encodePlayerName(name: string, avatarId: number): string {
+  return `${avatarId}:${name}`;
+}
+
+function decodePlayerName(encoded: string): { name: string; avatarId: AvatarId } {
+  const colonIdx = encoded.indexOf(":");
+  if (colonIdx > 0) {
+    const id = parseInt(encoded.slice(0, colonIdx));
+    if (!isNaN(id) && id >= 0 && id < AVATARS.length) {
+      return { name: encoded.slice(colonIdx + 1), avatarId: id as AvatarId };
+    }
+  }
+  return { name: encoded, avatarId: 0 };
+}
+
+function getAvatar(avatarId: AvatarId) {
+  return AVATARS[avatarId] ?? AVATARS[0];
+}
+
 // ─── Glow Orbs ────────────────────────────────────────────────────────────────
 function UnoGlowOrbs() {
   return <>
@@ -359,32 +392,35 @@ function UnoCardBack({ w = 32, h = 46 }: { w?: number; h?: number }) {
 // ─── Player Seat Components ────────────────────────────────────────────────
 function PlayerAvatar({ player, size = 44 }: { player: PlayerInfo; size?: number }) {
   const isCurrent = player.isCurrentPlayer;
+  const { avatarId } = decodePlayerName(player.name);
+  const av = getAvatar(player.isBot ? 0 : avatarId);
   return (
     <div style={{ position: "relative", flexShrink: 0 }}>
       <motion.div
         animate={isCurrent ? {
-          boxShadow: ["0 0 0px rgba(96,212,255,0)", "0 0 22px rgba(96,212,255,0.65)", "0 0 0px rgba(96,212,255,0)"],
+          boxShadow: [`0 0 0px ${av.glow}00`, `0 0 22px ${av.glow}bb`, `0 0 0px ${av.glow}00`],
         } : {}}
         transition={{ repeat: Infinity, duration: 1.2 }}
         style={{
           width: size, height: size, borderRadius: "50%",
-          background: isCurrent
-            ? "radial-gradient(circle, rgba(96,212,255,0.18), rgba(30,160,210,0.05))"
-            : "rgba(255,255,255,0.06)",
-          border: `2px solid ${isCurrent ? "rgba(96,212,255,0.85)" : "rgba(255,255,255,0.22)"}`,
+          background: player.isBot ? "rgba(124,58,237,0.3)" : av.bg,
+          border: `2.5px solid ${isCurrent ? av.glow : "rgba(255,255,255,0.22)"}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: size * 0.38, fontWeight: 900,
-          color: isCurrent ? "#60d4ff" : "rgba(255,255,255,0.7)",
+          fontSize: size * 0.48,
           transition: "border-color 0.3s",
+          boxShadow: isCurrent ? `0 0 14px ${av.glow}88` : "0 2px 8px rgba(0,0,0,0.5)",
+          overflow: "hidden",
         }}>
-        {player.isBot ? "🤖" : player.name.trim()[0]?.toUpperCase() ?? "?"}
+        <span style={{ lineHeight: 1, userSelect: "none" }}>
+          {player.isBot ? "🤖" : av.emoji}
+        </span>
       </motion.div>
       {isCurrent && (
         <motion.div
           animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
           style={{
             position: "absolute", inset: -5, borderRadius: "50%",
-            border: "1.5px dashed rgba(96,212,255,0.35)", pointerEvents: "none",
+            border: `1.5px dashed ${av.glow}88`, pointerEvents: "none",
           }} />
       )}
       {player.saidUno && (
@@ -405,6 +441,7 @@ function TopSeat({ player }: { player: PlayerInfo }) {
   const cW = 30, cH = 43, overlap = 6;
   const totalW = cW + (n - 1) * (cW - overlap);
   const isCurrent = player.isCurrentPlayer;
+  const displayName = player.isBot ? player.name : decodePlayerName(player.name).name;
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
@@ -415,7 +452,7 @@ function TopSeat({ player }: { player: PlayerInfo }) {
         color: isCurrent ? "#fff" : "rgba(255,255,255,0.6)",
         fontSize: 10, fontWeight: 800, textAlign: "center",
         maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>{player.name}</div>
+      }}>{displayName}</div>
       {/* Wood + leather card holder */}
       <div style={{
         background: "linear-gradient(180deg, #8a4e28 0%, #6a361a 40%, #4a2210 80%, #341608 100%)",
@@ -461,6 +498,7 @@ function LeftSeat({ player }: { player: PlayerInfo }) {
   const cW = 30, cH = 43, overlap = 9;
   const totalH = cH + (n - 1) * (cH - overlap);
   const isCurrent = player.isCurrentPlayer;
+  const displayName = player.isBot ? player.name : decodePlayerName(player.name).name;
   return (
     <div style={{
       display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
@@ -508,7 +546,7 @@ function LeftSeat({ player }: { player: PlayerInfo }) {
           fontSize: 9, fontWeight: 800,
           maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           textAlign: "center",
-        }}>{player.name}</div>
+        }}>{displayName}</div>
         <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
       </div>
     </div>
@@ -522,6 +560,7 @@ function RightSeat({ player }: { player: PlayerInfo }) {
   const cW = 30, cH = 43, overlap = 9;
   const totalH = cH + (n - 1) * (cH - overlap);
   const isCurrent = player.isCurrentPlayer;
+  const displayName = player.isBot ? player.name : decodePlayerName(player.name).name;
   return (
     <div style={{
       display: "flex", flexDirection: "row-reverse", alignItems: "center", gap: 6,
@@ -569,7 +608,7 @@ function RightSeat({ player }: { player: PlayerInfo }) {
           fontSize: 9, fontWeight: 800,
           maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           textAlign: "center",
-        }}>{player.name}</div>
+        }}>{displayName}</div>
         <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
       </div>
     </div>
@@ -579,6 +618,9 @@ function RightSeat({ player }: { player: PlayerInfo }) {
 // Hologram avatar pedestal — shown on the table surface for the right player
 function HologramAvatar({ player }: { player: PlayerInfo }) {
   const isCurrent = player.isCurrentPlayer;
+  const { avatarId } = decodePlayerName(player.name);
+  const av = getAvatar(player.isBot ? 0 : avatarId);
+  const displayName = player.isBot ? player.name : decodePlayerName(player.name).name;
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
@@ -588,24 +630,24 @@ function HologramAvatar({ player }: { player: PlayerInfo }) {
       <motion.div
         animate={isCurrent ? {
           boxShadow: [
-            "0 0 10px rgba(80,200,255,0.3), 0 0 30px rgba(80,200,255,0.15)",
-            "0 0 20px rgba(80,200,255,0.6), 0 0 50px rgba(80,200,255,0.3)",
-            "0 0 10px rgba(80,200,255,0.3), 0 0 30px rgba(80,200,255,0.15)",
+            `0 0 10px ${av.glow}55, 0 0 30px ${av.glow}33`,
+            `0 0 20px ${av.glow}aa, 0 0 50px ${av.glow}55`,
+            `0 0 10px ${av.glow}55, 0 0 30px ${av.glow}33`,
           ],
         } : {}}
         transition={{ repeat: Infinity, duration: 1.5 }}
         style={{
           width: 52, height: 52,
           borderRadius: 6,
-          background: "linear-gradient(135deg, rgba(60,160,220,0.18), rgba(100,60,180,0.12))",
-          border: "1.5px solid rgba(100,200,255,0.6)",
+          background: player.isBot ? "rgba(124,58,237,0.25)" : av.bg,
+          border: `1.5px solid ${av.glow}99`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 22, color: "rgba(150,220,255,0.9)",
-          boxShadow: "0 0 14px rgba(80,200,255,0.35), inset 0 0 14px rgba(80,200,255,0.1)",
+          fontSize: 26,
+          boxShadow: `0 0 14px ${av.glow}55, inset 0 0 14px ${av.glow}22`,
           backdropFilter: "blur(4px)",
           position: "relative", zIndex: 2,
         }}>
-        {player.isBot ? "🤖" : player.name.trim()[0]?.toUpperCase() ?? "?"}
+        <span style={{ lineHeight: 1 }}>{player.isBot ? "🤖" : av.emoji}</span>
         {/* Scan lines effect */}
         <div style={{
           position: "absolute", inset: 0, borderRadius: 5, overflow: "hidden",
@@ -632,11 +674,11 @@ function HologramAvatar({ player }: { player: PlayerInfo }) {
       }} />
       {/* Name */}
       <div style={{
-        marginTop: 3, color: isCurrent ? "rgba(120,220,255,0.9)" : "rgba(255,255,255,0.55)",
+        marginTop: 3, color: isCurrent ? av.glow : "rgba(255,255,255,0.55)",
         fontSize: 9, fontWeight: 800, textAlign: "center",
         maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        textShadow: isCurrent ? "0 0 8px rgba(80,200,255,0.7)" : "none",
-      }}>{player.name}</div>
+        textShadow: isCurrent ? `0 0 8px ${av.glow}bb` : "none",
+      }}>{displayName}</div>
       {player.saidUno && (
         <div style={{
           position: "absolute", top: -8, right: -8, zIndex: 10,
@@ -676,7 +718,7 @@ function ActiveColor({ color }: { color: Color }) {
 }
 
 // ─── Main Game Component ──────────────────────────────────────────────────────
-type Screen = "entry" | "host-setup" | "join" | "game";
+type Screen = "entry" | "join" | "game";
 
 export default function UnoGame() {
   const search = useSearch();
@@ -692,6 +734,8 @@ export default function UnoGame() {
   const [error, setError] = useState<string | null>(null);
   const [gs, setGs] = useState<UnoState | null>(null);
   const [myName, setMyName] = useState("");
+  const [myAvatar, setMyAvatar] = useState<AvatarId>(0);
+  const [myBotCount, setMyBotCount] = useState(1);
   const [joinCode, setJoinCode] = useState(urlCode);
   const [copied, setCopied] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -773,13 +817,19 @@ export default function UnoGame() {
   // ── Actions ──
   const createRoom = () => {
     if (!myName.trim()) { setError("اكتب اسمك أولاً"); return; }
-    send({ type: "uno:create", name: myName.trim() });
+    const encoded = encodePlayerName(myName.trim(), myAvatar);
+    send({ type: "uno:create", name: encoded });
+    // Add bots after a short delay so the room is created first
+    for (let i = 0; i < myBotCount; i++) {
+      setTimeout(() => send({ type: "uno:add_bot", difficulty: botDifficulty }), 300 + i * 150);
+    }
     setScreen("game");
   };
   const joinRoom = () => {
     if (!myName.trim()) { setError("اكتب اسمك أولاً"); return; }
     if (!joinCode.trim()) { setError("اكتب كود الغرفة"); return; }
-    send({ type: "uno:join", name: myName.trim(), code: joinCode.trim() });
+    const encoded = encodePlayerName(myName.trim(), myAvatar);
+    send({ type: "uno:join", name: encoded, code: joinCode.trim() });
     setScreen("game");
   };
   const playCard = (cardId: string) => send({ type: "uno:play_card", cardId });
@@ -817,149 +867,255 @@ export default function UnoGame() {
     </div>
   );
 
-  // ─── ENTRY SCREEN ─────────────────────────────────────────────────────────
-  if (screen === "entry") return wrap(
-    <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
-      <button onClick={() => navigate("/")} style={{
-        background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 28, fontWeight: 700,
-      }}><ArrowRight size={14}/>الرئيسية</button>
+  // ─── ENTRY SCREEN (unified — name + avatar + bots + create) ──────────────
+  if (screen === "entry") return (
+    <div className="min-h-screen gradient-bg flex flex-col items-center justify-start p-4"
+      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", overflowY: "auto" }}>
+      <UnoGlowOrbs />
+      <div style={{ width: "100%", maxWidth: 520, position: "relative", zIndex: 1, paddingTop: 12 }}>
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
+          {/* Back button */}
+          <button onClick={() => navigate("/")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 18, fontWeight: 700,
+          }}><ArrowRight size={14}/>الرئيسية</button>
 
-      <div style={{ textAlign: "center" }}>
-        {/* Logo with glow ring */}
-        <div style={{ position: "relative", display: "inline-block", marginBottom: 28 }}>
-          <div style={{
-            position: "absolute", inset: -10, borderRadius: 32,
-            background: "radial-gradient(circle,rgba(220,38,38,0.45),transparent 70%)",
-            filter: "blur(18px)", zIndex: 0,
-          }} />
-          <motion.img
-            src="/uno-logo.png" alt="UNO"
-            animate={{ y: [0, -6, 0] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+          {/* Header: small logo + title */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+            <img src="/uno-logo.png" alt="UNO" style={{
+              width: 62, height: 62, borderRadius: 14,
+              boxShadow: "0 6px 22px rgba(220,38,38,0.5)",
+              border: "2px solid rgba(255,255,255,0.15)",
+              flexShrink: 0,
+            }} />
+            <div>
+              <h1 style={{ fontSize: 32, fontWeight: 900, color: "#fff", lineHeight: 1,
+                textShadow: "0 0 24px rgba(220,38,38,0.9)" }}>UNO</h1>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 500, marginTop: 3 }}>
+                لعبة الأوراق الأشهر — أونلاين!
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.4)",
+              borderRadius: 12, padding: "10px 16px", marginBottom: 16,
+              color: "#fca5a5", fontSize: 13, fontWeight: 600,
+            }}>{error}</div>
+          )}
+
+          {/* Name input */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 700,
+              display: "block", marginBottom: 7 }}>اسمك في اللعبة</label>
+            <input value={myName} onChange={e => setMyName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && createRoom()}
+              placeholder="أدخل اسمك..."
+              style={{
+                width: "100%", padding: "13px 16px", borderRadius: 14,
+                background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(220,38,38,0.4)",
+                color: "#fff", fontSize: 16, fontWeight: 600, outline: "none", boxSizing: "border-box",
+                fontFamily: "'Cairo','Arial',sans-serif",
+              }} />
+          </div>
+
+          {/* Avatar picker */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 700,
+              display: "block", marginBottom: 10 }}>اختر شخصيتك</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              {AVATARS.map(av => {
+                const selected = myAvatar === av.id;
+                return (
+                  <motion.button key={av.id}
+                    whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.94 }}
+                    onClick={() => setMyAvatar(av.id as AvatarId)}
+                    style={{
+                      background: selected ? av.bg : "rgba(255,255,255,0.07)",
+                      border: selected ? `2px solid ${av.glow}` : "2px solid rgba(255,255,255,0.12)",
+                      borderRadius: 14, padding: "10px 6px 8px",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                      cursor: "pointer",
+                      boxShadow: selected ? `0 0 18px ${av.glow}66` : "none",
+                      transition: "all 0.15s",
+                    }}>
+                    <span style={{ fontSize: 26, lineHeight: 1 }}>{av.emoji}</span>
+                    <span style={{
+                      color: selected ? "#fff" : "rgba(255,255,255,0.5)",
+                      fontSize: 9, fontWeight: 700, textAlign: "center",
+                    }}>{av.label}</span>
+                    {selected && (
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bot count selector */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 700,
+              display: "block", marginBottom: 8 }}>عدد البوتات</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[0, 1, 2, 3].map(n => (
+                <button key={n} onClick={() => setMyBotCount(n)}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 12, fontSize: 14, fontWeight: 800,
+                    cursor: "pointer",
+                    border: myBotCount === n ? "2px solid #a78bfa" : "2px solid rgba(124,58,237,0.25)",
+                    background: myBotCount === n ? "rgba(124,58,237,0.4)" : "rgba(124,58,237,0.1)",
+                    color: myBotCount === n ? "#fff" : "#a78bfa",
+                    fontFamily: "'Cairo','Arial',sans-serif",
+                    transition: "all 0.15s",
+                  }}>
+                  {n === 0 ? "لا" : n} {n > 0 ? "🤖" : ""}
+                </button>
+              ))}
+            </div>
+            {myBotCount > 0 && (
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                {(["easy","medium","hard"] as const).map(d => {
+                  const labels = { easy: "سهل", medium: "متوسط", hard: "صعب" };
+                  return (
+                    <button key={d} onClick={() => setBotDifficulty(d)}
+                      style={{
+                        flex: 1, padding: "6px 0", borderRadius: 9, fontSize: 11, fontWeight: 700,
+                        cursor: "pointer",
+                        border: botDifficulty === d ? "1.5px solid #7c3aed" : "1.5px solid rgba(124,58,237,0.25)",
+                        background: botDifficulty === d ? "rgba(124,58,237,0.35)" : "rgba(124,58,237,0.08)",
+                        color: botDifficulty === d ? "#fff" : "#a78bfa",
+                        fontFamily: "'Cairo','Arial',sans-serif",
+                      }}>{labels[d]}</button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Create button */}
+          <motion.button
+            whileHover={{ scale: 1.02, boxShadow: "0 14px 40px rgba(220,38,38,0.65)" }}
+            whileTap={{ scale: 0.97 }}
+            onClick={createRoom} disabled={!wsReady}
             style={{
-              width: 130, height: 130, borderRadius: 26, position: "relative", zIndex: 1,
-              border: "3px solid rgba(255,255,255,0.18)",
-              boxShadow: "0 12px 40px rgba(220,38,38,0.55), 0 4px 16px rgba(0,0,0,0.5)",
-            }}
-          />
-        </div>
+              width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 18, cursor: wsReady ? "pointer" : "not-allowed",
+              background: wsReady ? "linear-gradient(135deg,#dc2626,#991b1b)" : "rgba(255,255,255,0.08)",
+              color: wsReady ? "#fff" : "rgba(255,255,255,0.35)", border: "none",
+              boxShadow: wsReady ? "0 8px 30px rgba(220,38,38,0.5)" : "none",
+              fontFamily: "'Cairo','Arial',sans-serif", marginBottom: 12,
+            }}>🃏 أنشئ غرفة وابدأ اللعب</motion.button>
 
-        <h1 style={{
-          fontSize: 52, fontWeight: 900, color: "#fff", letterSpacing: "0.04em",
-          textShadow: "0 0 40px rgba(220,38,38,0.9), 0 2px 8px rgba(0,0,0,0.6)",
-          marginBottom: 10, lineHeight: 1,
-        }}>UNO</h1>
-
-        <p style={{
-          color: "rgba(255,255,255,0.6)", fontSize: 15, marginBottom: 48,
-          fontWeight: 500, letterSpacing: "0.02em",
-        }}>لعبة الأوراق الأشهر — أونلاين!</p>
-
-        {error && (
-          <div style={{
-            background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.4)",
-            borderRadius: 12, padding: "10px 16px", marginBottom: 20,
-            color: "#fca5a5", fontSize: 14, fontWeight: 600,
-          }}>{error}</div>
-        )}
-
-        <motion.button
-          whileHover={{ scale: 1.04, boxShadow: "0 16px 48px rgba(220,38,38,0.7)" }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => { setError(null); setScreen("host-setup"); }}
-          style={{
-            width: "100%", padding: "20px", borderRadius: 20,
-            fontWeight: 900, fontSize: 20, cursor: "pointer",
-            background: "linear-gradient(135deg,#ef4444 0%,#b91c1c 100%)",
-            color: "#fff", border: "none",
-            boxShadow: "0 8px 32px rgba(220,38,38,0.55), inset 0 1px 0 rgba(255,255,255,0.15)",
-            letterSpacing: "0.03em",
-            fontFamily: "'Cairo','Arial',sans-serif",
-          }}>🃏 أنشئ غرفة</motion.button>
-
-        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, marginTop: 20, fontWeight: 500 }}>
-          أنشئ غرفة وشارك الرابط مع أصدقائك للعب معاً
-        </p>
+          {/* Join with code link */}
+          <div style={{ textAlign: "center" }}>
+            <button onClick={() => setScreen("join")} style={{
+              background: "none", border: "none", color: "rgba(255,255,255,0.45)",
+              cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline",
+              fontFamily: "'Cairo','Arial',sans-serif",
+            }}>لديك رمز دعوة؟ انضم لغرفة</button>
+          </div>
+        </motion.div>
       </div>
-    </motion.div>
-  );
-
-  // ─── HOST SETUP SCREEN ────────────────────────────────────────────────────
-  if (screen === "host-setup") return wrap(
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <button onClick={() => setScreen("entry")} style={{
-        background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 24,
-      }}><ArrowRight size={16}/>رجوع</button>
-
-      <div style={{ textAlign: "center", marginBottom: 28 }}>
-        <img src="/uno-logo.png" alt="UNO" style={{ width: 64, height: 64, borderRadius: 14, marginBottom: 12 }} />
-        <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff" }}>أنشئ غرفة UNO</h2>
-      </div>
-
-      {error && <p style={{ color: "#f87171", marginBottom: 14, fontSize: 13 }}>{error}</p>}
-
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>اسمك في اللعبة</label>
-      <input value={myName} onChange={e => setMyName(e.target.value)}
-        onKeyDown={e => e.key === "Enter" && createRoom()}
-        placeholder="أدخل اسمك..."
-        style={{ width: "100%", marginTop: 6, marginBottom: 28, padding: "14px 16px", borderRadius: 14,
-          background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(220,38,38,0.5)", color: "#fff",
-          fontSize: 16, fontWeight: 600, outline: "none", boxSizing: "border-box",
-          fontFamily: "'Cairo','Arial',sans-serif" }} />
-
-      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-        onClick={createRoom} disabled={!wsReady}
-        style={{
-          width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 18, cursor: "pointer",
-          background: wsReady ? "linear-gradient(135deg,#dc2626,#991b1b)" : "rgba(255,255,255,0.1)",
-          color: wsReady ? "#fff" : "rgba(255,255,255,0.4)", border: "none",
-          boxShadow: wsReady ? "0 6px 24px rgba(220,38,38,0.5)" : "none",
-          fontFamily: "'Cairo','Arial',sans-serif",
-        }}>🎮 ابدأ الغرفة</motion.button>
-    </motion.div>
+    </div>
   );
 
   // ─── JOIN SCREEN ──────────────────────────────────────────────────────────
-  if (screen === "join") return wrap(
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <button onClick={() => setScreen("entry")} style={{
-        background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 24,
-      }}><ArrowRight size={16}/>رجوع</button>
+  if (screen === "join") return (
+    <div className="min-h-screen gradient-bg flex flex-col items-center justify-start p-4"
+      dir="rtl" style={{ fontFamily: "'Cairo','Arial',sans-serif", position: "relative", overflowY: "auto" }}>
+      <UnoGlowOrbs />
+      <div style={{ width: "100%", maxWidth: 520, position: "relative", zIndex: 1, paddingTop: 12 }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <button onClick={() => setScreen("entry")} style={{
+            background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 18, fontWeight: 700,
+          }}><ArrowRight size={14}/>رجوع</button>
 
-      <div style={{ textAlign: "center", marginBottom: 28 }}>
-        <img src="/uno-logo.png" alt="UNO" style={{ width: 64, height: 64, borderRadius: 14, marginBottom: 12 }} />
-        <h2 style={{ fontSize: 26, fontWeight: 900, color: "#fff" }}>انضم لغرفة</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+            <img src="/uno-logo.png" alt="UNO" style={{ width: 62, height: 62, borderRadius: 14,
+              boxShadow: "0 6px 22px rgba(220,38,38,0.5)", border: "2px solid rgba(255,255,255,0.15)", flexShrink: 0 }} />
+            <div>
+              <h1 style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1,
+                textShadow: "0 0 24px rgba(220,38,38,0.9)" }}>انضم للعبة</h1>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 500, marginTop: 3 }}>أدخل بيانات اللاعب</p>
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.4)",
+              borderRadius: 12, padding: "10px 16px", marginBottom: 16,
+              color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>{error}</div>
+          )}
+
+          {/* Name */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 700,
+              display: "block", marginBottom: 7 }}>اسمك في اللعبة</label>
+            <input value={myName} onChange={e => setMyName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && joinRoom()}
+              placeholder="أدخل اسمك..."
+              style={{ width: "100%", padding: "13px 16px", borderRadius: 14,
+                background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(220,38,38,0.4)",
+                color: "#fff", fontSize: 16, fontWeight: 600, outline: "none", boxSizing: "border-box",
+                fontFamily: "'Cairo','Arial',sans-serif" }} />
+          </div>
+
+          {/* Room code */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 700,
+              display: "block", marginBottom: 7 }}>رمز الغرفة</label>
+            <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && joinRoom()}
+              placeholder="مثال: ABCD"
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 14,
+                background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.2)",
+                color: "#fff", fontSize: 22, fontWeight: 900, outline: "none", boxSizing: "border-box",
+                letterSpacing: "0.15em", textAlign: "center", fontFamily: "monospace" }} />
+          </div>
+
+          {/* Avatar picker */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 700,
+              display: "block", marginBottom: 10 }}>اختر شخصيتك</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              {AVATARS.map(av => {
+                const selected = myAvatar === av.id;
+                return (
+                  <motion.button key={av.id}
+                    whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.94 }}
+                    onClick={() => setMyAvatar(av.id as AvatarId)}
+                    style={{
+                      background: selected ? av.bg : "rgba(255,255,255,0.07)",
+                      border: selected ? `2px solid ${av.glow}` : "2px solid rgba(255,255,255,0.12)",
+                      borderRadius: 14, padding: "10px 6px 8px",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                      cursor: "pointer", boxShadow: selected ? `0 0 18px ${av.glow}66` : "none",
+                      transition: "all 0.15s",
+                    }}>
+                    <span style={{ fontSize: 26, lineHeight: 1 }}>{av.emoji}</span>
+                    <span style={{ color: selected ? "#fff" : "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: 700, textAlign: "center" }}>
+                      {av.label}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={joinRoom} disabled={!wsReady}
+            style={{
+              width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 18,
+              cursor: wsReady ? "pointer" : "not-allowed",
+              background: wsReady ? "linear-gradient(135deg,#dc2626,#991b1b)" : "rgba(255,255,255,0.1)",
+              color: wsReady ? "#fff" : "rgba(255,255,255,0.4)", border: "none",
+              boxShadow: wsReady ? "0 6px 24px rgba(220,38,38,0.5)" : "none",
+              fontFamily: "'Cairo','Arial',sans-serif",
+            }}>انضم للعبة 🃏</motion.button>
+        </motion.div>
       </div>
-
-      {error && <p style={{ color: "#f87171", marginBottom: 14, fontSize: 13 }}>{error}</p>}
-
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>اسمك في اللعبة</label>
-      <input value={myName} onChange={e => setMyName(e.target.value)} placeholder="أدخل اسمك..."
-        style={{ width: "100%", marginTop: 6, marginBottom: 18, padding: "14px 16px", borderRadius: 14,
-          background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(220,38,38,0.5)", color: "#fff",
-          fontSize: 16, fontWeight: 600, outline: "none", boxSizing: "border-box",
-          fontFamily: "'Cairo','Arial',sans-serif" }} />
-
-      <label style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 700 }}>كود الغرفة</label>
-      <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="مثال: ABCD"
-        style={{ width: "100%", marginTop: 6, marginBottom: 28, padding: "14px 16px", borderRadius: 14,
-          background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.2)", color: "#fff",
-          fontSize: 22, fontWeight: 900, outline: "none", boxSizing: "border-box",
-          letterSpacing: "0.15em", textAlign: "center", fontFamily: "monospace" }} />
-
-      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-        onClick={joinRoom} disabled={!wsReady}
-        style={{
-          width: "100%", padding: "16px", borderRadius: 16, fontWeight: 900, fontSize: 18, cursor: "pointer",
-          background: wsReady ? "linear-gradient(135deg,#dc2626,#991b1b)" : "rgba(255,255,255,0.1)",
-          color: wsReady ? "#fff" : "rgba(255,255,255,0.4)", border: "none",
-          boxShadow: wsReady ? "0 6px 24px rgba(220,38,38,0.5)" : "none",
-          fontFamily: "'Cairo','Arial',sans-serif",
-        }}>انضم للعبة 🃏</motion.button>
-    </motion.div>
+    </div>
   );
 
   // ─── GAME SCREEN ──────────────────────────────────────────────────────────
@@ -1018,63 +1174,101 @@ export default function UnoGame() {
             </div>
           </motion.div>
 
-          {/* Players */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          {/* Players header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
             <Users size={16} color="#dc2626" />
             <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 700, fontSize: 15 }}>
               {gs.players.length}/4 لاعبين {gs.players.length === 4 ? "🔒 كاملة" : `(تبقى ${4 - gs.players.length})`}
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+          {/* Square player cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
             {gs.players.map(p => {
               const isMe = p.id === myId;
-              const playerColor = ["#dc2626","#2563eb","#16a34a","#ca8a04","#7c3aed"][
-                gs.players.indexOf(p) % 5
-              ];
+              const { avatarId, name: displayName } = p.isBot
+                ? { avatarId: 0 as AvatarId, name: p.name }
+                : decodePlayerName(p.name);
+              const av = getAvatar(p.isBot ? 0 : avatarId);
               const diffLabel: Record<string, string> = { easy: "سهل", medium: "متوسط", hard: "صعب" };
               return (
-                <motion.div key={p.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                <motion.div key={p.id}
+                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
                   style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    background: isMe ? `${playerColor}18` : p.isBot ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.06)",
-                    border: `1.5px solid ${isMe ? playerColor : p.isBot ? "rgba(124,58,237,0.45)" : playerColor + "33"}`,
-                    borderRadius: 14, padding: "10px 12px", position: "relative",
-                    boxShadow: isMe ? `0 0 16px ${playerColor}30` : "none",
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    borderRadius: 16, padding: "16px 8px 12px",
+                    background: isMe
+                      ? av.bg
+                      : p.isBot
+                        ? "rgba(124,58,237,0.14)"
+                        : "rgba(255,255,255,0.06)",
+                    border: isMe
+                      ? `2px solid ${av.glow}`
+                      : p.isBot
+                        ? "2px solid rgba(124,58,237,0.45)"
+                        : "2px solid rgba(255,255,255,0.1)",
+                    boxShadow: isMe ? `0 0 20px ${av.glow}44` : "none",
+                    position: "relative",
+                    cursor: "default",
                   }}>
+                  {/* Avatar circle */}
                   <div style={{
-                    width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-                    background: p.isBot ? "rgba(124,58,237,0.25)" : playerColor + "33",
-                    border: `2px solid ${p.isBot ? "#7c3aed" : playerColor}`,
+                    width: 52, height: 52, borderRadius: "50%", marginBottom: 8,
+                    background: p.isBot ? "rgba(124,58,237,0.3)" : av.bg,
+                    border: `3px solid ${isMe ? av.glow : "rgba(255,255,255,0.2)"}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: p.isBot ? 20 : 17, fontWeight: 900,
-                    color: p.isBot ? "#a78bfa" : playerColor,
-                  }}>{p.isBot ? "🤖" : p.name.trim()[0]?.toUpperCase()}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#fff", fontWeight: 800, fontSize: 13,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.name}
-                      {isMe && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, marginRight: 4 }}>(أنت)</span>}
-                    </div>
-                    {p.isHost && <div style={{ color: "#dc2626", fontSize: 10, fontWeight: 700 }}>هوست 👑</div>}
-                    {p.isBot && <div style={{ color: "#a78bfa", fontSize: 10, fontWeight: 700 }}>
-                      بوت · {diffLabel[p.difficulty ?? "easy"]}
-                    </div>}
+                    fontSize: 26,
+                    boxShadow: isMe ? `0 0 16px ${av.glow}88` : "0 3px 10px rgba(0,0,0,0.5)",
+                  }}>
+                    {p.isBot ? "🤖" : av.emoji}
                   </div>
+                  {/* Name */}
+                  <div style={{
+                    color: isMe ? "#fff" : "rgba(255,255,255,0.8)",
+                    fontWeight: 800, fontSize: 11,
+                    textAlign: "center", maxWidth: "100%",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    marginBottom: 3,
+                  }}>
+                    {displayName}{isMe && " ⭐"}
+                  </div>
+                  {/* Badges */}
+                  {p.isHost && (
+                    <div style={{ color: "#fbbf24", fontSize: 9, fontWeight: 700 }}>هوست 👑</div>
+                  )}
+                  {p.isBot && (
+                    <div style={{ color: "#a78bfa", fontSize: 9, fontWeight: 700 }}>
+                      🤖 {diffLabel[p.difficulty ?? "easy"]}
+                    </div>
+                  )}
+                  {/* Remove bot button */}
                   {amHost && p.isBot && (
                     <button
                       onClick={() => send({ type: "uno:remove_bot", botId: p.id })}
-                      title="حذف البوت"
                       style={{
-                        background: "rgba(220,38,38,0.2)", border: "1px solid rgba(220,38,38,0.4)",
-                        borderRadius: 8, width: 26, height: 26, display: "flex", alignItems: "center",
-                        justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fca5a5",
-                        fontSize: 12, padding: 0,
+                        position: "absolute", top: 6, left: 6,
+                        background: "rgba(220,38,38,0.3)", border: "none",
+                        borderRadius: 6, width: 20, height: 20, display: "flex", alignItems: "center",
+                        justifyContent: "center", cursor: "pointer", color: "#fca5a5",
+                        fontSize: 10, padding: 0,
                       }}>✕</button>
                   )}
                 </motion.div>
               );
             })}
+            {/* Empty slot placeholders */}
+            {Array.from({ length: Math.max(0, 4 - gs.players.length) }).map((_, i) => (
+              <div key={`empty-${i}`} style={{
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                borderRadius: 16, padding: "16px 8px",
+                background: "rgba(255,255,255,0.03)",
+                border: "2px dashed rgba(255,255,255,0.1)",
+                minHeight: 120, color: "rgba(255,255,255,0.2)", fontSize: 11, fontWeight: 600,
+              }}>
+                <Users size={22} color="rgba(255,255,255,0.2)" style={{ marginBottom: 6 }} />
+                ينتظر...
+              </div>
+            ))}
           </div>
 
           {/* ── Add Bot ── */}
@@ -1162,7 +1356,7 @@ export default function UnoGame() {
                 style={{ fontSize: 80, marginBottom: 12 }}>🎉</motion.div>
               <h1 style={{ fontSize: 32, fontWeight: 900, color: "#fff",
                 textShadow: "0 0 30px rgba(220,38,38,0.8)", marginBottom: 8 }}>
-                {isWinner ? "مبروك! أنت فزت! 🏆" : `${winner?.name ?? ""} فاز!`}
+                {isWinner ? "مبروك! أنت فزت! 🏆" : `${winner ? (winner.isBot ? winner.name : decodePlayerName(winner.name).name) : ""} فاز!`}
               </h1>
               <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }}>UNO! اللعبة انتهت</p>
             </div>
@@ -1186,7 +1380,7 @@ export default function UnoGame() {
                     {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
                   </div>
                   <div style={{ flex: 1, color: p.id === myId ? "#fca5a5" : "#fff", fontWeight: 700, fontSize: 14 }}>
-                    {p.name}{p.id === myId && " (أنت)"}
+                    {p.isBot ? p.name : decodePlayerName(p.name).name}{p.id === myId && " (أنت)"}
                   </div>
                   <div style={{ color: "#ca8a04", fontWeight: 900, fontSize: 16 }}>
                     {p.score} {p.score === 1 ? "فوز" : "فوز"}
@@ -1276,17 +1470,19 @@ export default function UnoGame() {
             )}
           </AnimatePresence>
 
-          {/* ── Back + Chat (top-left, fixed) ── */}
+          {/* ── Top-left controls (fixed) ── */}
           <div style={{
             position: "fixed", top: 10, left: 10, zIndex: 60,
             display: "flex", alignItems: "center", gap: 7,
           }}>
+            {/* Back */}
             <button onClick={() => navigate("/")} style={{
               background: "rgba(8,4,1,0.9)", border: "1px solid rgba(255,255,255,0.15)",
               borderRadius: 8, color: "rgba(255,255,255,0.85)", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
               padding: "5px 9px", backdropFilter: "blur(10px)",
             }}><ArrowRight size={12}/>رجوع</button>
+            {/* Chat */}
             <button onClick={() => setChatOpen(v => !v)} style={{
               background: "rgba(8,4,1,0.9)", border: "1px solid rgba(255,255,255,0.15)",
               borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "#fff",
@@ -1302,6 +1498,17 @@ export default function UnoGame() {
                 </div>
               )}
             </button>
+            {/* Volume slider */}
+            <div style={{
+              background: "rgba(8,4,1,0.88)", border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 8, padding: "4px 8px", backdropFilter: "blur(10px)",
+              display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <span style={{ fontSize: 11 }}>{soundVol === 0 ? "🔇" : "🔊"}</span>
+              <input type="range" min={0} max={1} step={0.05} value={soundVol}
+                onChange={e => setSoundVol(parseFloat(e.target.value))}
+                style={{ width: 60, accentColor: "#c87a20", cursor: "pointer" }} />
+            </div>
             {gs.drawStack > 0 && (
               <motion.div animate={{ scale: [1, 1.18, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}
                 style={{ background: "#dc2626", color: "#fff", fontWeight: 900, fontSize: 11,
@@ -1472,27 +1679,6 @@ export default function UnoGame() {
                 </div>
               </div>
 
-              {/* Volume — bottom-right, glassmorphism */}
-              <div style={{
-                position: "absolute", bottom: 14, right: 14, zIndex: 15,
-                background: "rgba(12,6,2,0.55)", backdropFilter: "blur(18px)",
-                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12,
-                padding: "8px 13px 10px",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
-                minWidth: 140,
-              }}>
-                <div style={{ color: "rgba(255,255,255,0.82)", fontSize: 10, fontWeight: 600, textAlign: "center", marginBottom: 6, letterSpacing: "0.06em" }}>
-                  Volume
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 12, lineHeight: 1 }}>🔇</span>
-                  <input type="range" min={0} max={1} step={0.05} value={soundVol}
-                    onChange={e => setSoundVol(parseFloat(e.target.value))}
-                    style={{ flex: 1, accentColor: "#c87a20", cursor: "pointer" }} />
-                  <span style={{ fontSize: 12, lineHeight: 1 }}>🔊</span>
-                </div>
-              </div>
-
             </div>
             {/* ═══ END TABLE ═══ */}
 
@@ -1606,7 +1792,7 @@ export default function UnoGame() {
                 display: "flex", justifyContent: "space-between", padding: "0 12px",
               }}>
                 <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: 800 }}>
-                  {me?.name ?? "أنت"}{isMyTurn ? " ⚡" : ""}
+                  {me ? decodePlayerName(me.name).name : "أنت"}{isMyTurn ? " ⚡" : ""}
                 </div>
                 <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700 }}>
                   {myHand.length} ورقة{!isMyTurn && " — انتظر..."}
