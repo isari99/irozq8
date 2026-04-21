@@ -11,6 +11,7 @@ export interface UnoWS extends WebSocket {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Color = "red" | "blue" | "green" | "yellow";
 type WildColor = Color | "wild";
+type Difficulty = "easy" | "medium" | "hard";
 
 export interface UnoCard {
   id: string;
@@ -21,13 +22,15 @@ export interface UnoCard {
 
 interface UnoPlayer {
   id: string;
-  ws: UnoWS;
+  ws: UnoWS | null;
   name: string;
   hand: UnoCard[];
   saidUno: boolean;
   isHost: boolean;
   isConnected: boolean;
   score: number;
+  isBot: boolean;
+  difficulty: Difficulty;
 }
 
 interface ChatMsg {
@@ -52,6 +55,7 @@ interface UnoRoom {
   lastAction: string;
   chat: ChatMsg[];
   unoTimers: Map<string, ReturnType<typeof setTimeout>>;
+  botTimers: Map<string, ReturnType<typeof setTimeout>>;
 }
 
 const rooms = new Map<string, UnoRoom>();
@@ -140,7 +144,7 @@ function peekNext(room: UnoRoom): UnoPlayer | null {
 // ─── Broadcast ────────────────────────────────────────────────────────────────
 function broadcast(room: UnoRoom) {
   room.players.forEach((player, myIdx) => {
-    if (player.ws.readyState !== WebSocket.OPEN) return;
+    if (!player.ws || player.ws.readyState !== WebSocket.OPEN) return;
     const isCurrentPlayer = myIdx === room.currentPlayerIndex;
     const top = topCard(room);
 
@@ -157,6 +161,8 @@ function broadcast(room: UnoRoom) {
         isConnected: p.isConnected,
         isCurrentPlayer: i === room.currentPlayerIndex,
         score: p.score,
+        isBot: p.isBot,
+        difficulty: p.difficulty,
       })),
       myHand: player.hand,
       myPlayerIndex: myIdx,
@@ -180,7 +186,7 @@ function broadcast(room: UnoRoom) {
 // ─── UNO Window ──────────────────────────────────────────────────────────────
 function scheduleUnoPenalty(room: UnoRoom, playerId: string) {
   const player = room.players.find(p => p.id === playerId);
-  if (!player || player.hand.length !== 1 || player.saidUno) return;
+  if (!player || player.hand.length !== 1 || player.saidUno || player.isBot) return;
 
   const timer = setTimeout(() => {
     room.unoTimers.delete(playerId);
@@ -194,6 +200,170 @@ function scheduleUnoPenalty(room: UnoRoom, playerId: string) {
 
   if (room.unoTimers.has(playerId)) clearTimeout(room.unoTimers.get(playerId));
   room.unoTimers.set(playerId, timer);
+}
+
+// ─── Bot AI ───────────────────────────────────────────────────────────────────
+function pickBotColor(bot: UnoPlayer): Color {
+  const colorCount: Record<Color, number> = { red: 0, blue: 0, green: 0, yellow: 0 };
+  bot.hand.forEach(c => { if (c.color !== "wild") colorCount[c.color as Color]++; });
+  const sorted = (Object.entries(colorCount) as [Color, number][]).sort((a, b) => b[1] - a[1]);
+  return sorted[0]?.[0] ?? "red";
+}
+
+function botAI(room: UnoRoom, bot: UnoPlayer): void {
+  const top = topCard(room);
+  if (!top) return;
+
+  // ── Handle pending wild (color choice) ──
+  if (room.pendingWild) {
+    const chosenColor = pickBotColor(bot);
+    room.currentColor = chosenColor;
+    room.pendingWild = false;
+
+    if (room.drawStack > 0) {
+      room.currentPlayerIndex = advance(room, 1);
+      const nextP = room.players[room.currentPlayerIndex];
+      if (nextP) {
+        const drawn = drawFrom(room, room.drawStack);
+        nextP.hand.push(...drawn);
+        room.lastAction = `${bot.name} اختار ${colorLabel(chosenColor)} - ${nextP.name} سحب ${room.drawStack} أوراق! 💀`;
+        room.drawStack = 0;
+        room.currentPlayerIndex = advance(room, 1);
+      }
+    } else {
+      room.currentPlayerIndex = advance(room, 1);
+      room.lastAction = `${bot.name} اختار ${colorLabel(chosenColor)} 🎨`;
+    }
+    return;
+  }
+
+  // ── Find playable cards ──
+  let playable = bot.hand.filter(c => canPlay(c, top, room.currentColor));
+  if (room.drawStack > 0) {
+    playable = playable.filter(c => (c.type === "draw2" && top.type === "draw2") || c.type === "wild4");
+  }
+
+  // ── No playable card → draw ──
+  if (playable.length === 0) {
+    if (room.drawStack > 0) {
+      const drawn = drawFrom(room, room.drawStack);
+      bot.hand.push(...drawn);
+      room.lastAction = `${bot.name} سحب ${drawn.length} أوراق 💀`;
+      room.drawStack = 0;
+      room.currentPlayerIndex = advance(room, 1);
+    } else {
+      const drawn = drawFrom(room, 1);
+      bot.hand.push(...drawn);
+      const drawnCard = drawn[0];
+      if (drawnCard && canPlay(drawnCard, top, room.currentColor)) {
+        // Play the drawn card immediately
+        bot.hand.splice(bot.hand.length - 1, 1);
+        bot.saidUno = false;
+        room.discardPile.push(drawnCard);
+        if (drawnCard.color !== "wild") room.currentColor = drawnCard.color as Color;
+        if (bot.hand.length === 0) {
+          room.winner = bot.id;
+          room.phase = "gameover";
+          bot.score += 1;
+          room.lastAction = `🎉 ${bot.name} فاز! UNO! 🎉`;
+          return;
+        }
+        if (bot.hand.length === 1) { bot.saidUno = true; }
+        applyCard(room, drawnCard, bot);
+      } else {
+        room.lastAction = `${bot.name} سحب ورقة وانتهى دوره`;
+        room.currentPlayerIndex = advance(room, 1);
+      }
+    }
+    return;
+  }
+
+  // ── Choose card by difficulty ──
+  let chosen: UnoCard;
+
+  if (bot.difficulty === "easy") {
+    chosen = playable[Math.floor(Math.random() * playable.length)];
+
+  } else if (bot.difficulty === "medium") {
+    const actions = playable.filter(c => c.type !== "number");
+    const pool = actions.length > 0 ? actions : playable;
+    chosen = pool[Math.floor(Math.random() * pool.length)];
+
+  } else {
+    // Hard: prefer same-color action > same-color number > wild > wild4
+    const sameColor = playable.filter(c => c.color === room.currentColor);
+    const sameColorActions = sameColor.filter(c => c.type !== "number");
+    const nonWild4 = playable.filter(c => c.type !== "wild4");
+    if (sameColorActions.length > 0) {
+      chosen = sameColorActions[Math.floor(Math.random() * sameColorActions.length)];
+    } else if (sameColor.length > 0) {
+      chosen = sameColor[Math.floor(Math.random() * sameColor.length)];
+    } else if (nonWild4.length > 0) {
+      chosen = nonWild4[Math.floor(Math.random() * nonWild4.length)];
+    } else {
+      chosen = playable[0];
+    }
+  }
+
+  // ── Play the card ──
+  const cardIdx = bot.hand.findIndex(c => c.id === chosen.id);
+  if (cardIdx < 0) return;
+
+  bot.hand.splice(cardIdx, 1);
+  bot.saidUno = false;
+  room.discardPile.push(chosen);
+  if (chosen.color !== "wild") room.currentColor = chosen.color as Color;
+
+  // Win check
+  if (bot.hand.length === 0) {
+    room.winner = bot.id;
+    room.phase = "gameover";
+    bot.score += 1;
+    room.lastAction = `🎉 ${bot.name} فاز! UNO! 🎉`;
+    return;
+  }
+
+  // Bots always call UNO
+  if (bot.hand.length === 1) {
+    bot.saidUno = true;
+    room.lastAction = `${bot.name} قال UNO! 🎉`;
+  }
+
+  applyCard(room, chosen, bot);
+}
+
+// ─── Bot Turn Scheduler ───────────────────────────────────────────────────────
+function scheduleBotTurn(room: UnoRoom) {
+  if (room.phase !== "playing") return;
+
+  const currentPlayer = room.players[room.currentPlayerIndex];
+  if (!currentPlayer?.isBot) return;
+
+  // Clear existing timer for this bot if any
+  const existingTimer = room.botTimers.get(currentPlayer.id);
+  if (existingTimer) clearTimeout(existingTimer);
+
+  const delay: Record<Difficulty, number> = { easy: 1600, medium: 1200, hard: 800 };
+  const ms = delay[currentPlayer.difficulty] + Math.random() * 400;
+
+  const timer = setTimeout(() => {
+    room.botTimers.delete(currentPlayer.id);
+    if (!rooms.has(room.code)) return;
+    if (room.phase !== "playing") return;
+    if (room.players[room.currentPlayerIndex]?.id !== currentPlayer.id) return;
+
+    botAI(room, currentPlayer);
+
+    if (room.phase === "gameover") {
+      broadcast(room);
+      return;
+    }
+
+    broadcast(room);
+    scheduleBotTurn(room); // chain to next bot if applicable
+  }, ms);
+
+  room.botTimers.set(currentPlayer.id, timer);
 }
 
 // ─── Start Game ───────────────────────────────────────────────────────────────
@@ -303,7 +473,11 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
 
     const room: UnoRoom = {
       code,
-      players: [{ id: playerId, ws, name, hand: [], saidUno: false, isHost: true, isConnected: true, score: 0 }],
+      players: [{
+        id: playerId, ws, name, hand: [], saidUno: false,
+        isHost: true, isConnected: true, score: 0,
+        isBot: false, difficulty: "easy",
+      }],
       phase: "lobby",
       currentPlayerIndex: 0,
       direction: 1,
@@ -316,6 +490,7 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
       lastAction: "",
       chat: [],
       unoTimers: new Map(),
+      botTimers: new Map(),
     };
 
     rooms.set(code, room);
@@ -339,7 +514,11 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
     ws.unoRoomCode = code;
     ws.unoPlayerId = playerId;
 
-    room.players.push({ id: playerId, ws, name, hand: [], saidUno: false, isHost: false, isConnected: true, score: 0 });
+    room.players.push({
+      id: playerId, ws, name, hand: [], saidUno: false,
+      isHost: false, isConnected: true, score: 0,
+      isBot: false, difficulty: "easy",
+    });
     ws.send(JSON.stringify({ type: "uno:joined", code, playerId }));
     broadcast(room);
     return;
@@ -351,11 +530,60 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
   const player = room.players.find(p => p.id === ws.unoPlayerId);
   if (!player) return;
 
+  // ── Add Bot ──
+  if (type === "uno:add_bot") {
+    if (!player.isHost || room.phase !== "lobby") return;
+    if (room.players.length >= 10) {
+      ws.send(JSON.stringify({ type: "uno:error", message: "الغرفة ممتلئة (الحد الأقصى 10 لاعبين)" }));
+      return;
+    }
+
+    const difficulty = (msg.difficulty as Difficulty) ?? "easy";
+    const botCount = room.players.filter(p => p.isBot).length + 1;
+    const botId = `bot_${Math.random().toString(36).slice(2, 8)}`;
+    const diffLabel: Record<Difficulty, string> = { easy: "سهل", medium: "متوسط", hard: "صعب" };
+
+    room.players.push({
+      id: botId,
+      ws: null,
+      name: `Bot ${botCount}`,
+      hand: [],
+      saidUno: false,
+      isHost: false,
+      isConnected: true,
+      score: 0,
+      isBot: true,
+      difficulty,
+    });
+
+    room.lastAction = `تم إضافة بوت (${diffLabel[difficulty]}) 🤖`;
+    broadcast(room);
+    return;
+  }
+
+  // ── Remove Bot ──
+  if (type === "uno:remove_bot") {
+    if (!player.isHost || room.phase !== "lobby") return;
+    const botId = msg.botId as string;
+    const bot = room.players.find(p => p.id === botId && p.isBot);
+    if (!bot) return;
+
+    room.players = room.players.filter(p => p.id !== botId);
+    // Re-number remaining bots
+    let botNum = 1;
+    room.players.forEach(p => { if (p.isBot) p.name = `Bot ${botNum++}`; });
+
+    room.lastAction = `تم حذف ${bot.name} 🗑`;
+    broadcast(room);
+    return;
+  }
+
   // ── Start Game ──
   if (type === "uno:start") {
     if (!player.isHost || room.phase !== "lobby" || room.players.length < 2) return;
     startGame(room);
     broadcast(room);
+    scheduleBotTurn(room);
     return;
   }
 
@@ -388,6 +616,7 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
     room.chat = [];
     startGame(room);
     broadcast(room);
+    scheduleBotTurn(room);
     return;
   }
 
@@ -406,7 +635,6 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
     room.pendingWild = false;
 
     if (room.drawStack > 0) {
-      // Apply draw to next player
       room.currentPlayerIndex = advance(room, 1);
       const nextP = room.players[room.currentPlayerIndex];
       if (nextP) {
@@ -423,6 +651,7 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
 
     scheduleUnoPenalty(room, player.id);
     broadcast(room);
+    scheduleBotTurn(room);
     return;
   }
 
@@ -440,7 +669,6 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
       return;
     }
 
-    // If draw stack active, can only play matching draw type
     if (room.drawStack > 0) {
       const validStack = (card.type === "draw2" && top.type === "draw2") || card.type === "wild4";
       if (!validStack) {
@@ -449,13 +677,11 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
       }
     }
 
-    // Play the card
     player.hand.splice(cardIdx, 1);
     player.saidUno = false;
     room.discardPile.push(card);
     if (card.color !== "wild") room.currentColor = card.color as Color;
 
-    // Check win
     if (player.hand.length === 0) {
       room.winner = player.id;
       room.phase = "gameover";
@@ -468,6 +694,7 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
     applyCard(room, card, player);
     scheduleUnoPenalty(room, player.id);
     broadcast(room);
+    scheduleBotTurn(room);
     return;
   }
 
@@ -487,7 +714,6 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
       const drawnCard = drawn[0];
       if (drawnCard && top && canPlay(drawnCard, top, room.currentColor)) {
         room.lastAction = `${player.name} سحب ورقة (يمكنك لعبها)`;
-        // Keep turn on current player so they can optionally play it
       } else {
         room.lastAction = `${player.name} سحب ورقة وانتهى دوره`;
         room.currentPlayerIndex = advance(room, 1);
@@ -495,6 +721,7 @@ export function handleUnoMessage(ws: UnoWS, msg: Record<string, unknown>) {
     }
 
     broadcast(room);
+    scheduleBotTurn(room);
     return;
   }
 }
@@ -514,19 +741,23 @@ export function handleUnoDisconnect(ws: UnoWS) {
   if (room.phase === "lobby") {
     room.players = room.players.filter(p => p.id !== playerId);
     if (room.players.length === 0) { rooms.delete(code); return; }
-    if (player?.isHost && room.players.length > 0) room.players[0].isHost = true;
+    if (player?.isHost) {
+      const nextHuman = room.players.find(p => !p.isBot);
+      if (nextHuman) nextHuman.isHost = true;
+      else if (room.players.length > 0) room.players[0].isHost = true;
+    }
   }
 
   if (room.phase === "playing") {
-    // If current player disconnected, advance turn
     if (room.players[room.currentPlayerIndex]?.id === playerId) {
       room.currentPlayerIndex = advance(room, 1);
       room.lastAction = `${player?.name} انقطع اتصاله، الدور انتقل`;
+      scheduleBotTurn(room);
     }
     const connected = room.players.filter(p => p.isConnected && p.id !== playerId);
     if (connected.length < 1) {
       setTimeout(() => {
-        if (rooms.has(code) && room.players.every(p => !p.isConnected)) rooms.delete(code);
+        if (rooms.has(code) && room.players.every(p => !p.isConnected && !p.isBot)) rooms.delete(code);
       }, 120_000);
     }
   }

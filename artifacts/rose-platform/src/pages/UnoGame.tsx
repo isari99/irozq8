@@ -27,6 +27,7 @@ interface PlayerInfo {
   id: string; name: string; cardCount: number;
   saidUno: boolean; isHost: boolean; isConnected: boolean;
   isCurrentPlayer: boolean; score: number;
+  isBot?: boolean; difficulty?: "easy" | "medium" | "hard";
 }
 
 interface ChatMsg { playerId: string; name: string; text: string; ts: number; }
@@ -386,6 +387,7 @@ export default function UnoGame() {
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
   const [lastActionAnim, setLastActionAnim] = useState("");
+  const [botDifficulty, setBotDifficulty] = useState<"easy" | "medium" | "hard">("easy");
 
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
@@ -693,38 +695,94 @@ export default function UnoGame() {
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {gs.players.map(p => {
               const isMe = p.id === myId;
               const playerColor = ["#dc2626","#2563eb","#16a34a","#ca8a04","#7c3aed"][
                 gs.players.indexOf(p) % 5
               ];
+              const diffLabel: Record<string, string> = { easy: "سهل", medium: "متوسط", hard: "صعب" };
               return (
                 <motion.div key={p.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                   style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    background: isMe ? `${playerColor}18` : "rgba(255,255,255,0.06)",
-                    border: `1.5px solid ${isMe ? playerColor : playerColor + "33"}`,
-                    borderRadius: 14, padding: "12px 14px",
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: isMe ? `${playerColor}18` : p.isBot ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.06)",
+                    border: `1.5px solid ${isMe ? playerColor : p.isBot ? "rgba(124,58,237,0.45)" : playerColor + "33"}`,
+                    borderRadius: 14, padding: "10px 12px", position: "relative",
                     boxShadow: isMe ? `0 0 16px ${playerColor}30` : "none",
                   }}>
                   <div style={{
-                    width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                    background: playerColor + "33", border: `2px solid ${playerColor}`,
+                    width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+                    background: p.isBot ? "rgba(124,58,237,0.25)" : playerColor + "33",
+                    border: `2px solid ${p.isBot ? "#7c3aed" : playerColor}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 18, fontWeight: 900, color: playerColor,
-                  }}>{p.name.trim()[0]?.toUpperCase()}</div>
+                    fontSize: p.isBot ? 20 : 17, fontWeight: 900,
+                    color: p.isBot ? "#a78bfa" : playerColor,
+                  }}>{p.isBot ? "🤖" : p.name.trim()[0]?.toUpperCase()}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#fff", fontWeight: 800, fontSize: 14,
+                    <div style={{ color: "#fff", fontWeight: 800, fontSize: 13,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.name}{isMe && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginRight: 4 }}>(أنت)</span>}
+                      {p.name}
+                      {isMe && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, marginRight: 4 }}>(أنت)</span>}
                     </div>
-                    {p.isHost && <div style={{ color: "#dc2626", fontSize: 11, fontWeight: 700 }}>هوست 👑</div>}
+                    {p.isHost && <div style={{ color: "#dc2626", fontSize: 10, fontWeight: 700 }}>هوست 👑</div>}
+                    {p.isBot && <div style={{ color: "#a78bfa", fontSize: 10, fontWeight: 700 }}>
+                      بوت · {diffLabel[p.difficulty ?? "easy"]}
+                    </div>}
                   </div>
+                  {amHost && p.isBot && (
+                    <button
+                      onClick={() => send({ type: "uno:remove_bot", botId: p.id })}
+                      title="حذف البوت"
+                      style={{
+                        background: "rgba(220,38,38,0.2)", border: "1px solid rgba(220,38,38,0.4)",
+                        borderRadius: 8, width: 26, height: 26, display: "flex", alignItems: "center",
+                        justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fca5a5",
+                        fontSize: 12, padding: 0,
+                      }}>✕</button>
+                  )}
                 </motion.div>
               );
             })}
           </div>
+
+          {/* ── Add Bot ── */}
+          {amHost && gs.players.length < 10 && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              style={{ background: "rgba(124,58,237,0.1)", border: "1.5px dashed rgba(124,58,237,0.4)",
+                borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13, marginBottom: 10,
+                display: "flex", alignItems: "center", gap: 6 }}>
+                🤖 إضافة بوت
+              </div>
+              {/* Difficulty selector */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                {(["easy","medium","hard"] as const).map(d => {
+                  const labels = { easy: "سهل", medium: "متوسط", hard: "صعب" };
+                  const active = botDifficulty === d;
+                  return (
+                    <button key={d} onClick={() => setBotDifficulty(d)}
+                      style={{
+                        flex: 1, padding: "6px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                        cursor: "pointer", border: `1.5px solid ${active ? "#7c3aed" : "rgba(124,58,237,0.3)"}`,
+                        background: active ? "rgba(124,58,237,0.35)" : "rgba(124,58,237,0.1)",
+                        color: active ? "#fff" : "#a78bfa",
+                        fontFamily: "'Cairo','Arial',sans-serif",
+                      }}>{labels[d]}</button>
+                  );
+                })}
+              </div>
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                onClick={() => send({ type: "uno:add_bot", difficulty: botDifficulty })}
+                style={{
+                  width: "100%", padding: "10px", borderRadius: 12,
+                  background: "linear-gradient(135deg,#7c3aed,#5b21b6)",
+                  color: "#fff", border: "none", fontWeight: 800, fontSize: 14, cursor: "pointer",
+                  boxShadow: "0 4px 16px rgba(124,58,237,0.4)",
+                  fontFamily: "'Cairo','Arial',sans-serif",
+                }}>+ إضافة بوت</motion.button>
+            </motion.div>
+          )}
 
           {amHost ? (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
