@@ -123,7 +123,9 @@ function topCard(room: UnoRoom): UnoCard | null {
 function canPlay(card: UnoCard, top: UnoCard, activeColor: Color): boolean {
   if (card.type === "wild" || card.type === "wild4") return true;
   if (card.color === activeColor) return true;
-  if (top.type === card.type) return true;
+  // same type for specials (skip/reverse/draw2), NOT for numbers
+  if (card.type !== "number" && top.type === card.type) return true;
+  // same value for number cards
   if (card.type === "number" && top.type === "number" && card.value === top.value) return true;
   return false;
 }

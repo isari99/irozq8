@@ -402,7 +402,7 @@ function PlayerAvatar({ player, size = 44 }: { player: PlayerInfo; size?: number
 // TOP player seat — horizontal card holder
 function TopSeat({ player }: { player: PlayerInfo }) {
   const n = Math.max(1, Math.min(player.cardCount, 7));
-  const cW = 28, cH = 40, overlap = 8;
+  const cW = 30, cH = 43, overlap = 6;
   const totalW = cW + (n - 1) * (cW - overlap);
   const isCurrent = player.isCurrentPlayer;
   return (
@@ -410,33 +410,42 @@ function TopSeat({ player }: { player: PlayerInfo }) {
       display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
       opacity: player.isConnected ? 1 : 0.35,
     }}>
-      <PlayerAvatar player={player} size={44} />
+      <PlayerAvatar player={player} size={46} />
       <div style={{
         color: isCurrent ? "#fff" : "rgba(255,255,255,0.6)",
         fontSize: 10, fontWeight: 800, textAlign: "center",
-        maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>{player.name}</div>
-      {/* Leather horizontal holder */}
+      {/* Wood + leather card holder */}
       <div style={{
-        background: "linear-gradient(180deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
-        border: "1.5px solid rgba(255,190,90,0.3)",
-        borderRadius: 7,
-        padding: "5px 9px 7px",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,190,80,0.12), inset 0 -2px 0 rgba(0,0,0,0.4)",
+        background: "linear-gradient(180deg, #8a4e28 0%, #6a361a 40%, #4a2210 80%, #341608 100%)",
+        border: "2px solid rgba(255,200,100,0.28)",
+        borderRadius: "8px 8px 6px 6px",
+        padding: "6px 10px 10px",
+        boxShadow: [
+          "0 5px 18px rgba(0,0,0,0.7)",
+          "inset 0 1px 0 rgba(255,200,80,0.15)",
+          "inset 0 -3px 0 rgba(0,0,0,0.5)",
+        ].join(", "),
         position: "relative",
       }}>
-        <div style={{ position: "relative", width: totalW, height: cH }}>
+        {/* Slot groove */}
+        <div style={{
+          position: "absolute", top: 6, left: 8, right: 8, height: 3,
+          background: "rgba(0,0,0,0.4)", borderRadius: 2,
+        }} />
+        <div style={{ position: "relative", width: totalW, height: cH, marginTop: 2 }}>
           {Array.from({ length: n }).map((_, i) => (
-            <div key={i} style={{ position: "absolute", left: i * (cW - overlap), zIndex: i }}>
+            <div key={i} style={{ position: "absolute", left: i * (cW - overlap), top: 0, zIndex: i }}>
               <UnoCardBack w={cW} h={cH} />
             </div>
           ))}
         </div>
-        {/* Bottom ridge */}
+        {/* Bottom ledge */}
         <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: 5, borderRadius: "0 0 6px 6px",
-          background: "linear-gradient(180deg, #4a2510, #2a1207)",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 6, borderRadius: "0 0 5px 5px",
+          background: "linear-gradient(180deg, #5a2e14, #2a1207)",
+          boxShadow: "0 3px 6px rgba(0,0,0,0.6)",
         }} />
       </div>
       <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700 }}>
@@ -446,41 +455,52 @@ function TopSeat({ player }: { player: PlayerInfo }) {
   );
 }
 
-// LEFT player seat — vertical card holder, cards fan rightward
+// LEFT player seat — vertical card holder with perspective
 function LeftSeat({ player }: { player: PlayerInfo }) {
   const n = Math.max(1, Math.min(player.cardCount, 6));
-  const cW = 28, cH = 40, overlap = 10;
+  const cW = 30, cH = 43, overlap = 9;
   const totalH = cH + (n - 1) * (cH - overlap);
   const isCurrent = player.isCurrentPlayer;
   return (
     <div style={{
-      display: "flex", flexDirection: "row", alignItems: "center", gap: 7,
+      display: "flex", flexDirection: "row", alignItems: "center", gap: 6,
       opacity: player.isConnected ? 1 : 0.35,
     }}>
-      {/* Vertical leather holder */}
+      {/* Vertical leather holder with perspective */}
       <div style={{
-        background: "linear-gradient(90deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
-        border: "1.5px solid rgba(255,190,90,0.3)",
-        borderRadius: 7,
-        padding: "8px 5px 8px 7px",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.65), inset 1px 0 0 rgba(255,190,80,0.12), inset -2px 0 0 rgba(0,0,0,0.4)",
+        background: "linear-gradient(90deg, #8a4e28 0%, #6a361a 40%, #4a2210 80%, #341608 100%)",
+        border: "2px solid rgba(255,200,100,0.28)",
+        borderRadius: "6px 8px 8px 6px",
+        padding: "8px 8px 8px 6px",
+        boxShadow: [
+          "0 5px 18px rgba(0,0,0,0.7)",
+          "inset 1px 0 0 rgba(255,200,80,0.15)",
+          "inset -3px 0 0 rgba(0,0,0,0.5)",
+        ].join(", "),
         position: "relative",
+        transform: "perspective(180px) rotateY(18deg)",
+        transformOrigin: "left center",
       }}>
-        <div style={{ position: "relative", width: cW, height: totalH }}>
+        {/* Slot groove */}
+        <div style={{
+          position: "absolute", left: 5, top: 6, bottom: 6, width: 3,
+          background: "rgba(0,0,0,0.4)", borderRadius: 2,
+        }} />
+        <div style={{ position: "relative", width: cW, height: totalH, marginLeft: 2 }}>
           {Array.from({ length: n }).map((_, i) => (
-            <div key={i} style={{
-              position: "absolute",
-              top: i * (cH - overlap),
-              zIndex: i,
-              transform: `rotate(${(i - (n - 1) / 2) * 4}deg)`,
-              transformOrigin: "bottom center",
-            }}>
+            <div key={i} style={{ position: "absolute", top: i * (cH - overlap), left: 0, zIndex: i }}>
               <UnoCardBack w={cW} h={cH} />
             </div>
           ))}
         </div>
+        {/* Right ledge */}
+        <div style={{
+          position: "absolute", top: 0, bottom: 0, right: 0, width: 6, borderRadius: "0 5px 5px 0",
+          background: "linear-gradient(90deg, #5a2e14, #2a1207)",
+          boxShadow: "3px 0 6px rgba(0,0,0,0.6)",
+        }} />
       </div>
-      {/* Info */}
+      {/* Player info */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
         <PlayerAvatar player={player} size={40} />
         <div style={{
@@ -495,41 +515,53 @@ function LeftSeat({ player }: { player: PlayerInfo }) {
   );
 }
 
-// RIGHT player seat — vertical card holder, cards fan leftward
+// RIGHT player seat — hologram avatar on pedestal (shown INSIDE the table)
+// Card holder shown on the right edge
 function RightSeat({ player }: { player: PlayerInfo }) {
   const n = Math.max(1, Math.min(player.cardCount, 6));
-  const cW = 28, cH = 40, overlap = 10;
+  const cW = 30, cH = 43, overlap = 9;
   const totalH = cH + (n - 1) * (cH - overlap);
   const isCurrent = player.isCurrentPlayer;
   return (
     <div style={{
-      display: "flex", flexDirection: "row-reverse", alignItems: "center", gap: 7,
+      display: "flex", flexDirection: "row-reverse", alignItems: "center", gap: 6,
       opacity: player.isConnected ? 1 : 0.35,
     }}>
-      {/* Vertical leather holder */}
+      {/* Vertical leather holder with perspective */}
       <div style={{
-        background: "linear-gradient(270deg, #7a4222 0%, #562e14 55%, #3d1f0a 100%)",
-        border: "1.5px solid rgba(255,190,90,0.3)",
-        borderRadius: 7,
-        padding: "8px 7px 8px 5px",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.65), inset -1px 0 0 rgba(255,190,80,0.12), inset 2px 0 0 rgba(0,0,0,0.4)",
+        background: "linear-gradient(270deg, #8a4e28 0%, #6a361a 40%, #4a2210 80%, #341608 100%)",
+        border: "2px solid rgba(255,200,100,0.28)",
+        borderRadius: "8px 6px 6px 8px",
+        padding: "8px 6px 8px 8px",
+        boxShadow: [
+          "0 5px 18px rgba(0,0,0,0.7)",
+          "inset -1px 0 0 rgba(255,200,80,0.15)",
+          "inset 3px 0 0 rgba(0,0,0,0.5)",
+        ].join(", "),
         position: "relative",
+        transform: "perspective(180px) rotateY(-18deg)",
+        transformOrigin: "right center",
       }}>
-        <div style={{ position: "relative", width: cW, height: totalH }}>
+        {/* Slot groove */}
+        <div style={{
+          position: "absolute", right: 5, top: 6, bottom: 6, width: 3,
+          background: "rgba(0,0,0,0.4)", borderRadius: 2,
+        }} />
+        <div style={{ position: "relative", width: cW, height: totalH, marginRight: 2 }}>
           {Array.from({ length: n }).map((_, i) => (
-            <div key={i} style={{
-              position: "absolute",
-              top: i * (cH - overlap),
-              zIndex: i,
-              transform: `rotate(${(i - (n - 1) / 2) * -4}deg)`,
-              transformOrigin: "bottom center",
-            }}>
+            <div key={i} style={{ position: "absolute", top: i * (cH - overlap), left: 0, zIndex: i }}>
               <UnoCardBack w={cW} h={cH} />
             </div>
           ))}
         </div>
+        {/* Left ledge */}
+        <div style={{
+          position: "absolute", top: 0, bottom: 0, left: 0, width: 6, borderRadius: "5px 0 0 5px",
+          background: "linear-gradient(270deg, #5a2e14, #2a1207)",
+          boxShadow: "-3px 0 6px rgba(0,0,0,0.6)",
+        }} />
       </div>
-      {/* Info */}
+      {/* Player info */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
         <PlayerAvatar player={player} size={40} />
         <div style={{
@@ -540,6 +572,78 @@ function RightSeat({ player }: { player: PlayerInfo }) {
         }}>{player.name}</div>
         <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{player.cardCount}</div>
       </div>
+    </div>
+  );
+}
+
+// Hologram avatar pedestal — shown on the table surface for the right player
+function HologramAvatar({ player }: { player: PlayerInfo }) {
+  const isCurrent = player.isCurrentPlayer;
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      gap: 0, position: "relative",
+    }}>
+      {/* Hologram glow ring */}
+      <motion.div
+        animate={isCurrent ? {
+          boxShadow: [
+            "0 0 10px rgba(80,200,255,0.3), 0 0 30px rgba(80,200,255,0.15)",
+            "0 0 20px rgba(80,200,255,0.6), 0 0 50px rgba(80,200,255,0.3)",
+            "0 0 10px rgba(80,200,255,0.3), 0 0 30px rgba(80,200,255,0.15)",
+          ],
+        } : {}}
+        transition={{ repeat: Infinity, duration: 1.5 }}
+        style={{
+          width: 52, height: 52,
+          borderRadius: 6,
+          background: "linear-gradient(135deg, rgba(60,160,220,0.18), rgba(100,60,180,0.12))",
+          border: "1.5px solid rgba(100,200,255,0.6)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 22, color: "rgba(150,220,255,0.9)",
+          boxShadow: "0 0 14px rgba(80,200,255,0.35), inset 0 0 14px rgba(80,200,255,0.1)",
+          backdropFilter: "blur(4px)",
+          position: "relative", zIndex: 2,
+        }}>
+        {player.isBot ? "🤖" : player.name.trim()[0]?.toUpperCase() ?? "?"}
+        {/* Scan lines effect */}
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: 5, overflow: "hidden",
+          background: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(80,200,255,0.04) 3px, rgba(80,200,255,0.04) 4px)",
+          pointerEvents: "none",
+        }} />
+      </motion.div>
+      {/* Pedestal */}
+      <div style={{
+        width: 44, height: 8,
+        background: "linear-gradient(180deg, #5a3010, #3a1e08)",
+        borderRadius: "0 0 4px 4px",
+        border: "1px solid rgba(255,200,100,0.2)",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+      }} />
+      <div style={{
+        width: 36, height: 5,
+        background: "linear-gradient(180deg, #3a1e08, #221208)",
+        borderRadius: "0 0 3px 3px",
+        border: "1px solid rgba(255,180,80,0.15)",
+        boxShadow: isCurrent
+          ? "0 0 12px rgba(80,200,255,0.5)"
+          : "0 0 6px rgba(200,140,40,0.3)",
+      }} />
+      {/* Name */}
+      <div style={{
+        marginTop: 3, color: isCurrent ? "rgba(120,220,255,0.9)" : "rgba(255,255,255,0.55)",
+        fontSize: 9, fontWeight: 800, textAlign: "center",
+        maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        textShadow: isCurrent ? "0 0 8px rgba(80,200,255,0.7)" : "none",
+      }}>{player.name}</div>
+      {player.saidUno && (
+        <div style={{
+          position: "absolute", top: -8, right: -8, zIndex: 10,
+          background: "#dc2626", color: "#fff", fontSize: 7, fontWeight: 900,
+          padding: "2px 5px", borderRadius: 5, border: "1px solid #fff",
+        }}>UNO!</div>
+      )}
     </div>
   );
 }
@@ -690,13 +794,14 @@ export default function UnoGame() {
     if (!gs || !isMyTurn || gs.pendingWild) return false;
     const top = gs.topCard;
     if (!top) return false;
-    const isWild = card.type === "wild" || card.type === "wild4";
-    if (isWild) return true;
+    if (card.type === "wild" || card.type === "wild4") return true;
     if (gs.drawStack > 0) {
       return card.type === "draw2" && top.type === "draw2";
     }
     if (card.color === gs.currentColor) return true;
-    if (top.type === card.type) return true;
+    // same type for specials ONLY (skip/reverse/draw2), NOT for numbers
+    if (card.type !== "number" && top.type === card.type) return true;
+    // same value for numbers
     if (card.type === "number" && top.type === "number" && card.value === top.value) return true;
     return false;
   };
@@ -1164,7 +1269,7 @@ export default function UnoGame() {
             )}
           </AnimatePresence>
 
-          {/* ── Back + Chat buttons (top-left) ── */}
+          {/* ── Back + Chat (top-left) ── */}
           <div style={{
             position: "absolute", top: 10, left: 10, zIndex: 40,
             display: "flex", alignItems: "center", gap: 7,
@@ -1199,25 +1304,24 @@ export default function UnoGame() {
             )}
           </div>
 
-          {/* ── Volume Control (bottom-right, matching image) ── */}
+          {/* ── Volume Control (top-right, matching image) ── */}
           <div style={{
-            position: "absolute", right: 14, bottom: "calc(22% + 12px)", zIndex: 40,
+            position: "absolute", top: 10, right: 10, zIndex: 40,
             background: "rgba(12,8,5,0.88)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 10,
-            padding: "8px 13px 10px",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 10, padding: "7px 12px 9px",
             backdropFilter: "blur(12px)",
             boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
             minWidth: 140,
           }}>
-            <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 600, textAlign: "center", marginBottom: 7, letterSpacing: "0.02em" }}>
+            <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 600, textAlign: "center", marginBottom: 6, letterSpacing: "0.02em" }}>
               Volume
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 13, lineHeight: 1 }}>🔇</span>
               <input type="range" min={0} max={1} step={0.05} value={soundVol}
                 onChange={e => setSoundVol(parseFloat(e.target.value))}
-                style={{ flex: 1, accentColor: "#c87a20", cursor: "pointer", height: 3 }} />
+                style={{ flex: 1, accentColor: "#c87a20", cursor: "pointer" }} />
               <span style={{ fontSize: 13, lineHeight: 1 }}>🔊</span>
             </div>
           </div>
@@ -1292,6 +1396,15 @@ export default function UnoGame() {
                   border: "0.5px solid rgba(255,200,100,0.04)",
                   borderRadius: 4, pointerEvents: "none", zIndex: 4,
                 }} />
+
+                {/* ── Hologram Avatar (upper-right of table, for rightP) ── */}
+                {rightP && (
+                  <div style={{
+                    position: "absolute", top: 14, right: 16, zIndex: 12,
+                  }}>
+                    <HologramAvatar player={rightP} />
+                  </div>
+                )}
 
                 {/* ── CENTER PILES on wood platform ── */}
                 <div style={{
